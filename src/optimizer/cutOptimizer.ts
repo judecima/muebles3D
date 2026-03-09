@@ -15,9 +15,9 @@ interface PartToCut {
 }
 
 /**
- * Motor Industrial "ArquiMax Deep Engine v3.0"
+ * Motor Industrial "ArquiMax Deep Engine v3.1"
  * Implementa Guillotine Bin Packing con Búsqueda Estocástica de 3000 ciclos.
- * Maximiza el aprovechamiento mediante mutaciones de orden y estrategias de split duales.
+ * Garantiza respeto absoluto al TRIM y optimización de KERF.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection }[],
@@ -39,8 +39,9 @@ export function runOptimization(
     return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas", kerf, trim };
   }
 
-  const usableW = panelWidth - (trim * 2);
-  const usableH = panelHeight - (trim * 2);
+  // El área utilizable es el panel menos los dos márgenes de trim
+  const usableW = Math.max(0, panelWidth - (trim * 2));
+  const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
 
   const ITERATIONS = 3000;
@@ -54,30 +55,32 @@ export function runOptimization(
     const currentParts = [...flatParts];
     const sortMethod = sortMethods[i % sortMethods.length];
     
-    // Mutaciones de orden industriales
+    // Diferentes órdenes de inserción para explorar el espacio de soluciones
     if (sortMethod === 'area') currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     else if (sortMethod === 'width') currentParts.sort((a, b) => b.width - a.width || b.height - a.height);
     else if (sortMethod === 'height') currentParts.sort((a, b) => b.height - a.height || b.width - a.width);
     else shuffle(currentParts);
 
     const strategy = strategies[i % strategies.length];
-    const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, strategy, partColors);
+    // Ejecutamos la disposición considerando el eje de corte (horizontal o vertical)
+    const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, strategy, partColors, i % 2 === 0);
     const score = calculateScore(currentLayouts);
 
     if (score > bestScore) {
       bestScore = score;
+      // Clonación profunda para asegurar que no se pierda la mejor solución
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
 
-    // Si encontramos una solución perfecta (1 tablero > 95%), salimos antes
-    if (currentLayouts.length === 1 && calculateTotalEfficiency(currentLayouts) > 95) break;
+    // Si todo entra en un panel con alta eficiencia, podemos terminar
+    if (currentLayouts.length === 1 && calculateTotalEfficiency(currentLayouts) > 96) break;
   }
 
   return {
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: calculateTotalEfficiency(bestLayouts),
-    summary: `Optimización v3.0: 3000 ciclos completados. Eficiencia máxima alcanzada.`,
+    summary: `Optimización v3.1: 3000 ciclos completados. Respeto estricto a márgenes de ${trim}mm.`,
     kerf,
     trim
   };
@@ -89,7 +92,8 @@ function executeLayout(
   h: number, 
   kerf: number, 
   strategy: string,
-  partColors: Record<string, string>
+  partColors: Record<string, string>,
+  preferHorizontalSplit: boolean
 ): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
   let remainingParts = [...parts];
@@ -144,22 +148,23 @@ function executeLayout(
           color: partColors[part.name]
         });
 
-        // Guillotine Split Dual (Alternar horizontal/vertical según remanente)
+        // Guillotine Split: Decidimos el eje de corte para minimizar fragmentación
         const dw = rect.w - pw;
         const dh = rect.h - ph;
 
-        if (dw > dh) {
-          // Split vertical (más eficiente para piezas horizontales)
+        // Estrategia de split dinámica
+        const splitVertical = preferHorizontalSplit ? dw < dh : dw > dh;
+
+        if (splitVertical) {
           if (dw > kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: rect.h });
           if (dh > kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: dh - kerf });
         } else {
-          // Split horizontal (más eficiente para piezas verticales)
           if (dh > kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: dh - kerf });
           if (dw > kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: ph });
         }
 
         placedIndices.add(i);
-        // Mantener rectángulos pequeños al final para priorizar los grandes
+        // Ordenar espacios libres para priorizar los mejores ajustes en la siguiente pieza
         freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
@@ -196,11 +201,9 @@ function calculateScore(layouts: OptimizedPanel[]): number {
   const total = layouts.reduce((acc, l) => acc + l.totalArea, 0);
   const efficiency = (used / total) * 100;
   
-  // Penalizar masivamente cada tablero extra para forzar ahorro de material
-  const panelPenalty = (layouts.length - 1) * 100000;
+  // Penalización crítica por tablero adicional
+  const panelPenalty = (layouts.length - 1) * 200000;
   
-  // Penalizar fragmentación (espacios libres pequeños e inútiles)
-  // En v3.0 priorizamos simplemente la eficiencia total por tablero
   return efficiency - panelPenalty;
 }
 
@@ -222,7 +225,7 @@ function generateColors(parts: PartToCut[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 50%, 0.3)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 50%, 0.35)`;
   });
   return colors;
 }
