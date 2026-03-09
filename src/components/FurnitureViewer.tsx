@@ -1,4 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+
+'use client';
+
+import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { SceneManager } from '@/three/SceneManager';
 import { Part, FurnitureColor } from '@/lib/types';
 
@@ -8,9 +11,15 @@ interface FurnitureViewerProps {
   color: FurnitureColor;
 }
 
-export function FurnitureViewer({ parts, action, color }: FurnitureViewerProps) {
+export const FurnitureViewer = forwardRef(({ parts, action, color }: FurnitureViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SceneManager | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    getScreenshot: () => {
+      return managerRef.current ? managerRef.current.getScreenshot() : '';
+    }
+  }));
 
   useEffect(() => {
     if (containerRef.current && !managerRef.current) {
@@ -59,4 +68,6 @@ export function FurnitureViewer({ parts, action, color }: FurnitureViewerProps) 
   }, [action]);
 
   return <div ref={containerRef} className="w-full h-full touch-none" />;
-}
+});
+
+FurnitureViewer.displayName = 'FurnitureViewer';

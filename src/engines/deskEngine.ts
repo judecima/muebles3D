@@ -1,3 +1,4 @@
+
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
@@ -28,9 +29,14 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
   const drawerW = cabinetInnerW - 26; // Descuento de 26mm para rieles (13mm x 2)
   const drawerD = D - 40; // Margen trasero
   const drawerBoxH = 140; // Altura caja cajón
+  const frontH = 190;
+
+  // Ajuste de altura superior: el primer cajón comienza 10mm debajo de la tapa
+  const startY = effectiveH - T - 10; 
 
   for (let i = 0; i < 2; i++) {
-    const posY = effectiveH - T - 180 - (i * 200);
+    // Calculamos la posición center Y para que el tope del primer frente esté a 10mm de la tapa
+    const posY = startY - (frontH / 2) - (i * (frontH + 10));
     const prefix = `desk-drawer-${i}`;
     
     // 1. Frente del Cajón
@@ -38,7 +44,7 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
       id: `${prefix}-front`, 
       name: `Frente Cajón ${i + 1}`, 
       width: cabinetW - 4, 
-      height: 190, 
+      height: frontH, 
       depth: T, 
       x: cabinetCenterX, 
       y: posY, 
@@ -47,12 +53,9 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
     });
     
     // 2. Caja del Cajón (Piezas independientes)
-    // Laterales del cajón
     parts.push({ id: `${prefix}-side-L`, name: `Lateral Izq. Cajón ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX - drawerW / 2 + T / 2, y: posY, z: D / 2 - drawerD / 2, type: 'drawer' });
     parts.push({ id: `${prefix}-side-R`, name: `Lateral Der. Cajón ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX + drawerW / 2 - T / 2, y: posY, z: D / 2 - drawerD / 2, type: 'drawer' });
-    // Trasera del cajón
     parts.push({ id: `${prefix}-back`, name: `Trasera Cajón ${i + 1}`, width: drawerW - 2 * T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 - drawerD + T / 2, type: 'drawer' });
-    // Base del cajón
     parts.push({ id: `${prefix}-bottom`, name: `Base Cajón ${i + 1}`, width: drawerW - 2 * T, height: 3, depth: drawerD - T, x: cabinetCenterX, y: posY - drawerBoxH / 2 + 1.5, z: D / 2 - drawerD / 2 + T / 2, type: 'drawer' });
 
     // 3. Rieles Metálicos (Fijos a los laterales del módulo)
@@ -78,5 +81,5 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   }
 
-  return { parts, summary: 'Escritorio con módulo cajonera estructural. Cajones con descuento técnico de 26mm para rieles telescópicos.' };
+  return { parts, summary: 'Escritorio estructural Red Arquimax. Cajones con ajuste superior de 10mm y descuento técnico de rieles.' };
 }

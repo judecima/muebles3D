@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -14,7 +15,8 @@ import {
   RefreshCw, 
   Palette,
   Settings2,
-  Undo2
+  Undo2,
+  FileDown
 } from 'lucide-react';
 
 interface ControlPanelProps {
@@ -36,8 +38,12 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
       <CardHeader className="bg-primary text-primary-foreground py-4 sticky top-0 z-10 shadow-sm">
-        <CardTitle className="text-lg font-bold flex items-center gap-2">
-          <Settings2 className="w-5 h-5" /> MuebleCAD 3D
+        <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <Settings2 className="w-5 h-5" /> 
+            <span>Red Arquimax</span>
+          </div>
+          <span className="text-[10px] opacity-70 font-normal">DISEÑADOR TÉCNICO V1.0</span>
         </CardTitle>
       </CardHeader>
       
@@ -83,7 +89,7 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
         {/* Color */}
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1">
-            <Palette className="w-3.5 h-3.5" /> Acabado MDF
+            <Palette className="w-3.5 h-3.5" /> Acabado Alarce
           </Label>
           <Select value={color} onValueChange={(v) => onColorChange(v as FurnitureColor)}>
             <SelectTrigger className="w-full bg-slate-50">
@@ -96,9 +102,15 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
           </Select>
         </div>
 
-        <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-bold shadow-sm" onClick={() => onAction('generate')}>
-          <RefreshCw className="w-4 h-4 mr-2" /> Generar Modelo
-        </Button>
+        <div className="space-y-2">
+          <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-bold shadow-sm" onClick={() => onAction('generate')}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Generar Modelo
+          </Button>
+          
+          <Button className="w-full bg-slate-900 hover:bg-black text-white font-bold" onClick={() => onAction('export-pdf')}>
+            <FileDown className="w-4 h-4 mr-2" /> DESCARGAR PDF
+          </Button>
+        </div>
 
         <div className="pt-4 border-t border-slate-100 space-y-4">
           {/* Puertas */}

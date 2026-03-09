@@ -1,3 +1,4 @@
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Part, FurnitureColor } from '@/lib/types';
@@ -29,7 +30,8 @@ export class SceneManager {
     this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10000);
     this.camera.position.set(1500, 1000, 1500);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Habilitamos preserveDrawingBuffer para capturar capturas de pantalla para el PDF
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.shadowMap.enabled = true;
@@ -176,7 +178,6 @@ export class SceneManager {
 
   public setDrawers(open: boolean) {
     this.partsMap.forEach((obj) => {
-      // Solo mover las piezas tipo 'drawer', los rieles ('hardware') quedan anclados
       if (obj.userData.type === 'drawer') {
         const originalPos = obj.userData.originalPosition as THREE.Vector3;
         obj.position.z = open ? originalPos.z + 400 : originalPos.z;
@@ -204,6 +205,11 @@ export class SceneManager {
       obj.position.copy(originalPos);
       obj.rotation.set(0, 0, 0);
     });
+  }
+
+  public getScreenshot(): string {
+    this.renderer.render(this.scene, this.camera);
+    return this.renderer.domElement.toDataURL('image/png');
   }
 
   private disposeObject(obj: THREE.Object3D) {
