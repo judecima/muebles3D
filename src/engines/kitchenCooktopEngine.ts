@@ -37,6 +37,7 @@ export function kitchenCooktopEngine(dim: FurnitureDimensions): FurnitureModel {
   // 1. Frente Estético
   parts.push({ 
     id: `${prefix}-front-aesthetic`, 
+    groupId: prefix,
     name: 'Frente Estético Anafe', 
     width: drawerFrontW, height: drawerFrontH - 2, depth: T, 
     x: W/2, y: drawerY_Front, z: D/2 + T/2, 
@@ -46,6 +47,7 @@ export function kitchenCooktopEngine(dim: FurnitureDimensions): FurnitureModel {
   // 2. Frente Estructural de Caja (Rebajado)
   parts.push({ 
     id: `${prefix}-box-front`, 
+    groupId: prefix,
     name: 'Frente Estruct. Caja (Rebajado)', 
     width: drawerW - 2*T, height: drawerBoxH, depth: T, 
     x: W/2, y: drawerY_Box, z: D/2 - T/2, 
@@ -53,18 +55,18 @@ export function kitchenCooktopEngine(dim: FurnitureDimensions): FurnitureModel {
   });
 
   // 3. Laterales de Caja
-  parts.push({ id: `${prefix}-box-side-L`, name: 'Lat. Izq. Caja (Rebajado)', width: T, height: drawerBoxH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-  parts.push({ id: `${prefix}-box-side-R`, name: 'Lat. Der. Caja (Rebajado)', width: T, height: drawerBoxH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+  parts.push({ id: `${prefix}-box-side-L`, groupId: prefix, name: 'Lat. Izq. Caja (Rebajado)', width: T, height: drawerBoxH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+  parts.push({ id: `${prefix}-box-side-R`, groupId: prefix, name: 'Lat. Der. Caja (Rebajado)', width: T, height: drawerBoxH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
   
   // 4. Trasera de Caja
-  parts.push({ id: `${prefix}-box-back`, name: 'Trasera Caja (Rebajado)', width: drawerW - 2*T, height: drawerBoxH, depth: T, x: W/2, y: drawerY_Box, z: D/2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+  parts.push({ id: `${prefix}-box-back`, groupId: prefix, name: 'Trasera Caja (Rebajado)', width: drawerW - 2*T, height: drawerBoxH, depth: T, x: W/2, y: drawerY_Box, z: D/2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
   
   // 5. Piso de Caja
-  parts.push({ id: `${prefix}-box-bottom`, name: 'Piso Caja (Rebajado)', width: drawerW - 2*T, height: 3, depth: drawerD, x: W/2, y: drawerY_Box - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
+  parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: 'Piso Caja (Rebajado)', width: drawerW - 2*T, height: 3, depth: drawerD, x: W/2, y: drawerY_Box - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
   
   // Herrajes
-  parts.push({ id: `${prefix}-rail-L`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: T + 6.5, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
-  parts.push({ id: `${prefix}-rail-R`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: W - T - 6.5, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+  parts.push({ id: `${prefix}-rail-L`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: T + 6.5, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+  parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: W - T - 6.5, y: drawerY_Box, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
 
   // --- PUERTAS INFERIORES ---
   const doorH = H - drawerFrontH - T - 8;
@@ -77,7 +79,9 @@ export function kitchenCooktopEngine(dim: FurnitureDimensions): FurnitureModel {
   doorTypes.forEach((type) => {
     const isLeft = type === 'door-left';
     parts.push({ 
-      id: `cook-door-${isLeft ? 'L' : 'R'}`, name: `Puerta ${isLeft ? 'Izquierda' : 'Derecha'}`, 
+      id: `cook-door-${isLeft ? 'L' : 'R'}`, 
+      groupId: `cook-door-${isLeft ? 'L' : 'R'}`,
+      name: `Puerta ${isLeft ? 'Izquierda' : 'Derecha'}`, 
       width: doorW, height: doorH, depth: T, x: isLeft ? doorW / 2 : W - doorW / 2, y: doorY, z: D / 2 + T / 2, 
       type: type, pivot: { x: isLeft ? 0 : W, y: doorY, z: D / 2 },
       cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical',

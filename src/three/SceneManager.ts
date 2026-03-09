@@ -16,6 +16,7 @@ export class SceneManager {
   private mouse = new THREE.Vector2();
 
   private itemStates: Map<string, boolean> = new Map();
+  private animationOffsets: Map<string, number> = new Map(); // Para transiciones suaves
 
   private colors = {
     outline: 0x444444,
@@ -117,8 +118,6 @@ export class SceneManager {
     object.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const originalMaterial = child.material as THREE.MeshStandardMaterial;
-        const originalColor = originalMaterial.color.clone();
-        
         child.material = originalMaterial.clone();
         (child.material as THREE.MeshStandardMaterial).emissive.setHex(this.colors.highlight);
         (child.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.4;
@@ -136,17 +135,47 @@ export class SceneManager {
   private toggleSingleDoor(id: string, open: boolean) {
     const obj = this.partsMap.get(id);
     if (!obj) return;
-
     this.itemStates.set(id, open);
+    // La rotación se aplica en el animate() para suavidad si se desea, 
+    // pero por ahora lo mantenemos directo para coherencia con el motor actual
     const type = obj.userData.type;
+    if (type === 'door-left') obj.rotation.y = open ? -Math.PI / 2 : 0;
+    else if (type === 'door-right') obj.rotation.y = open ? Math.PI / 2 : 0;
+    else if (type === 'door-flip') obj.rotation.x = open ? -1.745 : 0;
+  }
 
-    if (type === 'door-left') {
-      obj.rotation.y = open ? -Math.PI / 2 : 0;
-    } else if (type === 'door-right') {
-      obj.rotation.y = open ? Math.PI / 2 : 0;
-    } else if (type === 'door-flip') {
-      obj.rotation.x = open ? -1.745 : 0; 
-    }
+  private toggleSingleDrawer(groupId: string, open: boolean) {
+    this.itemStates.set(groupId, open);
+  }
+
+  private updateAnimations() {
+    this.partsMap.forEach((obj, id) => {
+      const type = obj.userData.type;
+      const groupId = obj.userData.groupId || id;
+
+      if (type === 'drawer') {
+        const isOpen = !!this.itemStates.get(groupId);
+        let currentOffset = this.animationOffsets.get(groupId) || 0;
+        
+        // Calcular profundidad para el 80% de apertura
+        let depth = 450; 
+        if ((obj as any).geometry?.parameters?.depth) {
+          depth = (obj as any).geometry.parameters.depth;
+        }
+        const targetOffset = isOpen ? depth * 0.8 : 0;
+        
+        // Interpolación suave (ease-out aproximado)
+        if (Math.abs(targetOffset - currentOffset) > 0.1) {
+          currentOffset += (targetOffset - currentOffset) * 0.15;
+          this.animationOffsets.set(groupId, currentOffset);
+        } else {
+          currentOffset = targetOffset;
+        }
+
+        const orig = obj.userData.originalPosition as THREE.Vector3;
+        obj.position.z = orig.z + currentOffset;
+      }
+    });
   }
 
   private updateAllPistons() {
@@ -179,21 +208,12 @@ export class SceneManager {
     });
   }
 
-  private toggleSingleDrawer(groupId: string, open: boolean) {
-    this.itemStates.set(groupId, open);
-    this.partsMap.forEach((obj, id) => {
-      if ((id.startsWith(groupId) || obj.userData.groupId === groupId) && obj.userData.type === 'drawer') {
-        const orig = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = open ? orig.z + 400 : orig.z;
-      }
-    });
-  }
-
   private animate = () => {
     if (!this.renderer || !this.scene || !this.camera) return;
     requestAnimationFrame(this.animate);
     this.controls.update();
-    this.updateAllPistons(); 
+    this.updateAnimations();
+    this.updateAllPistons();
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -205,6 +225,7 @@ export class SceneManager {
     }
     this.partsMap.clear();
     this.itemStates.clear();
+    this.animationOffsets.clear();
 
     const hexBase = COLOR_PALETTE[color];
     const baseColor = new THREE.Color(hexBase);
@@ -217,7 +238,6 @@ export class SceneManager {
       }
 
       let geometry: THREE.BufferGeometry;
-      
       if (part.isHardware && part.name.includes('Bisagra')) {
         const radius = 17.5; 
         const height = 12;
@@ -232,7 +252,6 @@ export class SceneManager {
       }
 
       let material: THREE.MeshStandardMaterial;
-
       if (part.isHardware) {
         let colorVal = this.colors.hinge;
         if (part.name.includes('Riel')) colorVal = this.colors.rail;
@@ -242,7 +261,7 @@ export class SceneManager {
         material = new THREE.MeshStandardMaterial({ color: this.colors.mdf_back, roughness: 0.9 });
       } else {
         const isInternal = part.name.includes('Estante') || 
-                           part.name.includes('Cajón') && !part.name.includes('Frente') ||
+                           (part.name.includes('Cajón') && !part.name.includes('Frente')) ||
                            part.name.includes('Refuerzo') ||
                            part.name.includes('Divisor');
         
@@ -300,7 +319,6 @@ export class SceneManager {
   private createPiston(part: Part) {
     if (!part.pistonConfig) return;
     const config = part.pistonConfig;
-    
     const group = new THREE.Group();
     group.position.set(config.anchorMueble.x, config.anchorMueble.y, config.anchorMueble.z);
 
@@ -326,10 +344,8 @@ export class SceneManager {
 
     const ballGeom = new THREE.SphereGeometry(6, 16, 16);
     const ballMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8 });
-    
     const ballMueble = new THREE.Mesh(ballGeom, ballMat);
     group.add(ballMueble);
-
     const ballPuerta = new THREE.Mesh(ballGeom, ballMat);
     ballPuerta.position.z = rodLen;
     rod.add(ballPuerta);
@@ -350,16 +366,11 @@ export class SceneManager {
     box.getCenter(center);
     const size = new THREE.Vector3();
     box.getSize(size);
-
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = this.camera.fov * (Math.PI / 180);
-    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-
-    cameraDistance *= 2.2;
-
+    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2.2;
     const direction = new THREE.Vector3(1, 0.7, 1).normalize();
     this.camera.position.copy(direction.multiplyScalar(cameraDistance).add(center));
-
     this.controls.target.copy(center);
     this.controls.update();
   }
@@ -378,11 +389,10 @@ export class SceneManager {
     const drawerGroups = new Set<string>();
     this.partsMap.forEach((obj, id) => {
       if (obj.userData.type === 'drawer') {
-        const groupId = obj.userData.groupId || id.split('-').slice(0, 2).join('-');
+        const groupId = obj.userData.groupId || id;
         drawerGroups.add(groupId);
       }
     });
-
     drawerGroups.forEach(groupId => this.toggleSingleDrawer(groupId, open));
   }
 
@@ -390,7 +400,6 @@ export class SceneManager {
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
     const center = new THREE.Vector3();
     box.getCenter(center);
-
     this.partsMap.forEach((obj) => {
       const orig = obj.userData.originalPosition as THREE.Vector3;
       const dir = new THREE.Vector3().subVectors(orig, center).normalize();
@@ -403,37 +412,30 @@ export class SceneManager {
       obj.position.copy(obj.userData.originalPosition);
       obj.rotation.set(0, 0, 0);
       this.itemStates.set(id, false);
-      
-      const groupId = obj.userData.groupId;
-      if (groupId) this.itemStates.set(groupId, false);
+      const groupId = obj.userData.groupId || id;
+      this.itemStates.set(groupId, false);
+      this.animationOffsets.set(groupId, 0);
     });
   }
 
   public getScreenshot(): string {
     if (!this.renderer || !this.scene || !this.camera) return '';
-    
     const originalPos = this.camera.position.clone();
     const originalTarget = this.controls.target.clone();
-    
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
     const center = new THREE.Vector3();
     box.getCenter(center);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    
-    const dist = maxDim * 2.5;
+    const dist = Math.max(size.x, size.y, size.z) * 2.5;
     this.camera.position.set(center.x + dist, center.y + dist, center.z + dist);
     this.controls.target.copy(center);
     this.controls.update();
-    
     this.renderer.render(this.scene, this.camera);
     const data = this.renderer.domElement.toDataURL('image/png');
-    
     this.camera.position.copy(originalPos);
     this.controls.target.copy(originalTarget);
     this.controls.update();
-    
     return data;
   }
 
@@ -452,12 +454,13 @@ export class SceneManager {
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     if (this.renderer) {
       this.renderer.dispose();
-      if (this.renderer.domElement && this.renderer.domElement.parentNode) {
+      if (this.renderer.domElement?.parentNode) {
         this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
       }
     }
-    if (this.controls) this.controls.dispose();
+    this.controls.dispose();
     this.partsMap.clear();
     this.itemStates.clear();
+    this.animationOffsets.clear();
   }
 }
