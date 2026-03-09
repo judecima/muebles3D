@@ -90,7 +90,7 @@ export default function Home() {
 
     doc.setFontSize(22);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("RED ARQUIMAX - Despiece Técnico", 105, 30, { align: 'center' });
+    doc.text("RED ARQUIMAX - Ficha Técnica", 105, 30, { align: 'center' });
     
     if (viewerRef.current && view === '3d') {
       const img = viewerRef.current.getScreenshot();
@@ -101,7 +101,7 @@ export default function Home() {
 
     doc.addPage();
     doc.setFontSize(16);
-    doc.text("Listado de Cortes MDF", 15, 20);
+    doc.text("Listado de Cortes", 15, 20);
     
     const panelRows = parts.filter(p => !p.isHardware).map(p => [
       p.name, p.cutLargo, p.cutAncho, p.cutEspesor, 1, p.grainDirection
@@ -118,8 +118,8 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-50">
-      <aside className="hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0">
+    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-100">
+      <aside className="hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0 z-40">
         <ControlPanel 
           type={type} 
           dimensions={dimensions} 
@@ -145,7 +145,7 @@ export default function Home() {
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-80">
                   <SheetHeader className="sr-only">
-                    <SheetTitle>Configuración del Mueble</SheetTitle>
+                    <SheetTitle>Configuración</SheetTitle>
                   </SheetHeader>
                   <ControlPanel 
                     type={type} 
@@ -162,25 +162,25 @@ export default function Home() {
               </Sheet>
               <div className="flex items-center gap-1">
                 <Settings2 className="w-4 h-4 text-primary" />
-                <span className="text-xs font-bold uppercase text-slate-700 hidden xs:inline">RED ARQUIMAX</span>
+                <span className="text-[10px] font-black uppercase text-slate-800 hidden xs:inline tracking-tighter">RED ARQUIMAX</span>
               </div>
             </div>
 
-            <TabsList className="bg-slate-100 h-9">
-              <TabsTrigger value="3d" className="gap-2 text-xs md:text-sm h-7">
+            <TabsList className="bg-slate-100 h-9 p-1">
+              <TabsTrigger value="3d" className="gap-2 text-[10px] md:text-xs h-7 px-3">
                 <BoxIcon className="w-3.5 h-3.5" /> 
-                <span>Diseño</span>
+                <span className="uppercase font-bold">Diseño 3D</span>
               </TabsTrigger>
-              <TabsTrigger value="optimize" className="gap-2 text-xs md:text-sm h-7">
+              <TabsTrigger value="optimize" className="gap-2 text-[10px] md:text-xs h-7 px-3">
                 <LayoutGrid className="w-3.5 h-3.5" /> 
-                <span>Optimización</span>
+                <span className="uppercase font-bold">Optimizar</span>
               </TabsTrigger>
             </TabsList>
 
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="h-8 px-2 md:px-3" onClick={() => handleAction('export-pdf')}>
-                <FileDown className="w-4 h-4 md:mr-2" /> 
-                <span className="hidden sm:inline text-xs">PDF</span>
+              <Button variant="outline" size="sm" className="h-8 px-2 md:px-3 text-[10px] font-bold" onClick={() => handleAction('export-pdf')}>
+                <FileDown className="w-3.5 h-3.5 md:mr-2" /> 
+                <span className="hidden sm:inline">EXPORTAR</span>
               </Button>
             </div>
           </div>
@@ -188,11 +188,11 @@ export default function Home() {
           <TabsContent value="3d" className="flex-1 m-0 relative bg-slate-100 overflow-hidden flex flex-col data-[state=inactive]:hidden min-h-0">
             <div className="flex-1 relative">
               <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
-              <div className="absolute bottom-4 left-4 pointer-events-none opacity-10">
-                <h2 className="text-3xl md:text-6xl font-black text-primary">RED ARQUIMAX</h2>
+              <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full border border-slate-200 shadow-sm pointer-events-none">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{type}</span>
               </div>
             </div>
-            <div className="h-1/3 md:h-1/3 border-t bg-white min-h-[200px] shrink-0">
+            <div className="h-1/3 border-t bg-white min-h-[200px] shrink-0">
               <CutlistTable parts={parts} />
             </div>
           </TabsContent>
