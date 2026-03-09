@@ -133,8 +133,9 @@ export default function Home() {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("Listado Detallado de Cortes", 15, 20);
+    doc.text("Listado Detallado de Cortes y Herrajes", 15, 20);
     
+    // Piezas MDF
     const panelRows = parts.filter(p => !p.isHardware).map(p => [
       p.name, p.cutLargo, p.cutAncho, p.cutEspesor, 1, p.grainDirection
     ]);
@@ -147,6 +148,24 @@ export default function Home() {
       styles: { font: 'helvetica', fontSize: 9 },
       alternateRowStyles: { fillColor: [250, 250, 250] }
     });
+
+    // Herrajes
+    const aggregatedHardware = parts.filter(p => p.isHardware).reduce((acc, p) => {
+      acc[p.name] = (acc[p.name] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const hardwareRows = Object.entries(aggregatedHardware).map(([name, count]) => [name, count]);
+
+    if (hardwareRows.length > 0) {
+      (doc as any).autoTable({
+        head: [['Herraje', 'Cantidad']],
+        body: hardwareRows,
+        startY: (doc as any).lastAutoTable.finalY + 15,
+        headStyles: { fillColor: [80, 80, 80], font: 'helvetica', fontStyle: 'bold' },
+        styles: { font: 'helvetica', fontSize: 9 }
+      });
+    }
 
     drawWatermark(doc);
     doc.save(`tecnico-red-arquimax-${type}-${Date.now()}.pdf`);

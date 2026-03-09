@@ -44,14 +44,15 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
   const doorW = W / 2 - 2;
   const doorY = H / 2;
   
-  const hingeCount = doorH > 1500 ? 4 : doorH > 900 ? 3 : 2;
+  // Lógica Global de Bisagras
+  const hingeCountPerDoor = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
 
   parts.push({ 
     id: 'k-door-L', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, 
     x: doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-left',
     pivot: { x: 0, y: doorY, z: D / 2 },
     cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'libre',
-    hingeCount
+    hingeCount: hingeCountPerDoor
   });
 
   parts.push({ 
@@ -59,8 +60,17 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     x: W - doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-right',
     pivot: { x: W, y: doorY, z: D / 2 },
     cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'libre',
-    hingeCount
+    hingeCount: hingeCountPerDoor
   });
 
-  return { parts, summary: 'Bajo mesada Red Arquimax con amarres estructurales.', hasDoors: true, hasDrawers: false };
+  // Agregar bisagras al listado de herrajes
+  for(let i=0; i < hingeCountPerDoor * 2; i++) {
+    parts.push({
+      id: `hinge-base-${i}`, name: 'Bisagra Cazoleta 35mm', width: 30, height: 15, depth: 45,
+      x: i < hingeCountPerDoor ? 10 : W - 10, y: H/2, z: D/2, type: 'hardware', isHardware: true,
+      cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
+    });
+  }
+
+  return { parts, summary: 'Bajo mesada Red Arquimax con bisagras calculadas.', hasDoors: true, hasDrawers: false };
 }

@@ -109,8 +109,8 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      // Apertura a 100 grados (aprox 1.74 rad)
-      obj.rotation.x = open ? -1.74 : 0; 
+      // Apertura a 100 grados (1.745 rad)
+      obj.rotation.x = open ? -1.745 : 0; 
       this.updatePistons(open, obj);
     }
   }
