@@ -72,7 +72,7 @@ export class SceneManager {
     if (this.textures.has(color)) return this.textures.get(color)!;
 
     try {
-      return await new Promise((resolve, reject) => {
+      return await new Promise((resolve) => {
         this.textureLoader.load(
           this.textureMap[color],
           (texture) => {
@@ -82,17 +82,15 @@ export class SceneManager {
             resolve(texture);
           },
           undefined,
-          (err) => reject(err)
+          () => resolve(null)
         );
       });
     } catch (e) {
-      console.warn(`Error loading texture for ${color}, using fallback color.`);
       return null;
     }
   }
 
   public async buildFurniture(parts: Part[], color: FurnitureColor) {
-    // 1. Limpieza segura
     while (this.furnitureGroup.children.length > 0) {
       const obj = this.furnitureGroup.children[0];
       this.disposeObject(obj);
@@ -109,8 +107,8 @@ export class SceneManager {
       if (part.isHardware) {
         material = new THREE.MeshStandardMaterial({ 
           color: 0x94a3b8, 
-          roughness: 0.3, 
-          metalness: 0.8 
+          roughness: 0.2, 
+          metalness: 0.9 
         });
       } else {
         const matOptions: THREE.MeshStandardMaterialParameters = {
@@ -124,7 +122,7 @@ export class SceneManager {
           partTexture.repeat.set(part.width / 500, part.height / 500);
           partTexture.needsUpdate = true;
           matOptions.map = partTexture;
-          matOptions.color = 0xffffff; // Reset color to let texture show
+          matOptions.color = 0xffffff;
         }
         
         material = new THREE.MeshStandardMaterial(matOptions);
@@ -136,6 +134,7 @@ export class SceneManager {
 
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
+      mesh.userData.name = part.name;
 
       if ((part.type === 'door-left' || part.type === 'door-right') && part.pivot) {
         const hingeGroup = new THREE.Group();
@@ -177,9 +176,10 @@ export class SceneManager {
 
   public setDrawers(open: boolean) {
     this.partsMap.forEach((obj) => {
+      // Solo mover las piezas tipo 'drawer' (la caja), los rieles ('hardware') quedan fijos
       if (obj.userData.type === 'drawer') {
         const originalPos = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = open ? originalPos.z + 350 : originalPos.z;
+        obj.position.z = open ? originalPos.z + 400 : originalPos.z;
       }
     });
   }
@@ -193,7 +193,7 @@ export class SceneManager {
       const originalPos = obj.userData.originalPosition as THREE.Vector3;
       const direction = new THREE.Vector3().subVectors(originalPos, center).normalize();
       if (direction.length() < 0.1) direction.set(0, 1, 0);
-      const targetPos = originalPos.clone().add(direction.multiplyScalar(factor * 250));
+      const targetPos = originalPos.clone().add(direction.multiplyScalar(factor * 300));
       obj.position.copy(targetPos);
     });
   }
