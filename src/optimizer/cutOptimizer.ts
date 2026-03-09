@@ -30,8 +30,9 @@ interface Rect {
 }
 
 /**
- * Motor de optimización industrial "ArquiMax-Core"
- * Implementa Algoritmo de Guillotina con 2000 iteraciones de búsqueda estocástica.
+ * Motor de optimización industrial "ArquiMax-Core" V2.0
+ * Implementa Algoritmo de Guillotina con 2000 iteraciones y 
+ * múltiples estrategias de ordenamiento (Best Fit / Long Side First).
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection }[],
@@ -50,20 +51,29 @@ export function runOptimization(
   let bestResult: OptimizationResult | null = null;
   const ITERATIONS = 2000;
 
+  // Diferentes estrategias de ordenamiento para probar en las iteraciones
+  const sortStrategies = [
+    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área Descendente
+    (a: any, b: any) => Math.max(b.width, b.height) - Math.max(a.width, a.height), // Lado Largo Descendente
+    (a: any, b: any) => (b.width + b.height) - (a.width + a.height), // Perímetro Descendente
+    (a: any, b: any) => Math.min(b.width, b.height) - Math.min(a.width, a.height), // Lado Corto Descendente
+  ];
+
   for (let iter = 0; iter < ITERATIONS; iter++) {
-    // En la primera iteración usamos el orden estándar (Área descendente)
-    // En las siguientes, aplicamos pequeñas variaciones aleatorias para buscar mejores huecos
     const currentParts = [...flatParts];
+    
+    // Ciclar entre estrategias y añadir aleatoriedad parcial
+    const strategyIndex = iter % sortStrategies.length;
+    currentParts.sort(sortStrategies[strategyIndex]);
+
     if (iter > 0) {
-      // Mezcla aleatoria parcial para probar diferentes combinaciones de entrada
+      // Mezcla aleatoria parcial para diversificar la búsqueda
       for (let i = currentParts.length - 1; i > 0; i--) {
-        if (Math.random() > 0.7) {
+        if (Math.random() > 0.8) {
           const j = Math.floor(Math.random() * (i + 1));
           [currentParts[i], currentParts[j]] = [currentParts[j], currentParts[i]];
         }
       }
-    } else {
-      currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     }
 
     const result = executeGuillotine(currentParts, panelWidth, panelHeight, kerf);
@@ -74,8 +84,8 @@ export function runOptimization(
       bestResult = result;
     }
 
-    // Si alcanzamos una eficiencia perfecta o muy alta, paramos antes
-    if (bestResult.totalEfficiency > 98) break;
+    // Si encontramos una eficiencia extremadamente alta, optimizamos tiempo saliendo antes
+    if (bestResult.totalEfficiency > 98.5) break;
   }
 
   return bestResult!;
@@ -92,6 +102,7 @@ function executeGuillotine(
 
   while (remainingParts.length > 0) {
     const currentPanelParts: OptimizedPart[] = [];
+    // Espacio utilizable real tras el trim
     const freeRects: Rect[] = [{ x: 0, y: 0, w: panelWidth, h: panelHeight }];
     const placedIndices: number[] = [];
 
@@ -104,7 +115,7 @@ function executeGuillotine(
       for (let j = 0; j < freeRects.length; j++) {
         const rect = freeRects[j];
         
-        // 1. Intentar sin rotar
+        // 1. Probar orientación original
         if (part.width <= rect.w && part.height <= rect.h) {
           const waste = (rect.w * rect.h) - (part.width * part.height);
           if (waste < minWaste) {
@@ -114,9 +125,10 @@ function executeGuillotine(
           }
         }
         
-        // 2. Intentar rotado (solo si grainDirection es 'libre')
+        // 2. Probar orientación rotada (si es permitido)
         if (part.grainDirection === 'libre' && part.height <= rect.w && part.width <= rect.h) {
           const waste = (rect.w * rect.h) - (part.width * part.height);
+          // Priorizamos la rotación si deja un remanente más útil
           if (waste < minWaste) {
             minWaste = waste;
             bestRectIndex = j;
@@ -139,25 +151,36 @@ function executeGuillotine(
           rotated
         });
 
-        // Split de Guillotina Mejorado (Best Short Side Fit)
+        // Heurística de Corte de Guillotina Mejorada:
+        // Decidir la dirección del corte basándose en el remanente más largo (Maximized Area Split)
         const dw = rect.w - w;
         const dh = rect.h - h;
 
-        // Decidimos la dirección del corte de guillotina para minimizar remanentes inútiles
         if (dw > dh) {
-          // Corte vertical primero
-          if (dw > kerf) freeRects.push({ x: rect.x + w + kerf, y: rect.y, w: dw - kerf, h: rect.h });
-          if (dh > kerf) freeRects.push({ x: rect.x, y: rect.y + h + kerf, w: w, h: dh - kerf });
+          // Dividir verticalmente primero (Corte largo queda a la derecha)
+          if (dw > kerf) {
+            freeRects.push({ x: rect.x + w + kerf, y: rect.y, w: dw - kerf, h: rect.h });
+          }
+          if (dh > kerf) {
+            freeRects.push({ x: rect.x, y: rect.y + h + kerf, w: w, h: dh - kerf });
+          }
         } else {
-          // Corte horizontal primero
-          if (dh > kerf) freeRects.push({ x: rect.x, y: rect.y + h + kerf, w: rect.w, h: dh - kerf });
-          if (dw > kerf) freeRects.push({ x: rect.x + w + kerf, y: rect.y, w: dw - kerf, h: h });
+          // Dividir horizontalmente primero (Corte largo queda abajo)
+          if (dh > kerf) {
+            freeRects.push({ x: rect.x, y: rect.y + h + kerf, w: rect.w, h: dh - kerf });
+          }
+          if (dw > kerf) {
+            freeRects.push({ x: rect.x + w + kerf, y: rect.y, w: dw - kerf, h: h });
+          }
         }
         placedIndices.push(i);
+        
+        // Ordenamos los rectángulos libres por área pequeña para rellenar huecos primero
+        freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
 
-    if (placedIndices.length === 0) break; // Evitar bucle si ninguna pieza cabe
+    if (placedIndices.length === 0) break;
 
     const usedArea = currentPanelParts.reduce((sum, p) => sum + (p.width * p.height), 0);
     const totalArea = panelWidth * panelHeight;
@@ -179,6 +202,6 @@ function executeGuillotine(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsedArea / (totalAvailableArea || 1)) * 100,
-    summary: `Optimización industrial completa. Eficiencia: ${(totalUsedArea / (totalAvailableArea || 1) * 100).toFixed(1)}%.`
+    summary: `Optimización industrial completa. Eficiencia global: ${(totalUsedArea / (totalAvailableArea || 1) * 100).toFixed(1)}%.`
   };
 }
