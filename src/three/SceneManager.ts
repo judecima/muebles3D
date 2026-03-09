@@ -57,9 +57,7 @@ export class SceneManager {
 
   public clearFurniture() {
     this.furnitureGroup.children.forEach((child) => {
-      if (child instanceof THREE.Group || child instanceof THREE.Mesh) {
-        this.disposeObject(child);
-      }
+      this.disposeObject(child);
     });
     this.furnitureGroup.clear();
     this.partsMap.clear();
@@ -82,6 +80,9 @@ export class SceneManager {
     this.clearFurniture();
     
     parts.forEach(part => {
+      // No renderizamos herrajes visualmente para mantener la escena limpia
+      if (part.type === 'hardware') return;
+
       const geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
       const material = new THREE.MeshStandardMaterial({ 
         color: 0x4a90e2, 
@@ -92,24 +93,19 @@ export class SceneManager {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
 
-      // Almacenar posición original para explosión
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
 
       if ((part.type === 'door-left' || part.type === 'door-right') && part.pivot) {
-        // Sistema de Bisagras: Crear grupo pivote
         const hingeGroup = new THREE.Group();
         hingeGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
         
-        // Offset de la malla respecto al pivote
         const offsetX = part.type === 'door-left' ? part.width / 2 : -part.width / 2;
         mesh.position.set(offsetX, 0, part.z - part.pivot.z);
         
         hingeGroup.add(mesh);
         this.furnitureGroup.add(hingeGroup);
         this.partsMap.set(part.id, hingeGroup);
-        
-        // El grupo pivote también guarda posición para explosión
         hingeGroup.userData.originalPosition = hingeGroup.position.clone();
       } else {
         mesh.position.set(part.x, part.y, part.z);
@@ -118,7 +114,6 @@ export class SceneManager {
       }
     });
 
-    // Centrar controles
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
     const center = new THREE.Vector3();
     box.getCenter(center);
@@ -126,10 +121,12 @@ export class SceneManager {
   }
 
   public setDoors(open: boolean) {
-    this.partsMap.forEach((obj, id) => {
+    this.partsMap.forEach((obj) => {
       const partType = obj.children[0]?.userData.type || obj.userData.type;
       if (partType === 'door-left' || partType === 'door-right') {
-        const angle = open ? (partType === 'door-left' ? Math.PI / 1.8 : -Math.PI / 1.8) : 0;
+        // Apertura realista: 95 grados (aprox Math.PI / 1.9)
+        const maxAngle = Math.PI / 1.9;
+        const angle = open ? (partType === 'door-left' ? maxAngle : -maxAngle) : 0;
         obj.rotation.y = angle;
       }
     });
@@ -152,10 +149,7 @@ export class SceneManager {
     this.partsMap.forEach((obj) => {
       const originalPos = obj.userData.originalPosition as THREE.Vector3;
       const direction = new THREE.Vector3().subVectors(originalPos, furnitureCenter).normalize();
-      
-      // Si la pieza está muy al centro, forzamos una dirección para que se note
       if (direction.length() < 0.1) direction.set(0, 1, 0);
-
       obj.position.copy(originalPos).add(direction.multiplyScalar(factor * 300));
     });
   }

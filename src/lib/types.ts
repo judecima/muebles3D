@@ -9,8 +9,9 @@ export interface Part {
   x: number; // Posición centro X relativo al mueble
   y: number; // Posición centro Y relativo al mueble
   z: number; // Posición centro Z relativo al mueble
-  type: 'static' | 'door-left' | 'door-right' | 'drawer';
+  type: 'static' | 'door-left' | 'door-right' | 'drawer' | 'hardware';
   pivot?: { x: number; y: number; z: number }; // Solo para puertas
+  isHardware?: boolean; // Para identificar herrajes en la tabla
 }
 
 export interface FurnitureDimensions {

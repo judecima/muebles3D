@@ -24,7 +24,12 @@ export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
       type: 'door-right', 
       pivot: { x: W - T, y: H/2, z: D/2 } 
     },
+    // Bisagras
+    { id: 'bis-1', name: 'Bisagra Cazoleta', width: 0, height: 0, depth: 0, x: 0, y: 0, z: 0, type: 'hardware', isHardware: true },
+    { id: 'bis-2', name: 'Bisagra Cazoleta', width: 0, height: 0, depth: 0, x: 0, y: 0, z: 0, type: 'hardware', isHardware: true },
+    { id: 'bis-3', name: 'Bisagra Cazoleta', width: 0, height: 0, depth: 0, x: 0, y: 0, z: 0, type: 'hardware', isHardware: true },
+    { id: 'bis-4', name: 'Bisagra Cazoleta', width: 0, height: 0, depth: 0, x: 0, y: 0, z: 0, type: 'hardware', isHardware: true },
   ];
 
-  return { parts, summary: 'Alacena superior para cocina.' };
+  return { parts, summary: 'Alacena con sistema de bisagras y apertura controlada.' };
 }
