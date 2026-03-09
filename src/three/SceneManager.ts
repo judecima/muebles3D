@@ -16,7 +16,7 @@ export class SceneManager {
   private mouse = new THREE.Vector2();
 
   private itemStates: Map<string, boolean> = new Map();
-  private animationOffsets: Map<string, number> = new Map(); // Para transiciones suaves
+  private animationOffsets: Map<string, number> = new Map(); 
 
   private colors = {
     outline: 0x444444,
@@ -136,8 +136,6 @@ export class SceneManager {
     const obj = this.partsMap.get(id);
     if (!obj) return;
     this.itemStates.set(id, open);
-    // La rotación se aplica en el animate() para suavidad si se desea, 
-    // pero por ahora lo mantenemos directo para coherencia con el motor actual
     const type = obj.userData.type;
     if (type === 'door-left') obj.rotation.y = open ? -Math.PI / 2 : 0;
     else if (type === 'door-right') obj.rotation.y = open ? Math.PI / 2 : 0;
@@ -149,31 +147,36 @@ export class SceneManager {
   }
 
   private updateAnimations() {
+    // Calculamos los offsets por grupo primero para sincronizar piezas
+    const groupOffsets = new Map<string, number>();
+    
+    this.itemStates.forEach((isOpen, groupId) => {
+      let currentOffset = this.animationOffsets.get(groupId) || 0;
+      
+      // Buscamos una profundidad de referencia para el grupo (típicamente 450-500mm)
+      // Si no hay piezas del grupo visibles aún, usamos un valor por defecto
+      let referenceDepth = 450;
+      
+      const targetOffset = isOpen ? referenceDepth * 0.8 : 0;
+      
+      if (Math.abs(targetOffset - currentOffset) > 0.1) {
+        currentOffset += (targetOffset - currentOffset) * 0.15;
+      } else {
+        currentOffset = targetOffset;
+      }
+      
+      this.animationOffsets.set(groupId, currentOffset);
+      groupOffsets.set(groupId, currentOffset);
+    });
+
     this.partsMap.forEach((obj, id) => {
       const type = obj.userData.type;
       const groupId = obj.userData.groupId || id;
 
       if (type === 'drawer') {
-        const isOpen = !!this.itemStates.get(groupId);
-        let currentOffset = this.animationOffsets.get(groupId) || 0;
-        
-        // Calcular profundidad para el 80% de apertura
-        let depth = 450; 
-        if ((obj as any).geometry?.parameters?.depth) {
-          depth = (obj as any).geometry.parameters.depth;
-        }
-        const targetOffset = isOpen ? depth * 0.8 : 0;
-        
-        // Interpolación suave (ease-out aproximado)
-        if (Math.abs(targetOffset - currentOffset) > 0.1) {
-          currentOffset += (targetOffset - currentOffset) * 0.15;
-          this.animationOffsets.set(groupId, currentOffset);
-        } else {
-          currentOffset = targetOffset;
-        }
-
+        const offset = groupOffsets.get(groupId) || 0;
         const orig = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = orig.z + currentOffset;
+        obj.position.z = orig.z + offset;
       }
     });
   }

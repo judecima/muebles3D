@@ -36,20 +36,20 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
     const prefix = `desk-drawer-${i}`;
     
     // 1. Frente Estético
-    parts.push({ id: `${prefix}-front-aesthetic`, name: `Frente Estético Cajón ${i + 1}`, width: cabinetW - 4, height: frontH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 + T / 2, type: 'drawer', cutLargo: frontH, cutAncho: cabinetW - 4, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-front-aesthetic`, groupId: prefix, name: `Frente Estético Cajón ${i + 1}`, width: cabinetW - 4, height: frontH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 + T / 2, type: 'drawer', cutLargo: frontH, cutAncho: cabinetW - 4, cutEspesor: T, grainDirection: 'libre' });
     
     // 2. Frente Estructura de Caja
-    parts.push({ id: `${prefix}-box-front`, name: `Frente Estruct. Caja ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D/2 - T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-front`, groupId: prefix, name: `Frente Estruct. Caja ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D/2 - T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
 
     // 3. Laterales de Caja
-    parts.push({ id: `${prefix}-box-side-L`, name: `Lateral Izq. Caja ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX - drawerW / 2 + T / 2, y: posY, z: D / 2 - drawerD / 2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-box-side-R`, name: `Lateral Der. Caja ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX + drawerW / 2 - T / 2, y: posY, z: D / 2 - drawerD / 2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-L`, groupId: prefix, name: `Lateral Izq. Caja ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX - drawerW / 2 + T / 2, y: posY, z: D / 2 - drawerD / 2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-R`, groupId: prefix, name: `Lateral Der. Caja ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX + drawerW / 2 - T / 2, y: posY, z: D / 2 - drawerD / 2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
     
     // 4. Trasera de Caja
-    parts.push({ id: `${prefix}-box-back`, name: `Trasera Caja ${i + 1}`, width: drawerW - 2 * T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2 * T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-back`, groupId: prefix, name: `Trasera Caja ${i + 1}`, width: drawerW - 2 * T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 - drawerD + T / 2, type: 'drawer', cutLargo: drawerW - 2 * T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
     
     // 5. Piso de Caja
-    parts.push({ id: `${prefix}-box-bottom`, name: `Base Caja ${i + 1}`, width: drawerW - 2 * T, height: 3, depth: drawerD, x: cabinetCenterX, y: posY - drawerBoxH / 2 + 1.5, z: D / 2 - drawerD / 2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2 * T, cutEspesor: 3, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Base Caja ${i + 1}`, width: drawerW - 2 * T, height: 3, depth: drawerD, x: cabinetCenterX, y: posY - drawerBoxH / 2 + 1.5, z: D / 2 - drawerD / 2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2 * T, cutEspesor: 3, grainDirection: 'libre' });
   }
 
   return { parts, summary: 'Escritorio profesional con sistema de cajones constructivo independiente.', hasDoors: false, hasDrawers: true };
