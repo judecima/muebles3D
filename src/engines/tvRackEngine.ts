@@ -1,7 +1,9 @@
+
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
-  const { width: W, height: H, depth: D, thickness: T } = dim;
+  const { width: W, depth: D, thickness: T } = dim;
+  const H = 500; // Altura fija obligatoria Red Arquimax
 
   const parts: Part[] = [
     { id: 'base', name: 'Base Principal', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static' },
@@ -50,5 +52,5 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   });
 
-  return { parts, summary: 'Rack TV con cajones técnicos duales y cálculo de rieles de 26mm.' };
+  return { parts, summary: 'Rack TV Red Arquimax con altura fija de 500mm y cajones técnicos.' };
 }

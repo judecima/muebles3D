@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FurnitureType, FurnitureDimensions, FurnitureColor } from '@/lib/types';
 import { 
@@ -34,6 +35,13 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
     const { name, value } = e.target;
     onDimensionsChange({ ...dimensions, [name]: parseFloat(value) || 0 });
   };
+
+  const handleSliderChange = (values: number[]) => {
+    onDimensionsChange({ ...dimensions, width: values[0] });
+  };
+
+  const isHeightFixed = type === 'rackTV' || type === 'escritorio';
+  const isWidthSlider = type === 'escritorio';
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -67,22 +75,57 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
         </div>
 
         {/* Dimensiones */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-[10px] font-bold uppercase text-slate-500">Ancho (mm)</Label>
-            <Input name="width" type="number" value={dimensions.width} onChange={handleChange} className="h-9 border-slate-200" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] font-bold uppercase text-slate-500">Alto (mm)</Label>
-            <Input name="height" type="number" value={dimensions.height} onChange={handleChange} className="h-9 border-slate-200" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] font-bold uppercase text-slate-500">Prof. (mm)</Label>
-            <Input name="depth" type="number" value={dimensions.depth} onChange={handleChange} className="h-9 border-slate-200" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] font-bold uppercase text-slate-500">Espesor (mm)</Label>
-            <Input name="thickness" type="number" value={dimensions.thickness} onChange={handleChange} className="h-9 border-slate-200" />
+        <div className="space-y-4">
+          {isWidthSlider ? (
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <Label className="text-xs font-bold uppercase text-slate-500">Ancho del Escritorio</Label>
+                <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                  {dimensions.width} mm
+                </span>
+              </div>
+              <Slider
+                value={[dimensions.width]}
+                min={800}
+                max={1500}
+                step={10}
+                onValueChange={handleSliderChange}
+                className="py-4"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                <span>Min: 800 mm</span>
+                <span>Max: 1500 mm</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase text-slate-500">Ancho (mm)</Label>
+              <Input name="width" type="number" value={dimensions.width} onChange={handleChange} className="h-9 border-slate-200" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase text-slate-500">
+                Alto (mm) {isHeightFixed && <span className="text-primary-600">(Fijo)</span>}
+              </Label>
+              <Input 
+                name="height" 
+                type="number" 
+                value={dimensions.height} 
+                onChange={handleChange} 
+                className={`h-9 border-slate-200 ${isHeightFixed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
+                disabled={isHeightFixed}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase text-slate-500">Prof. (mm)</Label>
+              <Input name="depth" type="number" value={dimensions.depth} onChange={handleChange} className="h-9 border-slate-200" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase text-slate-500">Espesor (mm)</Label>
+              <Input name="thickness" type="number" value={dimensions.thickness} onChange={handleChange} className="h-9 border-slate-200" />
+            </div>
           </div>
         </div>
 
@@ -102,9 +145,9 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-bold shadow-sm" onClick={() => onAction('generate')}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Generar Modelo
+        <div className="space-y-2 pt-2">
+          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm" onClick={() => onAction('generate')}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Actualizar Modelo
           </Button>
           
           <Button className="w-full bg-slate-900 hover:bg-black text-white font-bold" onClick={() => onAction('export-pdf')}>

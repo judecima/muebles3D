@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -62,6 +63,20 @@ export default function Home() {
     setAction('reset');
   };
 
+  // Ajustar dimensiones fijas cuando cambia el tipo de mueble
+  useEffect(() => {
+    if (type === 'rackTV') {
+      setDimensions(prev => ({ ...prev, height: 500 }));
+    } else if (type === 'escritorio') {
+      setDimensions(prev => ({ 
+        ...prev, 
+        height: 750, 
+        width: Math.max(800, Math.min(prev.width, 1500)),
+        depth: 600 
+      }));
+    }
+  }, [type]);
+
   useEffect(() => {
     generateFurniture();
   }, [type, dimensions]);
@@ -107,16 +122,16 @@ export default function Home() {
 
     // Capturar Render Armado
     setAction('reset');
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 400));
     const imgArmado = viewerRef.current.getScreenshot();
     doc.addImage(imgArmado, 'PNG', 15, 60, 180, 100);
     doc.text("VISTA MUEBLE ARMADO", 105, 165, { align: 'center' });
 
     // Capturar Render Explotado
     setAction('explode');
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 400));
     const imgExplotado = viewerRef.current.getScreenshot();
-    doc.addImage(imgExlotado, 'PNG', 15, 175, 180, 100);
+    doc.addImage(imgExplotado, 'PNG', 15, 175, 180, 100);
     doc.text("VISTA EXPLOTADA", 105, 280, { align: 'center' });
     setAction('reset');
 
@@ -177,7 +192,7 @@ export default function Home() {
       body: hardwareRows,
       startY: 30,
       theme: 'striped',
-      headStyles: { fillColor: [150, 150, 150] } // Gris neutro para herrajes
+      headStyles: { fillColor: [100, 116, 139] } // Gris neutro para herrajes
     });
 
     doc.save('mueble-red-arquimax.pdf');
