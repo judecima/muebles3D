@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -5,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Part, AVAILABLE_PANELS, PanelSize } from '@/lib/types';
-import { optimizeCutLayout, OptimizeCutLayoutOutput } from '@/ai/flows/optimize-cut-layout-flow';
+import { runOptimization, OptimizationResult } from '@/lib/optimizer';
 import { Progress } from '@/components/ui/progress';
-import { Scissors, Loader2, Info, LayoutGrid } from 'lucide-react';
+import { Scissors, Loader2, Info, LayoutGrid, FileDown } from 'lucide-react';
 
 interface OptimizerPanelProps {
   parts: Part[];
@@ -17,33 +18,36 @@ interface OptimizerPanelProps {
 
 export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: OptimizerPanelProps) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<OptimizeCutLayoutOutput | null>(null);
+  const [result, setResult] = useState<OptimizationResult | null>(null);
 
-  const handleOptimize = async () => {
+  const handleOptimize = () => {
     setLoading(true);
-    try {
-      const cutlist = parts
-        .filter(p => !p.isHardware)
-        .map(p => ({
-          name: p.name,
-          width: p.cutLargo,
-          height: p.cutAncho,
-          quantity: 1,
-          grainDirection: p.grainDirection
-        }));
+    // Simular un pequeño retardo para feedback visual, aunque el cálculo es instantáneo
+    setTimeout(() => {
+      try {
+        const cutlist = parts
+          .filter(p => !p.isHardware)
+          .map(p => ({
+            name: p.name,
+            width: p.cutLargo,
+            height: p.cutAncho,
+            quantity: 1,
+            grainDirection: p.grainDirection
+          }));
 
-      const res = await optimizeCutLayout({
-        cutlist,
-        panelWidth: selectedPanel.width - 20, // 10mm trim per side
-        panelHeight: selectedPanel.height - 20,
-        kerf: 4.5
-      });
-      setResult(res);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+        const res = runOptimization(
+          cutlist,
+          selectedPanel.width - 20, // 10mm trim per side
+          selectedPanel.height - 20,
+          4.5 // Kerf estándar Red Arquimax
+        );
+        setResult(res);
+      } catch (e) {
+        console.error("Error en optimización:", e);
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
   };
 
   return (
@@ -52,7 +56,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Scissors className="w-4 h-4" /> Configuración de Tablero
+              <Scissors className="w-4 h-4" /> Motor de Optimización Local
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -77,7 +81,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
               <p className="flex justify-between"><span>Espesor de Sierra (Kerf):</span> <b>4.5 mm</b></p>
             </div>
             <Button className="w-full" onClick={handleOptimize} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Optimizar Corte'}
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Optimizar Corte Local'}
             </Button>
           </CardContent>
         </Card>
@@ -121,9 +125,11 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           <div className="space-y-12">
             {result.optimizedLayout.map((panel, idx) => (
               <div key={idx} className="space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase">Tablero #{panel.panelNumber} - Eficiencia: {panel.efficiency.toFixed(1)}%</h3>
+                <div className="flex justify-between items-end">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase">Tablero #{panel.panelNumber} - Eficiencia: {panel.efficiency.toFixed(1)}%</h3>
+                </div>
                 <div 
-                  className="relative border-4 border-slate-900 bg-slate-200 shadow-2xl mx-auto"
+                  className="relative border-4 border-slate-900 bg-slate-200 shadow-2xl mx-auto origin-top-left"
                   style={{ 
                     width: selectedPanel.width / 4, 
                     height: selectedPanel.height / 4 
@@ -141,7 +147,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                         height: p.height / 4
                       }}
                     >
-                      <span className="text-[8px] font-bold text-slate-800 leading-none text-center p-1 pointer-events-none group-hover:hidden">
+                      <span className="text-[7px] font-bold text-slate-800 leading-none text-center p-0.5 pointer-events-none group-hover:hidden truncate max-w-full">
                         {p.name}<br/>{p.width}x{p.height}
                       </span>
                     </div>
