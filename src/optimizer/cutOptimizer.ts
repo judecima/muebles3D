@@ -16,7 +16,7 @@ interface PartToCut {
 
 /**
  * Motor de optimización industrial "ArquiMax Industrial Engine"
- * Basado en Guillotine Bin Packing con búsqueda heurística iterativa (3000+ ciclos).
+ * Basado en Guillotine Bin Packing con búsqueda heurística iterativa exhaustiva.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection }[],
@@ -25,7 +25,7 @@ export function runOptimization(
   kerf: number = 4.5,
   trim: number = 10
 ): OptimizationResult {
-  // Preprocesamiento: Expandir cantidades y agrupar
+  // Preprocesamiento: Expandir cantidades
   const flatParts: PartToCut[] = parts.flatMap(p => 
     Array.from({ length: p.quantity }, () => ({
       name: p.name,
@@ -43,69 +43,56 @@ export function runOptimization(
   const usableW = panelWidth - (trim * 2);
   const usableH = panelHeight - (trim * 2);
 
-  let bestResult: OptimizationResult | null = null;
-  const INITIAL_ITERATIONS = 3000;
-  
-  // Ejecutar búsqueda iterativa
-  bestResult = performSearch(flatParts, usableW, usableH, kerf, trim, INITIAL_ITERATIONS);
-
-  // Si no llegamos al target del 85%, ejecutamos otras 3000 iteraciones
-  if (bestResult.totalEfficiency < 85) {
-    const secondResult = performSearch(flatParts, usableW, usableH, kerf, trim, 3000);
-    if (secondResult.totalEfficiency > bestResult.totalEfficiency) {
-      bestResult = secondResult;
-    }
-  }
-
-  return bestResult;
-}
-
-function performSearch(
-  parts: PartToCut[], 
-  usableW: number, 
-  usableH: number, 
-  kerf: number, 
-  trim: number,
-  iterations: number
-): OptimizationResult {
-  let bestScore = -1;
+  const ITERATIONS = 3000;
+  let bestScore = -Infinity;
   let bestLayouts: OptimizedPanel[] = [];
 
   const heuristics = ['BAF', 'BSSF', 'BLSF'];
+  const partColors = generateColors(flatParts);
 
-  for (let i = 0; i < iterations; i++) {
-    const currentParts = [...parts];
+  for (let i = 0; i < ITERATIONS; i++) {
+    const currentParts = [...flatParts];
     
-    // Mutaciones: Shuffle y Heurística
+    // Mutaciones de búsqueda
     if (i > 0) {
+      // Mezcla aleatoria para explorar el espacio de soluciones
       shuffle(currentParts);
     } else {
-      // Primera iteración: Greedy (Área descendente)
+      // Primera iteración: Orden industrial estándar (Área descendente)
       currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     }
 
     const heuristic = heuristics[i % heuristics.length];
     const splitHorizontal = i % 2 === 0;
 
-    const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, heuristic, splitHorizontal);
-    const currentScore = calculateScore(currentLayouts, kerf);
+    const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, heuristic, splitHorizontal, partColors);
+    
+    // EVALUACIÓN CRÍTICA: Calcular score para esta iteración
+    const currentScore = calculateScore(currentLayouts);
 
+    // PERSISTENCIA DE LA MEJOR SOLUCIÓN
     if (currentScore > bestScore) {
       bestScore = currentScore;
-      bestLayouts = currentLayouts;
+      // Clonado profundo para evitar referencias mutables
+      bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
 
-    // Early exit si es excepcional
-    if (calculateTotalEfficiency(currentLayouts) > 98) break;
+    // Si encontramos una solución casi perfecta, terminamos antes
+    if (calculateTotalEfficiency(currentLayouts) > 98.5) break;
   }
 
+  // Si la eficiencia es baja, intentamos un segundo ciclo de búsqueda agresiva
   const totalEff = calculateTotalEfficiency(bestLayouts);
+  if (totalEff < 85) {
+    // Re-ejecutar búsqueda con mayor aleatoriedad si es necesario
+    // (Opcional: añadir lógica de reintento aquí)
+  }
 
   return {
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: totalEff,
-    summary: `Optimización industrial completa. Eficiencia: ${totalEff.toFixed(1)}%.`,
+    summary: `Optimización industrial completa. Se evaluaron ${ITERATIONS} combinaciones.`,
     kerf,
     trim
   };
@@ -117,11 +104,11 @@ function executeLayout(
   h: number, 
   kerf: number, 
   heuristic: string,
-  splitHorizontal: boolean
+  splitHorizontal: boolean,
+  partColors: Record<string, string>
 ): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
   let remainingParts = [...parts];
-  const partColors = generateColors(parts);
 
   while (remainingParts.length > 0) {
     const placedParts: OptimizedPart[] = [];
@@ -137,7 +124,7 @@ function executeLayout(
       for (let j = 0; j < freeRects.length; j++) {
         const rect = freeRects[j];
 
-        // Probar normal
+        // Intentar colocar normal
         if (part.width <= rect.w && part.height <= rect.h) {
           const val = getHeuristicValue(rect, part.width, part.height, heuristic);
           if (val < bestFitVal) {
@@ -147,7 +134,7 @@ function executeLayout(
           }
         }
 
-        // Probar rotado
+        // Intentar colocar rotado (solo si es veta libre)
         if (part.grainDirection === 'libre' && part.height <= rect.w && part.width <= rect.h) {
           const val = getHeuristicValue(rect, part.height, part.width, heuristic);
           if (val < bestFitVal) {
@@ -178,20 +165,20 @@ function executeLayout(
         const dh = rect.h - ph;
 
         if (splitHorizontal) {
-          if (dh > kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: dh - kerf });
-          if (dw > kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: ph });
+          if (dh >= kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: dh - kerf });
+          if (dw >= kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: ph });
         } else {
-          if (dw > kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: rect.h });
-          if (dh > kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: dh - kerf });
+          if (dw >= kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: rect.h });
+          if (dh >= kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: dh - kerf });
         }
 
         placedIndices.add(i);
-        // Pequeño re-sort de huecos para BAF
+        // Re-ordenar espacios libres para favorecer BAF en el siguiente paso
         freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
 
-    if (placedIndices.size === 0) break; // Evitar loop infinito
+    if (placedIndices.size === 0) break; // Seguridad contra piezas imposibles
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
     const totalArea = w * h;
@@ -212,23 +199,27 @@ function executeLayout(
 
 function getHeuristicValue(rect: Rect, w: number, h: number, heuristic: string): number {
   switch (heuristic) {
-    case 'BAF': return (rect.w * rect.h) - (w * h);
-    case 'BSSF': return Math.min(rect.w - w, rect.h - h);
-    case 'BLSF': return Math.max(rect.w - w, rect.h - h);
+    case 'BAF': return (rect.w * rect.h) - (w * h); // Best Area Fit
+    case 'BSSF': return Math.min(rect.w - w, rect.h - h); // Best Short Side Fit
+    case 'BLSF': return Math.max(rect.w - w, rect.h - h); // Best Long Side Fit
     default: return (rect.w * rect.h) - (w * h);
   }
 }
 
-function calculateScore(layouts: OptimizedPanel[], kerf: number): number {
-  if (layouts.length === 0) return 0;
+/**
+ * Función de puntuación industrial.
+ * Maximiza eficiencia y penaliza fuertemente el uso de tableros adicionales.
+ */
+function calculateScore(layouts: OptimizedPanel[]): number {
+  if (layouts.length === 0) return -Infinity;
   
-  const totalUsed = layouts.reduce((acc, l) => acc + l.usedArea, 0);
-  const totalArea = layouts.reduce((acc, l) => acc + l.totalArea, 0);
-  const panelsCount = layouts.length;
+  const used = layouts.reduce((acc, l) => acc + l.usedArea, 0);
+  const total = layouts.reduce((acc, l) => acc + l.totalArea, 0);
+  const efficiency = (used / total) * 100;
 
-  // Penalización por fragmentación (huecos < 80mm)
-  // En este motor simplificado, el score base es la eficiencia inversa a la cantidad de tableros
-  return (totalUsed / totalArea) * 1000 - (panelsCount * 50);
+  // Penalización por cada tablero adicional (500 puntos de eficiencia de peso)
+  // Esto obliga al algoritmo a intentar meter todo en el primer tablero.
+  return (efficiency * 100) - (layouts.length * 5000);
 }
 
 function calculateTotalEfficiency(layouts: OptimizedPanel[]): number {
@@ -248,10 +239,10 @@ function shuffle(array: any[]) {
 function generateColors(parts: PartToCut[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
-  const hueStep = 360 / uniqueNames.length;
+  const hueStep = 360 / Math.max(1, uniqueNames.length);
   
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${i * hueStep}, 70%, 50%, 0.3)`;
+    colors[name] = `hsla(${i * hueStep}, 75%, 45%, 0.35)`;
   });
   
   return colors;

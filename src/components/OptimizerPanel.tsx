@@ -66,7 +66,8 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setLoading(true);
     setError(null);
     
-    // Ejecutar 3000 iteraciones en el motor industrial
+    // Ejecutar motor industrial de 3000 iteraciones
+    // Usamos setTimeout para permitir que el spinner de carga se renderice
     setTimeout(() => {
       try {
         const res = runOptimization(
@@ -88,7 +89,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
       } finally {
         setLoading(false);
       }
-    }, 50);
+    }, 100);
   };
 
   const exportCSV = () => {
@@ -109,7 +110,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     const doc = new jsPDF();
     const BRAND_COLOR = [174, 26, 226];
 
-    // Portada de Optimización
     doc.setFontSize(22);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.text("RED ARQUIMAX - Plano de Corte Industrial", 105, 30, { align: 'center' });
@@ -121,7 +121,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     doc.text(`Total Tableros: ${result.totalPanels}`, 20, 70);
     doc.text(`Kerf: ${result.kerf} mm | Trim: ${result.trim} mm`, 20, 80);
 
-    // Listado de Piezas
     (doc as any).autoTable({
       head: [['Pieza', 'Largo', 'Ancho', 'Esp.', 'Cant.', 'Veta']],
       body: localCutlist.map(p => [p.name, p.width, p.height, p.thickness, p.quantity, p.grainDirection]),
@@ -129,12 +128,10 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
       headStyles: { fillColor: BRAND_COLOR }
     });
 
-    // Cada panel en una nueva página (Simplificado para este MVP)
     result.optimizedLayout.forEach((panel, i) => {
       doc.addPage();
       doc.text(`Tablero #${panel.panelNumber} - Aprovechamiento: ${panel.efficiency.toFixed(1)}%`, 20, 20);
       
-      // Aquí se podría renderizar el canvas a imagen, pero para el MVP usamos la tabla de cortes por panel
       (doc as any).autoTable({
         head: [['Pieza en Tablero', 'X (mm)', 'Y (mm)', 'Ancho (mm)', 'Alto (mm)', 'Rotada']],
         body: panel.parts.map(p => [p.name, p.x, p.y, p.width, p.height, p.rotated ? 'SÍ' : 'NO']),
@@ -268,7 +265,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
               <div className="text-center">
                 <p className="font-bold text-slate-700">Motor Industrial: 3000 Iteraciones en curso...</p>
-                <p className="text-xs">Aplicando Algoritmo de Guillotina con Best Area Fit</p>
+                <p className="text-xs">Buscando la mejor solución de guillotina...</p>
               </div>
             </div>
           ) : error ? (
@@ -282,7 +279,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
               <LayoutGrid className="w-20 h-20 opacity-10" />
               <div className="text-center">
                 <p className="font-bold text-slate-400 text-sm uppercase tracking-widest">Plano de Corte Industrial</p>
-                <p className="text-xs text-slate-300">Presiona "Calcular Industrial" para iniciar el motor de optimización</p>
+                <p className="text-xs text-slate-300">Presiona "Calcular Industrial" para iniciar el motor de 3000 ciclos</p>
               </div>
             </div>
           ) : (
@@ -310,7 +307,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                          backgroundSize: '20px 20px'
                        }}>
                     
-                    {/* Trim Area (Visual) */}
                     <div 
                       className="absolute border border-red-500/20 border-dashed pointer-events-none" 
                       style={{
@@ -323,7 +319,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     
                     <div className="absolute inset-0">
                       {panel.parts.map((p, pIdx) => {
-                        // Ajuste por trim en el plano visual
                         const scaleX = 100 / selectedPanel.width;
                         const scaleY = 100 / selectedPanel.height;
                         const visualX = (p.x + result.trim) * scaleX;
@@ -349,11 +344,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                               <span className="text-[min(1.5vw,7px)] text-slate-700 uppercase truncate w-full font-bold px-1">{p.name}</span>
                               {p.rotated && <span className="text-[6px] text-primary font-black mt-0.5 px-1 bg-white/80 rounded-full">ROT</span>}
                             </div>
-                            
-                            {/* Líneas de Kerf Visuales (solo si hay espacio) */}
-                            {p.width > 20 && p.height > 20 && (
-                              <div className="absolute top-0 right-0 w-[4px] h-full bg-slate-900/10 opacity-0 group-hover:opacity-100" />
-                            )}
                           </div>
                         );
                       })}
