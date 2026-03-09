@@ -9,9 +9,13 @@ export class SceneManager {
   private controls: OrbitControls;
   private furnitureGroup: THREE.Group;
   private partsMap: Map<string, THREE.Object3D> = new Map();
-  private partsState: Map<string, boolean> = new Map();
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+  private container: HTMLElement;
 
-  // Colores CAD profesionales
+  // Estados de apertura individuales
+  private itemStates: Map<string, boolean> = new Map();
+
   private colors = {
     panel: 0xE8D9B5,
     border: 0xC8B08A,
@@ -20,6 +24,7 @@ export class SceneManager {
   };
 
   constructor(container: HTMLElement) {
+    this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(this.colors.background);
 
@@ -51,13 +56,66 @@ export class SceneManager {
     this.scene.add(this.furnitureGroup);
 
     this.animate();
-    window.addEventListener('resize', () => this.onWindowResize(container));
+    this.initInteraction();
+    window.addEventListener('resize', () => this.onWindowResize());
   }
 
-  private onWindowResize(container: HTMLElement) {
-    this.camera.aspect = container.clientWidth / container.clientHeight;
+  private initInteraction() {
+    this.container.addEventListener('pointerdown', (event) => {
+      const rect = this.container.getBoundingClientRect();
+      this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      const intersects = this.raycaster.intersectObjects(this.furnitureGroup.children, true);
+
+      if (intersects.length > 0) {
+        let object = intersects[0].object;
+        // Subir al grupo si es un pivote de puerta
+        while (object.parent && object.parent !== this.furnitureGroup && !object.userData.id) {
+          object = object.parent;
+        }
+        
+        const type = object.userData.type;
+        const id = object.userData.id;
+
+        if (type?.includes('door')) {
+          this.toggleDoor(id);
+        } else if (type === 'drawer') {
+          // Extraer el prefijo del grupo de cajón (ej. cajon-0)
+          const groupId = id.split('-').slice(0, 2).join('-');
+          this.toggleDrawer(groupId);
+        }
+      }
+    });
+  }
+
+  private toggleDoor(id: string) {
+    const door = this.partsMap.get(id);
+    if (!door) return;
+    const isOpen = !this.itemStates.get(id);
+    this.itemStates.set(id, isOpen);
+    
+    const angle = door.userData.type === 'door-left' ? -Math.PI / 2 : Math.PI / 2;
+    door.rotation.y = isOpen ? angle : 0;
+  }
+
+  private toggleDrawer(groupId: string) {
+    const isOpen = !this.itemStates.get(groupId);
+    this.itemStates.set(groupId, isOpen);
+
+    this.partsMap.forEach((obj, id) => {
+      if (obj.userData.type === 'drawer' && id.startsWith(groupId)) {
+        const orig = obj.userData.originalPosition as THREE.Vector3;
+        obj.position.z = isOpen ? orig.z + 400 : orig.z;
+      }
+    });
+  }
+
+  private onWindowResize() {
+    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
   }
 
   private animate = () => {
@@ -72,6 +130,7 @@ export class SceneManager {
       this.furnitureGroup.remove(this.furnitureGroup.children[0]);
     }
     this.partsMap.clear();
+    this.itemStates.clear();
 
     const visualGap = 1.0;
 
@@ -96,7 +155,6 @@ export class SceneManager {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = mesh.receiveShadow = true;
 
-      // Bordes CAD
       const edges = new THREE.EdgesGeometry(geometry);
       const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline }));
       mesh.add(line);
@@ -112,6 +170,8 @@ export class SceneManager {
         mesh.position.set(offsetX, 0, 0);
         pivotGroup.add(mesh);
         pivotGroup.userData.originalPosition = pivotGroup.position.clone();
+        pivotGroup.userData.type = part.type;
+        pivotGroup.userData.id = part.id;
         this.furnitureGroup.add(pivotGroup);
         this.partsMap.set(part.id, pivotGroup);
       } else {
@@ -126,8 +186,9 @@ export class SceneManager {
   }
 
   public setDoors(open: boolean) {
-    this.partsMap.forEach((obj) => {
+    this.partsMap.forEach((obj, id) => {
       if (obj.userData.type?.includes('door')) {
+        this.itemStates.set(id, open);
         const angle = obj.userData.type === 'door-left' ? -Math.PI / 2 : Math.PI / 2;
         obj.rotation.y = open ? angle : 0;
       }
@@ -135,6 +196,17 @@ export class SceneManager {
   }
 
   public setDrawers(open: boolean) {
+    // Identificar prefijos únicos de cajones
+    const drawerGroups = new Set<string>();
+    this.partsMap.forEach((obj, id) => {
+      if (obj.userData.type === 'drawer') {
+        const prefix = id.split('-').slice(0, 2).join('-');
+        drawerGroups.add(prefix);
+      }
+    });
+
+    drawerGroups.forEach(groupId => this.itemStates.set(groupId, open));
+
     this.partsMap.forEach((obj) => {
       if (obj.userData.type === 'drawer') {
         const orig = obj.userData.originalPosition as THREE.Vector3;
@@ -160,6 +232,7 @@ export class SceneManager {
       obj.position.copy(obj.userData.originalPosition);
       obj.rotation.set(0, 0, 0);
     });
+    this.itemStates.clear();
   }
 
   public getScreenshot(): string {

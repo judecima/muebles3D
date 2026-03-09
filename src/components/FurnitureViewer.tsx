@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
@@ -41,7 +40,7 @@ export const FurnitureViewer = forwardRef(({ parts, action, color }: FurnitureVi
   }, [parts, color]);
 
   useEffect(() => {
-    if (!managerRef.current) return;
+    if (!managerRef.current || !action) return;
 
     switch (action) {
       case 'open-doors':
@@ -61,8 +60,6 @@ export const FurnitureViewer = forwardRef(({ parts, action, color }: FurnitureVi
         break;
       case 'reset':
         managerRef.current.resetAssembly();
-        managerRef.current.setDoors(false);
-        managerRef.current.setDrawers(false);
         break;
     }
   }, [action]);
