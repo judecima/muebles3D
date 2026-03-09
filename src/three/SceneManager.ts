@@ -19,8 +19,8 @@ export class SceneManager {
   };
 
   private colorFallbackMap: Record<FurnitureColor, number> = {
-    'alarce-blanco': 0xeeeeee,
-    'alarce-marron': 0x5d4037
+    'alarce-blanco': 0xf5f5dc, // Tono crema/beige para Alarce Blanco
+    'alarce-marron': 0x5d4037  // Marrón oscuro medio para Alarce Marrón
   };
 
   constructor(container: HTMLElement) {
@@ -30,7 +30,6 @@ export class SceneManager {
     this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10000);
     this.camera.position.set(1500, 1000, 1500);
 
-    // Habilitamos preserveDrawingBuffer para capturar capturas de pantalla para el PDF
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -41,10 +40,10 @@ export class SceneManager {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     this.scene.add(ambientLight);
 
-    const directLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    const directLight = new THREE.DirectionalLight(0xffffff, 0.7);
     directLight.position.set(1000, 2000, 1000);
     directLight.castShadow = true;
     this.scene.add(directLight);
@@ -115,8 +114,8 @@ export class SceneManager {
       } else {
         const matOptions: THREE.MeshStandardMaterialParameters = {
           color: this.colorFallbackMap[color],
-          roughness: 0.8,
-          metalness: 0.05
+          roughness: 0.75,
+          metalness: 0.02
         };
 
         if (baseTexture) {
@@ -124,7 +123,8 @@ export class SceneManager {
           partTexture.repeat.set(part.width / 500, part.height / 500);
           partTexture.needsUpdate = true;
           matOptions.map = partTexture;
-          matOptions.color = 0xffffff;
+          // Aplicamos un tinte sutil del color para reforzar la identidad del acabado
+          matOptions.color = this.colorFallbackMap[color];
         }
         
         material = new THREE.MeshStandardMaterial(matOptions);
