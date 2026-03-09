@@ -63,9 +63,9 @@ export function ControlPanel({
 
   const isHeightFixed = type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada';
   const isWidthSlider = type === 'escritorio';
-  const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca';
+  const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip';
   const forceBack = type === 'placard' || type === 'rackTV';
-  const canHaveShelf = type === 'bajoMesada';
+  const canHaveShelf = type === 'bajoMesada' || type === 'alacenaFlip';
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -80,7 +80,6 @@ export function ControlPanel({
       </CardHeader>
       
       <CardContent className="space-y-6 pt-6 px-4 pb-20">
-        {/* Selector de Mueble */}
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase text-slate-500">Tipo de Proyecto</Label>
           <Select value={type} onValueChange={(v) => onTypeChange(v as FurnitureType)}>
@@ -91,14 +90,14 @@ export function ControlPanel({
               <SelectItem value="placard">Placard</SelectItem>
               <SelectItem value="escritorio">Escritorio</SelectItem>
               <SelectItem value="bajoMesada">Bajo Mesada</SelectItem>
-              <SelectItem value="alacena">Alacena Superior</SelectItem>
+              <SelectItem value="alacena">Alacena Superior (Batiente)</SelectItem>
+              <SelectItem value="alacenaFlip">Alacena Superior (Abatible Pistón)</SelectItem>
               <SelectItem value="rackTV">Rack TV</SelectItem>
               <SelectItem value="biblioteca">Biblioteca</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Dimensiones */}
         <div className="space-y-4">
           {isWidthSlider ? (
             <div className="space-y-3">
@@ -181,7 +180,6 @@ export function ControlPanel({
           </div>
         </div>
 
-        {/* Color */}
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1">
             <Palette className="w-3.5 h-3.5" /> Acabado Alarce
@@ -208,13 +206,12 @@ export function ControlPanel({
         </div>
 
         <div className="pt-4 border-t border-slate-100 space-y-4">
-          {/* Puertas - Condicional */}
           {hasDoors && (
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase text-slate-400">Sistema de Puertas</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('open-doors')}>
-                  <DoorOpen className="w-3.5 h-3.5 mr-1" /> Abrir (90°)
+                  <DoorOpen className="w-3.5 h-3.5 mr-1" /> Abrir
                 </Button>
                 <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('close-doors')}>
                   <DoorClosed className="w-3.5 h-3.5 mr-1" /> Cerrar
@@ -223,7 +220,6 @@ export function ControlPanel({
             </div>
           )}
 
-          {/* Cajones - Condicional */}
           {hasDrawers && (
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase text-slate-400">Sistema de Cajones</Label>
@@ -238,7 +234,6 @@ export function ControlPanel({
             </div>
           )}
 
-          {/* Explosión */}
           <div className="space-y-2 pt-2">
             <Label className="text-[10px] font-bold uppercase text-slate-400">Herramientas Pro</Label>
             <div className="space-y-2">

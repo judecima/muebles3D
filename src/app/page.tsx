@@ -26,6 +26,7 @@ const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   alacena: { width: 800, height: 600, depth: 320, thickness: 18, hasBack: true },
   placard: { width: 1800, height: 2100, depth: 600, thickness: 18, hasBack: true },
   biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasBack: true },
+  alacenaFlip: { width: 600, height: 510, depth: 320, thickness: 15, hasBack: true, hasShelf: true },
 };
 
 export default function Home() {
@@ -50,6 +51,7 @@ export default function Home() {
       case 'alacena': return require('@/engines/kitchenWallEngine').kitchenWallEngine;
       case 'placard': return require('@/engines/closetEngine').closetEngine;
       case 'biblioteca': return require('@/engines/bookshelfEngine').bookshelfEngine;
+      case 'alacenaFlip': return require('@/engines/superiorWallFlipEngine').superiorWallFlipEngine;
       default: return () => ({ parts: [], summary: '', hasDoors: false, hasDrawers: false });
     }
   };
@@ -78,7 +80,6 @@ export default function Home() {
       setAction(act);
       setTimeout(() => setAction(''), 100);
     }
-    // Cerrar menú móvil al realizar cualquier acción
     setIsMobileMenuOpen(false);
   };
 

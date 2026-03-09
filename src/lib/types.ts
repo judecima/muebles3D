@@ -1,4 +1,4 @@
-export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca';
+export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca' | 'alacenaFlip';
 export type FurnitureColor = 'alarce-blanco' | 'alarce-marron';
 export type GrainDirection = 'vertical' | 'horizontal' | 'libre';
 
@@ -11,7 +11,7 @@ export interface Part {
   x: number;
   y: number;
   z: number;
-  type: 'static' | 'door-left' | 'door-right' | 'drawer' | 'hardware';
+  type: 'static' | 'door-left' | 'door-right' | 'door-flip' | 'drawer' | 'hardware' | 'piston-body' | 'piston-rod';
   pivot?: { x: number; y: number; z: number };
   isHardware?: boolean;
   
@@ -21,6 +21,11 @@ export interface Part {
   cutEspesor: number;
   grainDirection: GrainDirection;
   hingeCount?: number;
+  pistonConfig?: {
+    side: 'left' | 'right';
+    anchorMueble: { x: number; y: number; z: number };
+    anchorPuerta: { x: number; y: number; z: number };
+  };
 }
 
 export interface FurnitureDimensions {

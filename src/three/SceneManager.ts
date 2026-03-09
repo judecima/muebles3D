@@ -99,11 +99,35 @@ export class SceneManager {
 
   private toggleSingleDoor(id: string, open: boolean) {
     const obj = this.partsMap.get(id);
-    if (obj) {
-      this.itemStates.set(id, open);
-      const angle = obj.userData.type === 'door-left' ? -Math.PI / 2 : Math.PI / 2;
-      obj.rotation.y = open ? angle : 0;
+    if (!obj) return;
+
+    this.itemStates.set(id, open);
+    const type = obj.userData.type;
+
+    if (type === 'door-left') {
+      obj.rotation.y = open ? -Math.PI / 2 : 0;
+    } else if (type === 'door-right') {
+      obj.rotation.y = open ? Math.PI / 2 : 0;
+    } else if (type === 'door-flip') {
+      obj.rotation.x = open ? -Math.PI / 1.9 : 0; // Aproximadamente 95 grados
+      this.updatePistons(open);
     }
+  }
+
+  private updatePistons(open: boolean) {
+    this.partsMap.forEach((obj, id) => {
+      if (obj.userData.type === 'piston-body') {
+        const rod = obj.getObjectByName('rod');
+        if (rod) {
+          // Animación telescópica: escala y traslación
+          // Extendido: 350mm, Cerrado: 240mm
+          const scale = open ? 350/240 : 1;
+          rod.scale.z = scale;
+          // Ajustar rotación para seguir el anclaje si fuera cinemática pura, 
+          // pero para MVP simplificamos el escalado lineal en su eje local
+        }
+      }
+    });
   }
 
   private toggleSingleDrawer(prefix: string, open: boolean) {
@@ -135,6 +159,11 @@ export class SceneManager {
     const visualGap = 1.0;
 
     parts.forEach(part => {
+      if (part.type === 'piston-body') {
+        this.createPiston(part);
+        return;
+      }
+
       const w = Math.max(0.1, part.width - (part.isHardware ? 0 : visualGap));
       const h = Math.max(0.1, part.height - (part.isHardware ? 0 : visualGap));
       const d = Math.max(0.1, part.depth - (part.isHardware ? 0 : visualGap));
@@ -163,11 +192,19 @@ export class SceneManager {
       mesh.userData.type = part.type;
       mesh.userData.id = part.id;
 
-      if ((part.type === 'door-left' || part.type === 'door-right') && part.pivot) {
+      if ((part.type === 'door-left' || part.type === 'door-right' || part.type === 'door-flip') && part.pivot) {
         const pivotGroup = new THREE.Group();
         pivotGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
-        const offsetX = (part.type === 'door-left') ? part.width / 2 : -part.width / 2;
-        mesh.position.set(offsetX, 0, part.depth/2);
+        
+        let offsetX = 0, offsetY = 0, offsetZ = 0;
+        if (part.type === 'door-left') offsetX = part.width / 2;
+        else if (part.type === 'door-right') offsetX = -part.width / 2;
+        else if (part.type === 'door-flip') {
+          offsetY = -part.height / 2;
+          offsetZ = part.depth / 2;
+        }
+
+        mesh.position.set(offsetX, offsetY, offsetZ);
         pivotGroup.add(mesh);
         pivotGroup.userData.originalPosition = pivotGroup.position.clone();
         pivotGroup.userData.type = part.type;
@@ -182,6 +219,53 @@ export class SceneManager {
     });
 
     this.fitCameraToFurniture();
+  }
+
+  private createPiston(part: Part) {
+    const group = new THREE.Group();
+    group.position.set(part.x, part.y, part.z);
+
+    // Cilindro principal (Negro Mate)
+    const cylinderGeom = new THREE.CylinderGeometry(6, 6, 180, 16);
+    cylinderGeom.rotateX(Math.PI / 2);
+    const cylinderMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
+    group.add(cylinder);
+
+    // Vástago (Metal Cromado)
+    const rodGeom = new THREE.CylinderGeometry(3.5, 3.5, 150, 16);
+    rodGeom.rotateX(Math.PI / 2);
+    rodGeom.translate(0, 0, 75); // Pivote en la base para escalado local
+    const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
+    const rod = new THREE.Mesh(rodGeom, rodMat);
+    rod.name = 'rod';
+    rod.position.z = 90;
+    group.add(rod);
+
+    // Soportes (Acero)
+    const supportGeom = new THREE.BoxGeometry(20, 20, 5);
+    const supportMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8 });
+    const support1 = new THREE.Mesh(supportGeom, supportMat);
+    support1.position.z = -90;
+    group.add(support1);
+
+    const support2 = new THREE.Mesh(supportGeom, supportMat);
+    support2.position.z = 240;
+    rod.add(support2); // Anclado al vástago para moverse con él
+
+    // Orientación inicial hacia la puerta
+    if (part.pistonConfig) {
+      const p1 = new THREE.Vector3(part.pistonConfig.anchorMueble.x, part.pistonConfig.anchorMueble.y, part.pistonConfig.anchorMueble.z);
+      const p2 = new THREE.Vector3(part.pistonConfig.anchorPuerta.x, part.pistonConfig.anchorPuerta.y, part.pistonConfig.anchorPuerta.z);
+      group.lookAt(p2);
+    }
+
+    group.userData.id = part.id;
+    group.userData.type = 'piston-body';
+    group.userData.originalPosition = group.position.clone();
+    
+    this.furnitureGroup.add(group);
+    this.partsMap.set(part.id, group);
   }
 
   public fitCameraToFurniture() {
@@ -206,7 +290,8 @@ export class SceneManager {
 
   public setDoors(open: boolean) {
     this.partsMap.forEach((obj, id) => {
-      if (obj.userData.type?.includes('door')) {
+      const type = obj.userData.type;
+      if (type === 'door-left' || type === 'door-right' || type === 'door-flip') {
         this.toggleSingleDoor(id, open);
       }
     });
@@ -242,10 +327,12 @@ export class SceneManager {
       obj.rotation.set(0, 0, 0);
       this.itemStates.set(id, false);
       
-      // Si es un drawer, resetear su prefijo también
       if (obj.userData.type === 'drawer') {
         const prefix = id.split('-').slice(0, 2).join('-');
         this.itemStates.set(prefix, false);
+      }
+      if (obj.userData.type === 'piston-body') {
+        this.updatePistons(false);
       }
     });
   }
@@ -256,7 +343,6 @@ export class SceneManager {
     const originalPos = this.camera.position.clone();
     const originalTarget = this.controls.target.clone();
     
-    // Posición técnica (Isométrica 45°)
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
     const center = new THREE.Vector3();
     box.getCenter(center);
