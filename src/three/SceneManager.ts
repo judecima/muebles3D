@@ -111,7 +111,7 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      // Ángulo de apertura de 100 grados
+      // Ángulo de apertura de 100 grados (1.745 rad)
       obj.rotation.x = open ? -1.745 : 0;
     }
   }
@@ -120,31 +120,33 @@ export class SceneManager {
     this.partsMap.forEach((pistonObj) => {
       if (pistonObj.userData.type === 'piston-body' && pistonObj.userData.config) {
         const config = pistonObj.userData.config;
-        const doorGroup = this.partsMap.get(config.doorId);
-        if (!doorGroup) return;
+        const doorPivotGroup = this.partsMap.get(config.doorId);
+        if (!doorPivotGroup) return;
 
         // La puerta real es el primer hijo del grupo de pivote
-        const doorMesh = doorGroup.children[0];
+        const doorMesh = doorPivotGroup.children[0];
         const rod = pistonObj.getObjectByName('rod');
         
-        // Obtener la posición del anclaje en la puerta en el espacio del mundo
+        // 1. Obtener la posición del anclaje móvil en la puerta en espacio de mundo
         const worldAnchorPuerta = doorMesh.localToWorld(new THREE.Vector3(
           config.anchorPuertaLocal.x,
           config.anchorPuertaLocal.y,
           config.anchorPuertaLocal.z
         ));
 
-        // Orientar el cuerpo del pistón hacia el anclaje móvil de la puerta
+        // 2. Orientar el cuerpo del pistón hacia el anclaje móvil
         pistonObj.lookAt(worldAnchorPuerta);
 
-        // Calcular distancia actual entre anclajes
+        // 3. Calcular distancia actual entre el anclaje fijo (mueble) y móvil (puerta)
         const currentDistance = pistonObj.position.distanceTo(worldAnchorPuerta);
         
         if (rod) {
+          // El cilindro mide el 60% de la longitud cerrada calculada idealmente
           const cylinderLen = config.lengthClosed * 0.6;
+          // La extensión es la distancia total menos el cuerpo del cilindro
           const extension = currentDistance - cylinderLen;
           
-          // Escalar el vástago para alcanzar el anclaje
+          // Ajustar vástago telescópico
           const baseRodLen = config.lengthClosed * 0.4;
           rod.scale.z = Math.max(0.1, extension / baseRodLen);
           rod.position.z = (cylinderLen / 2) + (extension / 2);
@@ -167,7 +169,10 @@ export class SceneManager {
     if (!this.renderer || !this.scene || !this.camera) return;
     requestAnimationFrame(this.animate);
     this.controls.update();
-    this.updateAllPistons(); // Actualizar pistones en cada frame para suavidad
+    
+    // Sincronización continua de herrajes móviles
+    this.updateAllPistons(); 
+    
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -191,7 +196,7 @@ export class SceneManager {
       let geometry: THREE.BufferGeometry;
       
       if (part.isHardware && part.name.includes('Bisagra')) {
-        const radius = 17.5; 
+        const radius = 17.5; // Cazoleta 35mm
         const height = 12;
         geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
         if (part.id.includes('flip')) {
@@ -271,14 +276,14 @@ export class SceneManager {
     const cylLen = L_closed * 0.6;
     const rodLen = L_closed * 0.4;
 
-    // Cuerpo del pistón (Cilindro)
+    // Cuerpo del pistón (Cilindro Negro)
     const cylinderGeom = new THREE.CylinderGeometry(5, 5, cylLen, 16);
-    cylinderGeom.rotateX(Math.PI / 2);
+    cylinderGeom.rotateX(Math.PI / 2); // Orientar al eje Z
     const cylinderMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
     const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
     group.add(cylinder);
 
-    // Vástago telescópico
+    // Vástago telescópico (Cromado)
     const rodGeom = new THREE.CylinderGeometry(3, 3, rodLen, 16);
     rodGeom.rotateX(Math.PI / 2);
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
@@ -287,7 +292,7 @@ export class SceneManager {
     rod.position.z = cylLen / 2; 
     group.add(rod);
 
-    // Soportes/Rótulas de fijación
+    // Soportes/Rótulas de fijación circulares
     const ballGeom = new THREE.SphereGeometry(7, 16, 16);
     const ballMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8 });
     

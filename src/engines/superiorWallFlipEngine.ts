@@ -39,18 +39,18 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     hingeCount
   });
 
-  // Bisagras cazoleta internas (circulares)
+  // Bisagras cazoleta internas (visual circular)
   for (let i = 0; i < hingeCount; i++) {
-    const posX = i === 0 ? 70 : (i === 1 ? W - 70 : W/2);
+    const posX = i === 0 ? 100 : (i === 1 ? W - 100 : W/2);
     parts.push({
       id: `hinge-flip-${i}`, name: 'Bisagra Interna 90°', width: 35, height: 35, depth: 12,
-      x: posX, y: H - 10, z: D/2 - 5, type: 'hardware', isHardware: true,
+      x: posX, y: H - 20, z: D/2 - 6, type: 'hardware', isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
     });
   }
 
-  // Soportes para colgar
-  [30, W - 30].forEach((posX, i) => {
+  // Soportes para colgar traseros
+  [40, W - 40].forEach((posX, i) => {
     parts.push({
       id: `hang-support-${i}`, name: 'Soporte Regulable Blanco', width: 40, height: 40, depth: 20, 
       x: posX, y: H - 30, z: -D/2 + 10, type: 'hardware', isHardware: true, 
@@ -58,43 +58,44 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   });
 
-  // Pistones Neumáticos Paramétricos
+  // PISTONES PARAMÉTRICOS AJUSTADOS A FÍSICA REAL
   const pistonCount = W <= 800 ? 1 : 2;
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
-  const L_closed = 220;
-  const L_open = 340;
+  // Parámetros de anclaje proporcionales para cinemática ideal
+  const anchorMuebleX_fromFront = D * 0.30;
+  const anchorMuebleY_fromBase = H * 0.25;
+  const anchorPuertaY_fromTop = H * 0.20; // Cerca de la bisagra
 
   sides.forEach(side => {
-    const sideX = side === 'left' ? T + 2 : W - T - 2;
+    const sideX = side === 'left' ? T + 5 : W - T - 5;
     
     parts.push({
       id: `piston-${side}`,
       name: 'Pistón a Gas',
-      width: 15, height: 15, depth: L_closed,
-      x: sideX, y: T + 60, z: D/2 - 20, // Anclaje inferior en lateral (Interior)
+      width: 15, height: 15, depth: 220, // Longitud visual inicial
+      x: sideX, y: anchorMuebleY_fromBase, z: D/2 - anchorMuebleX_fromFront, 
       type: 'piston-body',
       isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre',
       pistonConfig: {
         side,
-        anchorMueble: { x: sideX, y: T + 60, z: D/2 - 20 },
-        // Coordenada local relativa al centro de la puerta para SceneManager
+        anchorMueble: { x: sideX, y: anchorMuebleY_fromBase, z: D/2 - anchorMuebleX_fromFront },
         anchorPuertaLocal: { 
-          x: side === 'left' ? -W/2 + 40 : W/2 - 40, 
-          y: H/2 - 30, 
+          x: side === 'left' ? -W/2 + 50 : W/2 - 50, 
+          y: H/2 - anchorPuertaY_fromTop, 
           z: -T/2 
         },
         doorId: 'door-flip',
-        lengthClosed: L_closed,
-        lengthOpen: L_open
+        lengthClosed: 220,
+        lengthOpen: 340
       }
     });
   });
 
   return { 
     parts, 
-    summary: `Alacena horizontal compacta Red Arquimax con pistón a gas y bisagras cazoleta.`, 
+    summary: `Alacena horizontal con pistón a gas. Herrajes calculados según dimensiones de ${W}x${H}mm.`, 
     hasDoors: true, 
     hasDrawers: false 
   };
