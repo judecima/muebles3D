@@ -42,7 +42,6 @@ export default function Home() {
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
-  // Importación dinámica de motores
   const getEngine = (t: FurnitureType) => {
     switch (t) {
       case 'bajoMesada': return require('@/engines/kitchenBaseEngine').kitchenBaseEngine;
@@ -79,6 +78,8 @@ export default function Home() {
       setAction(act);
       setTimeout(() => setAction(''), 100);
     }
+    // Cerrar menú móvil al realizar cualquier acción
+    setIsMobileMenuOpen(false);
   };
 
   const drawWatermark = (doc: jsPDF) => {
@@ -100,10 +101,7 @@ export default function Home() {
     const doc = new jsPDF();
     const BRAND_COLOR = [174, 26, 226];
 
-    // Configuración de fuente agradable
     doc.setFont('helvetica', 'bold');
-
-    // Portada
     doc.setFontSize(26);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.text("RED ARQUIMAX", 105, 30, { align: 'center' });
@@ -123,7 +121,6 @@ export default function Home() {
     doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 67);
     doc.text(`Dimensiones Totales: ${dimensions.width} x ${dimensions.height} x ${dimensions.depth} mm`, 20, 74);
 
-    // Captura 3D Técnica (Ángulo 45°)
     if (viewerRef.current) {
       const img = viewerRef.current.getScreenshot();
       if (img) {
@@ -131,7 +128,6 @@ export default function Home() {
       }
     }
 
-    // Listado de Cortes
     doc.addPage();
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
@@ -194,7 +190,7 @@ export default function Home() {
                     onTypeChange={(v) => { setType(v); setIsMobileMenuOpen(false); }} 
                     onDimensionsChange={setDimensions} 
                     onColorChange={setColor}
-                    onAction={(a) => { handleAction(a); setIsMobileMenuOpen(false); }} 
+                    onAction={handleAction} 
                   />
                 </SheetContent>
               </Sheet>

@@ -9,8 +9,9 @@ export class SceneManager {
   private controls: OrbitControls;
   private furnitureGroup: THREE.Group;
   private partsMap: Map<string, THREE.Object3D> = new Map();
-  private mouse = new THREE.Vector2();
   private container: HTMLElement;
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
 
   private itemStates: Map<string, boolean> = new Map();
 
@@ -58,14 +59,62 @@ export class SceneManager {
 
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
+    this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
   }
 
   private onWindowResize = () => {
     if (!this.container || !this.camera || !this.renderer) return;
-    this.camera.aspect = this.container.clientWidth / container.clientHeight;
+    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
   };
+
+  private onPointerDown = (event: PointerEvent) => {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.furnitureGroup.children, true);
+
+    if (intersects.length > 0) {
+      let object = intersects[0].object;
+      while (object.parent && object.parent !== this.furnitureGroup) {
+        object = object.parent;
+      }
+
+      const id = object.userData.id;
+      const type = object.userData.type;
+
+      if (type?.includes('door')) {
+        const isOpen = !this.itemStates.get(id);
+        this.toggleSingleDoor(id, isOpen);
+      } else if (type === 'drawer') {
+        const prefix = id.split('-').slice(0, 2).join('-');
+        const isOpen = !this.itemStates.get(prefix);
+        this.toggleSingleDrawer(prefix, isOpen);
+      }
+    }
+  };
+
+  private toggleSingleDoor(id: string, open: boolean) {
+    const obj = this.partsMap.get(id);
+    if (obj) {
+      this.itemStates.set(id, open);
+      const angle = obj.userData.type === 'door-left' ? -Math.PI / 2 : Math.PI / 2;
+      obj.rotation.y = open ? angle : 0;
+    }
+  }
+
+  private toggleSingleDrawer(prefix: string, open: boolean) {
+    this.itemStates.set(prefix, open);
+    this.partsMap.forEach((obj, id) => {
+      if (id.startsWith(prefix) && obj.userData.type === 'drawer') {
+        const orig = obj.userData.originalPosition as THREE.Vector3;
+        obj.position.z = open ? orig.z + 400 : orig.z;
+      }
+    });
+  }
 
   private animate = () => {
     if (!this.renderer || !this.scene || !this.camera) return;
@@ -97,7 +146,7 @@ export class SceneManager {
         material = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.1, metalness: 0.9 });
       } else {
         material = new THREE.MeshStandardMaterial({ 
-          color: this.colors.panel, 
+          color: color === 'alarce-blanco' ? 0xffffff : 0x4a3728, 
           roughness: 0.8, 
           metalness: 0.05 
         });
@@ -107,7 +156,7 @@ export class SceneManager {
       mesh.castShadow = mesh.receiveShadow = true;
 
       const edges = new THREE.EdgesGeometry(geometry);
-      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline }));
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.2 }));
       mesh.add(line);
 
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
@@ -118,7 +167,7 @@ export class SceneManager {
         const pivotGroup = new THREE.Group();
         pivotGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
         const offsetX = (part.type === 'door-left') ? part.width / 2 : -part.width / 2;
-        mesh.position.set(offsetX, 0, 0);
+        mesh.position.set(offsetX, 0, part.depth/2);
         pivotGroup.add(mesh);
         pivotGroup.userData.originalPosition = pivotGroup.position.clone();
         pivotGroup.userData.type = part.type;
@@ -158,9 +207,7 @@ export class SceneManager {
   public setDoors(open: boolean) {
     this.partsMap.forEach((obj, id) => {
       if (obj.userData.type?.includes('door')) {
-        this.itemStates.set(id, open);
-        const angle = obj.userData.type === 'door-left' ? -Math.PI / 2 : Math.PI / 2;
-        obj.rotation.y = open ? angle : 0;
+        this.toggleSingleDoor(id, open);
       }
     });
   }
@@ -174,14 +221,7 @@ export class SceneManager {
       }
     });
 
-    drawerGroups.forEach(groupId => this.itemStates.set(groupId, open));
-
-    this.partsMap.forEach((obj) => {
-      if (obj.userData.type === 'drawer') {
-        const orig = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = open ? orig.z + 400 : orig.z;
-      }
-    });
+    drawerGroups.forEach(prefix => this.toggleSingleDrawer(prefix, open));
   }
 
   public explodeView(factor: number) {
@@ -197,11 +237,17 @@ export class SceneManager {
   }
 
   public resetAssembly() {
-    this.partsMap.forEach((obj) => {
+    this.partsMap.forEach((obj, id) => {
       obj.position.copy(obj.userData.originalPosition);
       obj.rotation.set(0, 0, 0);
+      this.itemStates.set(id, false);
+      
+      // Si es un drawer, resetear su prefijo también
+      if (obj.userData.type === 'drawer') {
+        const prefix = id.split('-').slice(0, 2).join('-');
+        this.itemStates.set(prefix, false);
+      }
     });
-    this.itemStates.clear();
   }
 
   public getScreenshot(): string {
@@ -210,7 +256,19 @@ export class SceneManager {
     const originalPos = this.camera.position.clone();
     const originalTarget = this.controls.target.clone();
     
-    this.fitCameraToFurniture();
+    // Posición técnica (Isométrica 45°)
+    const box = new THREE.Box3().setFromObject(this.furnitureGroup);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = maxDim * 2.5;
+    
+    this.camera.position.set(center.x + dist, center.y + dist, center.z + dist);
+    this.controls.target.copy(center);
+    this.controls.update();
+    
     this.renderer.render(this.scene, this.camera);
     const data = this.renderer.domElement.toDataURL('image/png');
     
@@ -233,6 +291,7 @@ export class SceneManager {
 
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
+    this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     if (this.renderer) {
       this.renderer.dispose();
       if (this.renderer.domElement && this.renderer.domElement.parentNode) {
