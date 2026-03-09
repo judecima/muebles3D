@@ -99,14 +99,15 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     }, 100);
   };
 
-  const drawWatermark = (doc: any) => {
+  const drawWatermark = (doc: jsPDF) => {
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setTextColor(240, 240, 240);
-      doc.setFontSize(30);
-      for (let y = -50; y < 400; y += 80) {
-        for (let x = -50; x < 300; x += 120) {
+      doc.setTextColor(235, 235, 235);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(40);
+      for (let y = -100; y < 500; y += 130) {
+        for (let x = -100; x < 400; x += 200) {
           doc.text("RED ARQUIMAX", x, y, { angle: 45 });
         }
       }
@@ -118,23 +119,37 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     const doc = new jsPDF('p', 'mm', 'a4');
     const BRAND_COLOR = [174, 26, 226];
 
-    doc.setFontSize(22);
+    // Configuración estética
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(24);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("RED ARQUIMAX - Plano de Corte", 105, 20, { align: 'center' });
+    doc.text("RED ARQUIMAX", 105, 20, { align: 'center' });
     
+    doc.setFontSize(14);
+    doc.setTextColor(80, 80, 80);
+    doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
+    
+    doc.setDrawColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+    doc.setLineWidth(0.5);
+    doc.line(20, 32, 190, 32);
+
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.text(`Espesor: ${targetThickness}mm | Tablero: ${selectedPanel.name} | Eficiencia: ${result.totalEfficiency.toFixed(1)}%`, 20, 35);
+    doc.setTextColor(60, 60, 60);
+    const summaryText = `Material: MDF ${targetThickness}mm | Tablero: ${selectedPanel.name} | Aprovechamiento: ${result.totalEfficiency.toFixed(1)}%`;
+    doc.text(summaryText, 20, 42);
 
     (doc as any).autoTable({
       head: [['Pieza', 'Largo (mm)', 'Ancho (mm)', 'Cant.', 'Veta']],
       body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection]),
-      startY: 40,
-      headStyles: { fillColor: BRAND_COLOR }
+      startY: 48,
+      headStyles: { fillColor: BRAND_COLOR, font: 'helvetica', fontStyle: 'bold' },
+      styles: { font: 'helvetica', fontSize: 9 },
+      alternateRowStyles: { fillColor: [248, 248, 248] }
     });
 
     drawWatermark(doc);
-    doc.save(`planocorte-${targetThickness}mm-${Date.now()}.pdf`);
+    doc.save(`planocorte-arquimax-${targetThickness}mm-${Date.now()}.pdf`);
   };
 
   return (

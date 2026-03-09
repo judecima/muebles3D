@@ -19,14 +19,6 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/co
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
-// Motores de ingeniería
-import { kitchenBaseEngine } from '@/engines/kitchenBaseEngine';
-import { deskEngine } from '@/engines/deskEngine';
-import { tvRackEngine } from '@/engines/tvRackEngine';
-import { kitchenWallEngine } from '@/engines/kitchenWallEngine';
-import { closetEngine } from '@/engines/closetEngine';
-import { bookshelfEngine } from '@/engines/bookshelfEngine';
-
 const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
   rackTV: { width: 1600, height: 500, depth: 400, thickness: 18, hasBack: true },
@@ -50,22 +42,27 @@ export default function Home() {
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
+  // Importación dinámica de motores
+  const getEngine = (t: FurnitureType) => {
+    switch (t) {
+      case 'bajoMesada': return require('@/engines/kitchenBaseEngine').kitchenBaseEngine;
+      case 'escritorio': return require('@/engines/deskEngine').deskEngine;
+      case 'rackTV': return require('@/engines/tvRackEngine').tvRackEngine;
+      case 'alacena': return require('@/engines/kitchenWallEngine').kitchenWallEngine;
+      case 'placard': return require('@/engines/closetEngine').closetEngine;
+      case 'biblioteca': return require('@/engines/bookshelfEngine').bookshelfEngine;
+      default: return () => ({ parts: [], summary: '', hasDoors: false, hasDrawers: false });
+    }
+  };
+
   useEffect(() => {
     setDimensions(DEFAULT_DIMENSIONS[type]);
     setAction('reset');
   }, [type]);
 
   const generateFurniture = () => {
-    let result: FurnitureModel;
-    switch (type) {
-      case 'bajoMesada': result = kitchenBaseEngine(dimensions); break;
-      case 'escritorio': result = deskEngine(dimensions); break;
-      case 'rackTV': result = tvRackEngine(dimensions); break;
-      case 'alacena': result = kitchenWallEngine(dimensions); break;
-      case 'placard': result = closetEngine(dimensions); break;
-      case 'biblioteca': result = bookshelfEngine(dimensions); break;
-      default: result = { parts: [], summary: '', hasDoors: false, hasDrawers: false };
-    }
+    const engine = getEngine(type);
+    const result: FurnitureModel = engine(dimensions);
     setParts(result.parts);
     setHasDoors(result.hasDoors);
     setHasDrawers(result.hasDrawers);
@@ -84,14 +81,15 @@ export default function Home() {
     }
   };
 
-  const drawWatermark = (doc: any) => {
+  const drawWatermark = (doc: jsPDF) => {
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setTextColor(240, 240, 240);
-      doc.setFontSize(30);
-      for (let y = -50; y < 400; y += 80) {
-        for (let x = -50; x < 300; x += 120) {
+      doc.setTextColor(235, 235, 235);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(35);
+      for (let y = -100; y < 500; y += 120) {
+        for (let x = -100; x < 400; x += 180) {
           doc.text("RED ARQUIMAX", x, y, { angle: 45 });
         }
       }
@@ -102,26 +100,41 @@ export default function Home() {
     const doc = new jsPDF();
     const BRAND_COLOR = [174, 26, 226];
 
+    // Configuración de fuente agradable
+    doc.setFont('helvetica', 'bold');
+
     // Portada
-    doc.setFontSize(22);
+    doc.setFontSize(26);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("RED ARQUIMAX - Ficha Técnica", 105, 30, { align: 'center' });
+    doc.text("RED ARQUIMAX", 105, 30, { align: 'center' });
     
-    doc.setFontSize(12);
+    doc.setFontSize(14);
+    doc.setTextColor(80, 80, 80);
+    doc.text("Ficha Técnica de Fabricación", 105, 40, { align: 'center' });
+    
+    doc.setDrawColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+    doc.setLineWidth(1);
+    doc.line(20, 45, 190, 45);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Mueble: ${type.toUpperCase()}`, 105, 40, { align: 'center' });
-    doc.text(`Dimensiones: ${dimensions.width}x${dimensions.height}x${dimensions.depth} mm`, 105, 48, { align: 'center' });
+    doc.text(`Proyecto: ${type.toUpperCase()}`, 20, 60);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 67);
+    doc.text(`Dimensiones Totales: ${dimensions.width} x ${dimensions.height} x ${dimensions.depth} mm`, 20, 74);
 
     // Captura 3D Técnica (Ángulo 45°)
     if (viewerRef.current) {
       const img = viewerRef.current.getScreenshot();
       if (img) {
-        doc.addImage(img, 'PNG', 15, 60, 180, 120);
+        doc.addImage(img, 'PNG', 15, 85, 180, 120);
       }
     }
 
+    // Listado de Cortes
     doc.addPage();
-    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.text("Listado Detallado de Cortes", 15, 20);
     
@@ -133,8 +146,9 @@ export default function Home() {
       head: [['Pieza', 'Largo (mm)', 'Ancho (mm)', 'Espesor', 'Cant.', 'Veta']],
       body: panelRows,
       startY: 30,
-      headStyles: { fillColor: BRAND_COLOR },
-      styles: { fontSize: 9 }
+      headStyles: { fillColor: BRAND_COLOR, font: 'helvetica', fontStyle: 'bold' },
+      styles: { font: 'helvetica', fontSize: 9 },
+      alternateRowStyles: { fillColor: [250, 250, 250] }
     });
 
     drawWatermark(doc);
