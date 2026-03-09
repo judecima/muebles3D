@@ -13,6 +13,7 @@ export const COLOR_PALETTE: Record<FurnitureColor, string> = {
 
 export interface Part {
   id: string;
+  groupId?: string; // Identificador de grupo para interacción independiente
   name: string;
   width: number;  // Dimensión 3D X
   height: number; // Dimensión 3D Y

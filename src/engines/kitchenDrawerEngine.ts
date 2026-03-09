@@ -26,10 +26,10 @@ export function kitchenDrawerEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   }
 
-  const usableH = H - T - 4; // Altura útil considerando base y luz superior
-  const drawerFrontH = (usableH - 8) / 3; // Luz de 4mm entre cajones
+  const usableH = H - T - 4; 
+  const drawerFrontH = (usableH - 8) / 3; 
   const drawerGap = 4;
-  const drawerW = innerW - 26; // Espacio para rieles telescópicos
+  const drawerW = innerW - 26; 
   const drawerD = D - 50;
   const drawerBoxH = Math.round(drawerFrontH * 0.75);
 
@@ -37,37 +37,31 @@ export function kitchenDrawerEngine(dim: FurnitureDimensions): FurnitureModel {
     const prefix = `k-drawer-${i}`;
     const posY = T + 2 + (i * (drawerFrontH + drawerGap)) + (drawerFrontH / 2);
     
-    // 1. Frente Estético (Tapa)
     parts.push({ 
       id: `${prefix}-front-aesthetic`, 
+      groupId: prefix,
       name: `Frente Estético Cajón ${i+1}`, 
       width: W - 4, height: drawerFrontH - 2, depth: T, 
       x: W/2, y: posY, z: D/2 + T/2, 
       type: 'drawer', cutLargo: drawerFrontH - 2, cutAncho: W - 4, cutEspesor: T, grainDirection: 'horizontal' 
     });
 
-    // 2. Frente Estructura de la Caja
     parts.push({ 
       id: `${prefix}-box-front`, 
+      groupId: prefix,
       name: `Frente Estruct. Caja ${i+1}`, 
       width: drawerW - 2*T, height: drawerBoxH, depth: T, 
       x: W/2, y: posY, z: D/2 - T/2, 
       type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' 
     });
 
-    // 3. Laterales de Caja
-    parts.push({ id: `${prefix}-box-side-L`, name: `Lat. Izq. Caja ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-box-side-R`, name: `Lat. Der. Caja ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-L`, groupId: prefix, name: `Lat. Izq. Caja ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-R`, groupId: prefix, name: `Lat. Der. Caja ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-back`, groupId: prefix, name: `Trasera Caja ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: W/2, y: posY, z: D/2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Piso Caja ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD, x: W/2, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
     
-    // 4. Trasera de Caja
-    parts.push({ id: `${prefix}-box-back`, name: `Trasera Caja ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: W/2, y: posY, z: D/2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    
-    // 5. Piso de Caja
-    parts.push({ id: `${prefix}-box-bottom`, name: `Piso Caja ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD, x: W/2, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
-    
-    // Herrajes
-    parts.push({ id: `${prefix}-rail-L`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: T + 6.5, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-rail-R`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: W - T - 6.5, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-rail-L`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: T + 6.5, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: W - T - 6.5, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   }
 
   return { parts, summary: 'Bajo mesada cajonera con sistema de caja independiente y frente estético.', hasDoors: false, hasDrawers: true };

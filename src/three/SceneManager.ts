@@ -50,7 +50,6 @@ export class SceneManager {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
-    // Iluminación mejorada (Superior Frontal)
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
 
@@ -61,7 +60,6 @@ export class SceneManager {
     dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
 
-    // Sombra de contacto suave
     const groundGeom = new THREE.PlaneGeometry(10000, 10000);
     const groundMat = new THREE.ShadowMaterial({ opacity: 0.15 });
     const ground = new THREE.Mesh(groundGeom, groundMat);
@@ -100,18 +98,17 @@ export class SceneManager {
       }
 
       const id = object.userData.id;
+      const groupId = object.userData.groupId || id;
       const type = object.userData.type;
 
-      // Resaltado de selección
       this.highlightObject(object);
 
       if (type?.includes('door')) {
-        const isOpen = !this.itemStates.get(id);
-        this.toggleSingleDoor(id, isOpen);
+        const isOpen = !this.itemStates.get(groupId);
+        this.toggleSingleDoor(groupId, isOpen);
       } else if (type === 'drawer') {
-        const prefix = id.split('-').slice(0, 2).join('-');
-        const isOpen = !this.itemStates.get(prefix);
-        this.toggleSingleDrawer(prefix, isOpen);
+        const isOpen = !this.itemStates.get(groupId);
+        this.toggleSingleDrawer(groupId, isOpen);
       }
     }
   };
@@ -148,7 +145,7 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      obj.rotation.x = open ? -1.745 : 0; // ~100 grados
+      obj.rotation.x = open ? -1.745 : 0; 
     }
   }
 
@@ -182,10 +179,10 @@ export class SceneManager {
     });
   }
 
-  private toggleSingleDrawer(prefix: string, open: boolean) {
-    this.itemStates.set(prefix, open);
+  private toggleSingleDrawer(groupId: string, open: boolean) {
+    this.itemStates.set(groupId, open);
     this.partsMap.forEach((obj, id) => {
-      if (id.startsWith(prefix) && obj.userData.type === 'drawer') {
+      if ((id.startsWith(groupId) || obj.userData.groupId === groupId) && obj.userData.type === 'drawer') {
         const orig = obj.userData.originalPosition as THREE.Vector3;
         obj.position.z = open ? orig.z + 400 : orig.z;
       }
@@ -211,7 +208,7 @@ export class SceneManager {
 
     const hexBase = COLOR_PALETTE[color];
     const baseColor = new THREE.Color(hexBase);
-    const interiorColor = baseColor.clone().offsetHSL(0, 0, 0.1); // +10% luminosidad
+    const interiorColor = baseColor.clone().offsetHSL(0, 0, 0.1); 
 
     parts.forEach(part => {
       if (part.type === 'piston-body') {
@@ -225,7 +222,7 @@ export class SceneManager {
         const radius = 17.5; 
         const height = 12;
         geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
-        if (part.id.includes('flip')) {
+        if (part.groupId?.includes('flip') || part.id.includes('flip')) {
           geometry.rotateX(0); 
         } else {
           geometry.rotateZ(Math.PI / 2); 
@@ -244,7 +241,6 @@ export class SceneManager {
       } else if (part.name.includes('Fondo')) {
         material = new THREE.MeshStandardMaterial({ color: this.colors.mdf_back, roughness: 0.9 });
       } else {
-        // Determinar si es interior (estantes, cajas de cajón, refuerzos)
         const isInternal = part.name.includes('Estante') || 
                            part.name.includes('Cajón') && !part.name.includes('Frente') ||
                            part.name.includes('Refuerzo') ||
@@ -260,7 +256,6 @@ export class SceneManager {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = mesh.receiveShadow = true;
 
-      // Sistema de bordes (Estilo Sketch)
       if (!part.isHardware) {
         const edges = new THREE.EdgesGeometry(geometry);
         const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.5 }));
@@ -270,6 +265,7 @@ export class SceneManager {
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
       mesh.userData.id = part.id;
+      mesh.userData.groupId = part.groupId;
 
       if ((part.type === 'door-left' || part.type === 'door-right' || part.type === 'door-flip') && part.pivot) {
         const pivotGroup = new THREE.Group();
@@ -288,6 +284,7 @@ export class SceneManager {
         pivotGroup.userData.originalPosition = pivotGroup.position.clone();
         pivotGroup.userData.type = part.type;
         pivotGroup.userData.id = part.id;
+        pivotGroup.userData.groupId = part.groupId;
         this.furnitureGroup.add(pivotGroup);
         this.partsMap.set(part.id, pivotGroup);
       } else {
@@ -338,6 +335,7 @@ export class SceneManager {
     rod.add(ballPuerta);
     
     group.userData.id = part.id;
+    group.userData.groupId = part.groupId;
     group.userData.type = 'piston-body';
     group.userData.config = config;
     group.userData.originalPosition = group.position.clone();
@@ -370,7 +368,8 @@ export class SceneManager {
     this.partsMap.forEach((obj, id) => {
       const type = obj.userData.type;
       if (type === 'door-left' || type === 'door-right' || type === 'door-flip') {
-        this.toggleSingleDoor(id, open);
+        const groupId = obj.userData.groupId || id;
+        this.toggleSingleDoor(groupId, open);
       }
     });
   }
@@ -379,12 +378,12 @@ export class SceneManager {
     const drawerGroups = new Set<string>();
     this.partsMap.forEach((obj, id) => {
       if (obj.userData.type === 'drawer') {
-        const prefix = id.split('-').slice(0, 2).join('-');
-        drawerGroups.add(prefix);
+        const groupId = obj.userData.groupId || id.split('-').slice(0, 2).join('-');
+        drawerGroups.add(groupId);
       }
     });
 
-    drawerGroups.forEach(prefix => this.toggleSingleDrawer(prefix, open));
+    drawerGroups.forEach(groupId => this.toggleSingleDrawer(groupId, open));
   }
 
   public explodeView(factor: number) {
@@ -405,10 +404,8 @@ export class SceneManager {
       obj.rotation.set(0, 0, 0);
       this.itemStates.set(id, false);
       
-      if (obj.userData.type === 'drawer') {
-        const prefix = id.split('-').slice(0, 2).join('-');
-        this.itemStates.set(prefix, false);
-      }
+      const groupId = obj.userData.groupId;
+      if (groupId) this.itemStates.set(groupId, false);
     });
   }
 

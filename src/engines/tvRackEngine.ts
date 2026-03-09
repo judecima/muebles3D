@@ -40,25 +40,31 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     const prefix = `cajon-${config.id}`;
     const posY = H/2;
 
-    // 1. Frente Estético
-    parts.push({ id: `${prefix}-front-aesthetic`, name: `Frente Estético Cajón ${config.id}`, width: compW - 4, height: H - 2*T - 4, depth: T, x: config.x, y: posY, z: D/2 + T/2, type: 'drawer', cutLargo: H - 2*T - 4, cutAncho: compW - 4, cutEspesor: T, grainDirection: 'vertical' });
+    parts.push({ 
+      id: `${prefix}-front-aesthetic`, 
+      groupId: prefix,
+      name: `Frente Estético Cajón ${config.id}`, 
+      width: compW - 4, height: H - 2*T - 4, depth: T, 
+      x: config.x, y: posY, z: D/2 + T/2, 
+      type: 'drawer', cutLargo: H - 2*T - 4, cutAncho: compW - 4, cutEspesor: T, grainDirection: 'vertical' 
+    });
     
-    // 2. Frente Estructura Caja
-    parts.push({ id: `${prefix}-box-front`, name: `Frente Estruct. Caja ${config.id}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: config.x, y: posY, z: D/2 - T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ 
+      id: `${prefix}-box-front`, 
+      groupId: prefix,
+      name: `Frente Estruct. Caja ${config.id}`, 
+      width: drawerW - 2*T, height: drawerBoxH, depth: T, 
+      x: config.x, y: posY, z: D/2 - T/2, 
+      type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' 
+    });
 
-    // 3. Laterales Caja
-    parts.push({ id: `${prefix}-box-side-L`, name: `Lateral Izq. Caja ${config.id}`, width: T, height: drawerBoxH, depth: drawerD, x: config.x - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-box-side-R`, name: `Lateral Der. Caja ${config.id}`, width: T, height: drawerBoxH, depth: drawerD, x: config.x + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-L`, groupId: prefix, name: `Lateral Izq. Caja ${config.id}`, width: T, height: drawerBoxH, depth: drawerD, x: config.x - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-R`, groupId: prefix, name: `Lateral Der. Caja ${config.id}`, width: T, height: drawerBoxH, depth: drawerD, x: config.x + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-back`, groupId: prefix, name: `Trasera Caja ${config.id}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: config.x, y: posY, z: D/2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Piso Caja ${config.id}`, width: drawerW - 2*T, height: 3, depth: drawerD, x: config.x, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
     
-    // 4. Trasera Caja
-    parts.push({ id: `${prefix}-box-back`, name: `Trasera Caja ${config.id}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: config.x, y: posY, z: D/2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    
-    // 5. Piso Caja
-    parts.push({ id: `${prefix}-box-bottom`, name: `Piso Caja ${config.id}`, width: drawerW - 2*T, height: 3, depth: drawerD, x: config.x, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
-    
-    // Herrajes
-    parts.push({ id: `${prefix}-rail-L`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: config.railLX, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-rail-R`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: config.railRX, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-rail-L`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: config.railLX, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: config.railRX, y: posY, z: D/2 - drawerD/2 - T, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   });
 
   return { parts, summary: 'Rack TV con cajones de sistema independiente.', hasDoors: false, hasDrawers: true };
