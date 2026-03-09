@@ -80,7 +80,6 @@ export class SceneManager {
     this.clearFurniture();
     
     parts.forEach(part => {
-      // No renderizamos herrajes visualmente para mantener la escena limpia
       if (part.type === 'hardware') return;
 
       const geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
@@ -93,13 +92,16 @@ export class SceneManager {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
 
+      // Guardar metadatos para simulación
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
 
       if ((part.type === 'door-left' || part.type === 'door-right') && part.pivot) {
+        // Crear sistema de pivote para puertas
         const hingeGroup = new THREE.Group();
         hingeGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
         
+        // La malla se posiciona relativa al grupo de la bisagra
         const offsetX = part.type === 'door-left' ? part.width / 2 : -part.width / 2;
         mesh.position.set(offsetX, 0, part.z - part.pivot.z);
         
@@ -122,10 +124,11 @@ export class SceneManager {
 
   public setDoors(open: boolean) {
     this.partsMap.forEach((obj) => {
+      // Detectar si el objeto es un grupo de bisagra
       const partType = obj.children[0]?.userData.type || obj.userData.type;
       if (partType === 'door-left' || partType === 'door-right') {
-        // Apertura realista: 95 grados (aprox Math.PI / 1.9)
-        const maxAngle = Math.PI / 1.9;
+        // Apertura estricta de 90 grados
+        const maxAngle = Math.PI / 2;
         const angle = open ? (partType === 'door-left' ? maxAngle : -maxAngle) : 0;
         obj.rotation.y = angle;
       }
