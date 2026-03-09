@@ -39,6 +39,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     hingeCount
   });
 
+  // Bisagras circulares internas (Cazoleta)
   for (let i = 0; i < hingeCount; i++) {
     const posX = i === 0 ? 70 : (i === 1 ? W - 70 : W/2);
     parts.push({
@@ -48,6 +49,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   }
 
+  // Soportes para colgar
   [30, W - 30].forEach((posX, i) => {
     parts.push({
       id: `hang-support-${i}`, name: 'Soporte Regulable Blanco', width: 40, height: 40, depth: 20, 
@@ -56,6 +58,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   });
 
+  // Pistones Neumáticos
   const pistonCount = W <= 800 ? 1 : 2;
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
@@ -64,20 +67,20 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
 
   sides.forEach(side => {
     const sideX = side === 'left' ? T + 2 : W - T - 2;
-    const doorX = side === 'left' ? 40 : W - 40;
+    const doorX = side === 'left' ? 60 : W - 60; // Alineado cerca de la bisagra (70mm)
 
     parts.push({
       id: `piston-${side}`,
       name: 'Pistón a Gas',
       width: 15, height: 15, depth: L_closed,
-      x: sideX, y: 60, z: D/2 - 20,
+      x: sideX, y: T + 5, z: D/2 - 20, // Comienza sobre la base
       type: 'piston-body',
       isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre',
       pistonConfig: {
         side,
-        anchorMueble: { x: 20, y: 60, z: D/2 - 20 },
-        anchorPuerta: { x: doorX, y: H - 30, z: D/2 + T },
+        anchorMueble: { x: sideX, y: T + 5, z: D/2 - 20 },
+        anchorPuerta: { x: doorX, y: H - 40, z: D/2 + T }, // Finaliza en la puerta cerca de la bisagra
         lengthClosed: L_closed,
         lengthOpen: L_open
       }

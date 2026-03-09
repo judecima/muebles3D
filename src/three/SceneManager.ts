@@ -111,7 +111,7 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      obj.rotation.x = open ? -1.745 : 0; 
+      obj.rotation.x = open ? -1.745 : 0; // 100 degrees
       this.updatePistons(open, obj);
     }
   }
@@ -136,8 +136,12 @@ export class SceneManager {
         if (rod) {
           const cylinderLen = config.lengthClosed * 0.6;
           const currentExtension = distance - cylinderLen;
-          rod.scale.z = currentExtension / (config.lengthClosed * 0.4); 
-          rod.position.z = (cylinderLen / 2) + (currentExtension / 2);
+          // Limitar extensión para evitar que el vástago "vuele"
+          const maxExtension = config.lengthOpen - cylinderLen;
+          const extensionFactor = Math.min(Math.max(currentExtension, 0), maxExtension);
+          
+          rod.scale.z = extensionFactor / (config.lengthClosed * 0.4); 
+          rod.position.z = (cylinderLen / 2) + (extensionFactor / 2);
         }
       }
     });
