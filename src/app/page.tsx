@@ -26,7 +26,7 @@ const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   alacena: { width: 800, height: 600, depth: 320, thickness: 18, hasBack: true },
   placard: { width: 1800, height: 2100, depth: 600, thickness: 18, hasBack: true },
   biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasBack: true },
-  alacenaFlip: { width: 600, height: 510, depth: 320, thickness: 15, hasBack: true, hasShelf: true },
+  alacenaFlip: { width: 500, height: 300, depth: 320, thickness: 18, hasBack: true, hasShelf: false },
 };
 
 export default function Home() {

@@ -109,7 +109,8 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      obj.rotation.x = open ? -Math.PI / 1.9 : 0; // Aproximadamente 95 grados
+      // Apertura a 100 grados (aprox 1.74 rad)
+      obj.rotation.x = open ? -1.74 : 0; 
       this.updatePistons(open);
     }
   }
@@ -119,12 +120,12 @@ export class SceneManager {
       if (obj.userData.type === 'piston-body') {
         const rod = obj.getObjectByName('rod');
         if (rod) {
-          // Animación telescópica: escala y traslación
-          // Extendido: 350mm, Cerrado: 240mm
-          const scale = open ? 350/240 : 1;
+          // Animación telescópica 220mm -> 340mm
+          const scale = open ? 340/220 : 1;
           rod.scale.z = scale;
-          // Ajustar rotación para seguir el anclaje si fuera cinemática pura, 
-          // pero para MVP simplificamos el escalado lineal en su eje local
+          
+          // El pistón debería rotar para seguir el anclaje de la puerta
+          // En un MVP escalamos, pero para mayor realismo podríamos orientar hacia el nuevo punto
         }
       }
     });
@@ -172,7 +173,8 @@ export class SceneManager {
       let material: THREE.MeshStandardMaterial;
 
       if (part.isHardware) {
-        material = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.1, metalness: 0.9 });
+        const colorVal = part.name.includes('Blanco') ? 0xffffff : 0x64748b;
+        material = new THREE.MeshStandardMaterial({ color: colorVal, roughness: 0.2, metalness: 0.7 });
       } else {
         material = new THREE.MeshStandardMaterial({ 
           color: color === 'alarce-blanco' ? 0xffffff : 0x4a3728, 
@@ -185,7 +187,7 @@ export class SceneManager {
       mesh.castShadow = mesh.receiveShadow = true;
 
       const edges = new THREE.EdgesGeometry(geometry);
-      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.2 }));
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.15 }));
       mesh.add(line);
 
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
@@ -225,37 +227,35 @@ export class SceneManager {
     const group = new THREE.Group();
     group.position.set(part.x, part.y, part.z);
 
-    // Cilindro principal (Negro Mate)
-    const cylinderGeom = new THREE.CylinderGeometry(6, 6, 180, 16);
+    // Cilindro (Negro)
+    const cylinderGeom = new THREE.CylinderGeometry(5, 5, 160, 16);
     cylinderGeom.rotateX(Math.PI / 2);
     const cylinderMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
     const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
     group.add(cylinder);
 
-    // Vástago (Metal Cromado)
-    const rodGeom = new THREE.CylinderGeometry(3.5, 3.5, 150, 16);
+    // Vástago (Metal)
+    const rodGeom = new THREE.CylinderGeometry(3, 3, 140, 16);
     rodGeom.rotateX(Math.PI / 2);
-    rodGeom.translate(0, 0, 75); // Pivote en la base para escalado local
+    rodGeom.translate(0, 0, 70); 
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
     const rod = new THREE.Mesh(rodGeom, rodMat);
     rod.name = 'rod';
-    rod.position.z = 90;
+    rod.position.z = 80;
     group.add(rod);
 
-    // Soportes (Acero)
-    const supportGeom = new THREE.BoxGeometry(20, 20, 5);
-    const supportMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8 });
+    // Soportes de acero
+    const supportGeom = new THREE.SphereGeometry(8, 16, 16);
+    const supportMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 });
     const support1 = new THREE.Mesh(supportGeom, supportMat);
-    support1.position.z = -90;
+    support1.position.z = -80;
     group.add(support1);
 
     const support2 = new THREE.Mesh(supportGeom, supportMat);
-    support2.position.z = 240;
-    rod.add(support2); // Anclado al vástago para moverse con él
+    support2.position.z = 220;
+    rod.add(support2);
 
-    // Orientación inicial hacia la puerta
     if (part.pistonConfig) {
-      const p1 = new THREE.Vector3(part.pistonConfig.anchorMueble.x, part.pistonConfig.anchorMueble.y, part.pistonConfig.anchorMueble.z);
       const p2 = new THREE.Vector3(part.pistonConfig.anchorPuerta.x, part.pistonConfig.anchorPuerta.y, part.pistonConfig.anchorPuerta.z);
       group.lookAt(p2);
     }
@@ -349,8 +349,9 @@ export class SceneManager {
     const size = new THREE.Vector3();
     box.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = maxDim * 2.5;
     
+    // Vista técnica isométrica (ángulo de ~45 grados)
+    const dist = maxDim * 2.5;
     this.camera.position.set(center.x + dist, center.y + dist, center.z + dist);
     this.controls.target.copy(center);
     this.controls.update();
