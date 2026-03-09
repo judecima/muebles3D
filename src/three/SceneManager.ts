@@ -36,7 +36,6 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
-    // Limpiar contenedor antes de añadir el canvas para evitar duplicados
     while (this.container.firstChild) {
       this.container.removeChild(this.container.firstChild);
     }
@@ -128,7 +127,6 @@ export class SceneManager {
   };
 
   public async buildFurniture(parts: Part[], color: FurnitureColor) {
-    // Limpieza profunda de la escena
     while (this.furnitureGroup.children.length > 0) {
       const child = this.furnitureGroup.children[0];
       this.disposeObject(child);
@@ -186,8 +184,28 @@ export class SceneManager {
       }
     });
 
+    this.fitCameraToFurniture();
+  }
+
+  private fitCameraToFurniture() {
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
-    box.getCenter(this.controls.target);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = this.camera.fov * (Math.PI / 180);
+    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+
+    cameraDistance *= 2.2; // Factor de zoom para dejar margen
+
+    // Mantenemos el ángulo de visión diagonal por defecto
+    const direction = new THREE.Vector3(1, 0.7, 1).normalize();
+    this.camera.position.copy(direction.multiplyScalar(cameraDistance).add(center));
+
+    this.controls.target.copy(center);
+    this.controls.update();
   }
 
   public setDoors(open: boolean) {
