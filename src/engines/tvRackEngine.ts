@@ -11,15 +11,15 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'divisor', name: 'Divisor Central', width: T, height: H - 2*T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static' },
   ];
 
-  const slideClearance = 26;
-  const drawerW = (W - 3*T) / 2 - 4;
-  const drawerBoxW = drawerW - slideClearance;
+  const railSpace = 26;
+  const compW = (W - 3*T) / 2;
+  const drawerW = compW - railSpace;
+  const drawerD = D - 40;
   const drawerH = H - 2*T - 30;
-  const drawerD = D * 0.8;
 
   const drawerConfigs = [
-    { x: T + drawerW/2 + 2, id: '1', railLX: T + 6, railRX: W/2 - T/2 - 6 },
-    { x: W - T - drawerW/2 - 2, id: '2', railLX: W/2 + T/2 + 6, railRX: W - T - 6 }
+    { x: T + compW/2, id: '1', railLX: T + 6.5, railRX: W/2 - T/2 - 6.5 },
+    { x: W - T - compW/2, id: '2', railLX: W/2 + T/2 + 6.5, railRX: W - T - 6.5 }
   ];
 
   drawerConfigs.forEach((config) => {
@@ -27,18 +27,28 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     const posY = H/2;
 
     // Frente
-    parts.push({ id: `${prefix}-frente`, name: `Frente Cajón ${config.id}`, width: drawerW, height: H - 2*T - 4, depth: T, x: config.x, y: posY, z: D/2 + T/2, type: 'drawer' });
+    parts.push({ id: `${prefix}-frente`, name: `Frente Cajón ${config.id}`, width: compW - 4, height: H - 2*T - 4, depth: T, x: config.x, y: posY, z: D/2 + T/2, type: 'drawer' });
     
     // Caja
-    parts.push({ id: `${prefix}-lat-izq`, name: `Lat. Izq. Cajón ${config.id}`, width: T, height: drawerH, depth: drawerD, x: config.x - drawerBoxW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
-    parts.push({ id: `${prefix}-lat-der`, name: `Lat. Der. Cajón ${config.id}`, width: T, height: drawerH, depth: drawerD, x: config.x + drawerBoxW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
-    parts.push({ id: `${prefix}-trasera`, name: `Trasera Cajón ${config.id}`, width: drawerBoxW - 2*T, height: drawerH, depth: T, x: config.x, y: posY, z: D/2 - drawerD + T/2, type: 'drawer' });
-    parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${config.id}`, width: drawerBoxW - 2*T, height: 3, depth: drawerD - T, x: config.x, y: posY - drawerH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer' });
+    parts.push({ id: `${prefix}-lat-izq`, name: `Lateral Izq. Cajón ${config.id}`, width: T, height: drawerH, depth: drawerD, x: config.x - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
+    parts.push({ id: `${prefix}-lat-der`, name: `Lateral Der. Cajón ${config.id}`, width: T, height: drawerH, depth: drawerD, x: config.x + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
+    parts.push({ id: `${prefix}-trasera`, name: `Trasera Cajón ${config.id}`, width: drawerW - 2*T, height: drawerH, depth: T, x: config.x, y: posY, z: D/2 - drawerD + T/2, type: 'drawer' });
+    parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${config.id}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, x: config.x, y: posY - drawerH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer' });
     
     // Rieles
-    parts.push({ id: `${prefix}-riel-L`, name: `Riel Izq. Cajón ${config.id}`, width: 12, height: 45, depth: drawerD, x: config.railLX, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true });
-    parts.push({ id: `${prefix}-riel-R`, name: `Riel Der. Cajón ${config.id}`, width: 12, height: 45, depth: drawerD, x: config.railRX, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true });
+    parts.push({ 
+      id: `${prefix}-riel-L`, name: `Riel Telescópico ${drawerD}mm`, 
+      width: 13, height: 35, depth: drawerD, 
+      x: config.railLX, y: posY, z: D/2 - drawerD/2, 
+      type: 'hardware', isHardware: true 
+    });
+    parts.push({ 
+      id: `${prefix}-riel-R`, name: `Riel Telescópico ${drawerD}mm`, 
+      width: 13, height: 35, depth: drawerD, 
+      x: config.railRX, y: posY, z: D/2 - drawerD/2, 
+      type: 'hardware', isHardware: true 
+    });
   });
 
-  return { parts, summary: 'Rack TV con cajones técnicos y rieles metálicos.' };
+  return { parts, summary: 'Rack TV con cajones técnicos duales y cálculo de rieles de 26mm.' };
 }

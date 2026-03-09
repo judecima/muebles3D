@@ -176,7 +176,7 @@ export class SceneManager {
 
   public setDrawers(open: boolean) {
     this.partsMap.forEach((obj) => {
-      // Solo mover las piezas tipo 'drawer' (la caja), los rieles ('hardware') quedan fijos
+      // Solo mover las piezas tipo 'drawer', los rieles ('hardware') quedan anclados
       if (obj.userData.type === 'drawer') {
         const originalPos = obj.userData.originalPosition as THREE.Vector3;
         obj.position.z = open ? originalPos.z + 400 : originalPos.z;

@@ -13,7 +13,7 @@ export function CutlistTable({ parts }: CutlistTableProps) {
   const panels = parts.filter(p => !p.isHardware);
   const hardware = parts.filter(p => p.isHardware);
 
-  // Agrupar paneles por dimensiones
+  // Agrupar paneles por dimensiones (MDF)
   const aggregatedPanels = panels.reduce((acc, part) => {
     const key = `${part.name}-${part.width}-${part.height}-${part.depth}`;
     if (!acc[key]) {
@@ -23,9 +23,9 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     return acc;
   }, {} as Record<string, Part & { quantity: number }>);
 
-  // Agrupar herrajes por nombre
+  // Agrupar herrajes por nombre y largo
   const aggregatedHardware = hardware.reduce((acc, part) => {
-    const key = part.name;
+    const key = `${part.name}-${part.depth}`;
     if (!acc[key]) {
       acc[key] = { ...part, quantity: 0 };
     }
@@ -40,16 +40,16 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
       <CardHeader className="py-3 px-6 bg-slate-50 shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
-          <ListChecks className="w-4 h-4" /> Despiece de Materiales y Herrajes
+          <ListChecks className="w-4 h-4" /> Despiece de Materiales (Cálculo Técnico)
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-y-auto flex-1 flex flex-col md:flex-row">
-        {/* Tabla de Paneles */}
+        {/* Tabla de Paneles MDF */}
         <div className="flex-1 border-r border-slate-100">
           <Table>
             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
               <TableRow>
-                <TableHead className="text-[10px] font-bold uppercase py-2">Pieza (Panel)</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase py-2">Pieza (Panel MDF)</TableHead>
                 <TableHead className="text-right text-[10px] font-bold uppercase py-2">Largo</TableHead>
                 <TableHead className="text-right text-[10px] font-bold uppercase py-2">Ancho</TableHead>
                 <TableHead className="text-right text-[10px] font-bold uppercase py-2">Espesor</TableHead>
@@ -82,16 +82,18 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                 <TableHead className="text-[10px] font-bold uppercase py-2 flex items-center gap-1">
                   <Settings className="w-3 h-3" /> Herrajes
                 </TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Largo</TableHead>
                 <TableHead className="text-right text-[10px] font-bold uppercase py-2">Cant.</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {hardwareList.length === 0 ? (
-                <TableRow><TableCell colSpan={2} className="text-center py-4 text-slate-400 italic">Sin accesorios</TableCell></TableRow>
+                <TableRow><TableCell colSpan={3} className="text-center py-4 text-slate-400 italic">Sin accesorios</TableCell></TableRow>
               ) : (
                 hardwareList.map((item, idx) => (
                   <TableRow key={idx} className="hover:bg-slate-50 transition-colors h-8">
                     <TableCell className="font-medium text-[11px] py-1">{item.name}</TableCell>
+                    <TableCell className="text-right text-[11px] py-1">{item.depth > 0 ? `${item.depth} mm` : '-'}</TableCell>
                     <TableCell className="text-right text-[11px] py-1 font-bold text-accent">{item.quantity}</TableCell>
                   </TableRow>
                 ))

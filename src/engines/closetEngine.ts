@@ -28,11 +28,12 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     pivot: { x: W, y: doorY, z: D / 2 }
   });
 
-  // Cajones Reales
-  const slideClearance = 26; // 13mm cada lado
-  const drawerW = W - 2*T - slideClearance;
-  const drawerH = 180;
+  // Cajones Técnicos
+  const innerW = W - 2*T;
+  const railSpace = 26; // 13mm cada lado
+  const drawerW = innerW - railSpace;
   const drawerD = D - 40;
+  const drawerH = 180;
 
   for (let i = 0; i < 2; i++) {
     const posY = T + 120 + (i * 220);
@@ -41,16 +42,26 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     // Frente
     parts.push({ id: `${prefix}-frente`, name: `Frente Cajón ${i+1}`, width: W - 2*T - 4, height: 210, depth: T, x: W/2, y: posY, z: D/2 + T/2, type: 'drawer' });
     
-    // Estructura Interna (Caja)
-    parts.push({ id: `${prefix}-lat-izq`, name: `Lat. Izq. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
-    parts.push({ id: `${prefix}-lat-der`, name: `Lat. Der. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
+    // Caja del Cajón
+    parts.push({ id: `${prefix}-lat-izq`, name: `Lateral Izq. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
+    parts.push({ id: `${prefix}-lat-der`, name: `Lateral Der. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
     parts.push({ id: `${prefix}-trasera`, name: `Trasera Cajón ${i+1}`, width: drawerW - 2*T, height: drawerH, depth: T, x: W/2, y: posY, z: D/2 - drawerD + T/2, type: 'drawer' });
     parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, x: W/2, y: posY - drawerH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer' });
 
-    // Rieles (Fijos al mueble)
-    parts.push({ id: `${prefix}-riel-izq`, name: `Riel Izq. Cajón ${i+1}`, width: 12, height: 45, depth: drawerD, x: T + 6, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true });
-    parts.push({ id: `${prefix}-riel-der`, name: `Riel Der. Cajón ${i+1}`, width: 12, height: 45, depth: drawerD, x: W - T - 6, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true });
+    // Rieles (Fijos al lateral interno del mueble)
+    parts.push({ 
+      id: `${prefix}-riel-izq`, name: `Riel Telescópico ${drawerD}mm`, 
+      width: 13, height: 35, depth: drawerD, 
+      x: T + 6.5, y: posY, z: D/2 - drawerD/2, 
+      type: 'hardware', isHardware: true 
+    });
+    parts.push({ 
+      id: `${prefix}-riel-der`, name: `Riel Telescópico ${drawerD}mm`, 
+      width: 13, height: 35, depth: drawerD, 
+      x: W - T - 6.5, y: posY, z: D/2 - drawerD/2, 
+      type: 'hardware', isHardware: true 
+    });
   }
 
-  return { parts, summary: 'Placard con cajones de construcción real y rieles metálicos.' };
+  return { parts, summary: 'Placard optimizado con descuento de 26mm para rieles y despiece técnico.' };
 }
