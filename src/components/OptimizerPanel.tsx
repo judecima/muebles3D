@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Part, AVAILABLE_PANELS, PanelSize } from '@/lib/types';
 import { optimizeCutLayout, OptimizeCutLayoutOutput } from '@/ai/flows/optimize-cut-layout-flow';
 import { Progress } from '@/components/ui/progress';
-import { Scissors, Loader2, Info } from 'lucide-react';
+import { Scissors, Loader2, Info, LayoutGrid } from 'lucide-react';
 
 interface OptimizerPanelProps {
   parts: Part[];
