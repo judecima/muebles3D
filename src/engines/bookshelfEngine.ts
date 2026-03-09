@@ -5,10 +5,10 @@ export function bookshelfEngine(dim: FurnitureDimensions): FurnitureModel {
   
   const numShelves = 4;
   const parts: Part[] = [
-    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'base', name: 'Base Inferior', width: W - 2*T, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'tapa', name: 'Tapa Superior', width: W - 2*T, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'libre' },
+    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'libre' },
+    { id: 'base', name: 'Base Inferior', width: W - 2*T, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'libre' },
+    { id: 'tapa', name: 'Tapa Superior', width: W - 2*T, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'libre' },
   ];
 
   if (hasBack) {
@@ -35,9 +35,9 @@ export function bookshelfEngine(dim: FurnitureDimensions): FurnitureModel {
       cutLargo: W - 2*T - 2,
       cutAncho: D * 0.95,
       cutEspesor: T,
-      grainDirection: 'horizontal'
+      grainDirection: 'libre'
     });
   }
 
-  return { parts, summary: `Biblioteca abierta con ${numShelves} estantes fijos.`, hasDoors: false, hasDrawers: false };
+  return { parts, summary: `Biblioteca con ${numShelves} estantes fijos.`, hasDoors: false, hasDrawers: false };
 }

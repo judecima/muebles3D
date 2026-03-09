@@ -136,8 +136,8 @@ export default function Home() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col relative overflow-hidden h-full">
-        <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full h-full flex flex-col">
+      <main className="flex-1 flex flex-col relative overflow-hidden h-full min-h-0">
+        <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full h-full flex flex-col min-h-0">
           {/* Header Bar */}
           <div className="flex items-center justify-between px-4 md:px-6 py-2 bg-white border-b shadow-sm z-30 shrink-0">
             <div className="flex items-center gap-2">
@@ -197,7 +197,7 @@ export default function Home() {
                 <h2 className="text-3xl md:text-6xl font-black text-primary">RED ARQUIMAX</h2>
               </div>
             </div>
-            <div className="h-1/3 md:h-1/3 border-t bg-white min-h-[200px]">
+            <div className="h-1/3 md:h-1/3 border-t bg-white min-h-[200px] shrink-0">
               <CutlistTable parts={parts} />
             </div>
           </TabsContent>

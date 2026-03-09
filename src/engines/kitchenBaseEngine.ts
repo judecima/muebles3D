@@ -1,16 +1,15 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
-  const { width: W, depth: D, thickness: T, hasBack, hasShelf } = dim;
-  const H = 870; // Altura fija Red Arquimax
+  const { width: W, height: H, depth: D, thickness: T, hasBack, hasShelf } = dim;
   const innerW = W - 2 * T;
 
   const parts: Part[] = [
-    { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'lat-R', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'base', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'amarre-front', name: 'Amarre Frontal (H)', width: innerW, height: T, depth: 60, x: W/2, y: H - T/2, z: D/2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'amarre-back', name: 'Amarre Trasero (V)', width: innerW, height: 60, depth: T, x: W/2, y: H - 30, z: -D/2 + T/2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'libre' },
+    { id: 'lat-R', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'libre' },
+    { id: 'base', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'libre' },
+    { id: 'amarre-front', name: 'Amarre Frontal (H)', width: innerW, height: T, depth: 60, x: W/2, y: H - T/2, z: D/2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'libre' },
+    { id: 'amarre-back', name: 'Amarre Trasero (V)', width: innerW, height: 60, depth: T, x: W/2, y: H - 30, z: -D/2 + T/2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'libre' },
   ];
 
   if (hasBack) {
@@ -23,7 +22,6 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   }
 
-  // Estante opcional para Bajo Mesada
   if (hasShelf) {
     parts.push({
       id: 'estante-interno',
@@ -38,7 +36,7 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
       cutLargo: innerW - 2,
       cutAncho: D * 0.9,
       cutEspesor: T,
-      grainDirection: 'horizontal'
+      grainDirection: 'libre'
     });
   }
 
@@ -52,7 +50,7 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     id: 'k-door-L', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, 
     x: doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-left',
     pivot: { x: 0, y: doorY, z: D / 2 },
-    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical',
+    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'libre',
     hingeCount
   });
 
@@ -60,13 +58,9 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     id: 'k-door-R', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, 
     x: W - doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-right',
     pivot: { x: W, y: doorY, z: D / 2 },
-    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical',
+    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'libre',
     hingeCount
   });
 
-  for (let i = 0; i < hingeCount * 2; i++) {
-    parts.push({ id: `bis-${i}`, name: 'Bisagra Cazoleta', width: 35, height: 35, depth: 12, x: 0, y: 0, z: 0, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
-  }
-
-  return { parts, summary: 'Bajo mesada Red Arquimax con amarres estructurales y opción de estante.', hasDoors: true, hasDrawers: false };
+  return { parts, summary: 'Bajo mesada Red Arquimax con amarres estructurales.', hasDoors: true, hasDrawers: false };
 }
