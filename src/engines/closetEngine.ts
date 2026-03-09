@@ -1,7 +1,7 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
-  const { width: W, height: H, depth: D, thickness: T } = dim;
+  const { width: W, height: H, depth: D, thickness: T, hasBack } = dim;
   
   const innerW = W - 2 * T;
   const railSpace = 26; // 13mm por lado
@@ -16,8 +16,17 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
     { id: 'tapa-sup', name: 'Tapa Superior', width: innerW, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'base-inf', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'fondo', name: 'Fondo Mueble', width: W - T, height: H - T, depth: 3, x: W/2, y: H/2, z: -D/2 + 1.5, type: 'static', cutLargo: H - T, cutAncho: W - T, cutEspesor: 3, grainDirection: 'libre' },
   ];
+
+  if (hasBack) {
+    parts.push({ 
+      id: 'fondo', 
+      name: 'Fondo Mueble', 
+      width: W, height: H, depth: 3, 
+      x: W/2, y: H/2, z: -D/2 - 1.5, 
+      type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
+    });
+  }
 
   const numDrawers = 2;
   const startY = T + 10;

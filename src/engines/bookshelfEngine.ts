@@ -15,9 +15,9 @@ export function bookshelfEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ 
       id: 'fondo', 
       name: 'Fondo Mueble', 
-      width: W - T, height: H - T, depth: 3, 
-      x: W/2, y: H/2, z: -D/2 + 1.5, 
-      type: 'static', cutLargo: H - T, cutAncho: W - T, cutEspesor: 3, grainDirection: 'libre' 
+      width: W, height: H, depth: 3, 
+      x: W/2, y: H/2, z: -D/2 - 1.5, 
+      type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
     });
   }
 
