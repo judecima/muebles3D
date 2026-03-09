@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useEffect, useRef } from 'react';
 import { SceneManager } from '@/three/SceneManager';
 import { Part } from '@/lib/types';
@@ -37,27 +35,27 @@ export function FurnitureViewer({ parts, action }: FurnitureViewerProps) {
 
     switch (action) {
       case 'open-doors':
-        managerRef.current.animateDoors(true);
+        managerRef.current.setDoors(true);
         break;
       case 'close-doors':
-        managerRef.current.animateDoors(false);
+        managerRef.current.setDoors(false);
         break;
       case 'open-drawers':
-        managerRef.current.animateDrawers(true);
+        managerRef.current.setDrawers(true);
         break;
       case 'close-drawers':
-        managerRef.current.animateDrawers(false);
+        managerRef.current.setDrawers(false);
         break;
       case 'explode':
         managerRef.current.explodeView(1);
         break;
       case 'reset':
-        managerRef.current.explodeView(0);
-        managerRef.current.animateDoors(false);
-        managerRef.current.animateDrawers(false);
+        managerRef.current.resetAssembly();
+        managerRef.current.setDoors(false);
+        managerRef.current.setDrawers(false);
         break;
     }
   }, [action]);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  return <div ref={containerRef} className="w-full h-full touch-none" />;
 }

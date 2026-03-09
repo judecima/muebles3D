@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ControlPanel } from '@/components/ControlPanel';
 import { FurnitureViewer } from '@/components/FurnitureViewer';
 import { CutlistTable } from '@/components/CutlistTable';
@@ -36,7 +36,7 @@ export default function Home() {
       default: result = { parts: [] };
     }
     setParts(result.parts);
-    setAction('reset'); // Clear any current animations
+    setAction('reset'); // Limpiar estados de animación al cambiar mueble
   };
 
   useEffect(() => {
@@ -48,13 +48,15 @@ export default function Home() {
       generateFurniture();
     } else {
       setAction(act);
+      // Pequeño hack para permitir repetir la misma acción (ej: re-explotar si se movió)
+      setTimeout(() => setAction(''), 100);
     }
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar Controls */}
-      <aside className="w-80 h-full border-r bg-white z-10">
+    <div className="flex h-screen w-full overflow-hidden bg-slate-100 font-body">
+      {/* Panel de Control Lateral */}
+      <aside className="w-72 h-full border-r border-slate-200 bg-white z-20 shadow-xl">
         <ControlPanel 
           type={type} 
           dimensions={dimensions} 
@@ -64,21 +66,25 @@ export default function Home() {
         />
       </aside>
 
-      {/* Main View Area */}
-      <main className="flex-1 flex flex-col relative">
-        <div className="flex-1 bg-[#F3F6F8]">
+      {/* Área Principal de Visualización */}
+      <main className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Visor 3D */}
+        <div className="flex-1 relative bg-[#F8FAFC]">
           <FurnitureViewer parts={parts} action={action} />
           
-          <div className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm border text-xs text-muted-foreground">
-            <p><strong>Controles:</strong></p>
-            <p>Click + Arrastrar: Rotar</p>
-            <p>Scroll: Zoom</p>
-            <p>Click Derecho + Arrastrar: Pan</p>
+          {/* Instrucciones flotantes */}
+          <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-lg border border-slate-200 text-[10px] text-slate-500 pointer-events-none">
+            <p className="font-bold text-slate-700 mb-1">CONTROLES DE CÁMARA</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <p>Rotar:</p><p className="font-medium">Click + Arrastrar</p>
+              <p>Zoom:</p><p className="font-medium">Scroll / Rueda</p>
+              <p>Pan (Mover):</p><p className="font-medium">Click Derecho + Arrastrar</p>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Cutlist Section */}
-        <section className="h-1/3 bg-white border-t overflow-y-auto">
+        {/* Panel Inferior de Despiece */}
+        <section className="h-[30%] bg-white border-t border-slate-200 z-10">
           <CutlistTable parts={parts} />
         </section>
       </main>

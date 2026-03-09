@@ -9,7 +9,7 @@ interface CutlistTableProps {
 }
 
 export function CutlistTable({ parts }: CutlistTableProps) {
-  // Aggregate quantities
+  // Agrupar piezas por dimensiones para la lista de corte
   const aggregated = parts.reduce((acc, part) => {
     const key = `${part.name}-${part.width}-${part.height}-${part.depth}`;
     if (!acc[key]) {
@@ -22,33 +22,41 @@ export function CutlistTable({ parts }: CutlistTableProps) {
   const displayParts = Object.values(aggregated);
 
   return (
-    <Card className="rounded-none border-t border-b-0 border-l-0 border-r-0 shadow-none">
-      <CardHeader className="py-4">
-        <CardTitle className="text-lg flex items-center gap-2 text-primary">
-          <ListChecks className="w-5 h-5" /> Lista de Corte (Despiece)
+    <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
+      <CardHeader className="py-3 px-6 bg-slate-50 shrink-0">
+        <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
+          <ListChecks className="w-4 h-4" /> Despiece de Materiales (MDF)
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 overflow-y-auto flex-1">
         <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30">
-              <TableHead>Pieza</TableHead>
-              <TableHead className="text-right">Ancho (mm)</TableHead>
-              <TableHead className="text-right">Largo (mm)</TableHead>
-              <TableHead className="text-right">Espesor (mm)</TableHead>
-              <TableHead className="text-right">Cantidad</TableHead>
+          <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+            <TableRow>
+              <TableHead className="text-[11px] font-bold uppercase">Pieza</TableHead>
+              <TableHead className="text-right text-[11px] font-bold uppercase">Largo (mm)</TableHead>
+              <TableHead className="text-right text-[11px] font-bold uppercase">Ancho (mm)</TableHead>
+              <TableHead className="text-right text-[11px] font-bold uppercase">Espesor (mm)</TableHead>
+              <TableHead className="text-right text-[11px] font-bold uppercase">Cant.</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayParts.map((part, idx) => (
-              <TableRow key={idx}>
-                <TableCell className="font-medium">{part.name}</TableCell>
-                <TableCell className="text-right">{part.width}</TableCell>
-                <TableCell className="text-right">{part.height}</TableCell>
-                <TableCell className="text-right">{part.depth}</TableCell>
-                <TableCell className="text-right">{part.quantity}</TableCell>
+            {displayParts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-slate-400 italic">
+                  No hay piezas generadas
+                </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              displayParts.map((part, idx) => (
+                <TableRow key={idx} className="hover:bg-slate-50 transition-colors">
+                  <TableCell className="font-medium text-xs">{part.name}</TableCell>
+                  <TableCell className="text-right text-xs">{part.height}</TableCell>
+                  <TableCell className="text-right text-xs">{part.width}</TableCell>
+                  <TableCell className="text-right text-xs">{part.depth}</TableCell>
+                  <TableCell className="text-right text-xs font-bold">{part.quantity}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

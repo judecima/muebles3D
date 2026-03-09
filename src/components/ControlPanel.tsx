@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FurnitureType, FurnitureDimensions } from '@/lib/types';
-import { Box, DoorOpen, DoorClosed, MoveHorizontal, Maximize, Trash2 } from 'lucide-react';
+import { Box, DoorOpen, DoorClosed, MoveHorizontal, Maximize, RefreshCw, Layers } from 'lucide-react';
 
 interface ControlPanelProps {
   type: FurnitureType;
@@ -22,18 +22,19 @@ export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChang
   };
 
   return (
-    <Card className="h-full border-none shadow-lg overflow-y-auto rounded-none bg-white">
-      <CardHeader className="bg-primary text-primary-foreground">
-        <CardTitle className="text-xl font-headline flex items-center gap-2">
-          <Box className="w-6 h-6" /> MuebleCAD 3D
+    <Card className="h-full border-none shadow-none overflow-y-auto rounded-none bg-slate-50">
+      <CardHeader className="bg-primary text-primary-foreground py-4">
+        <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <Box className="w-5 h-5" /> MuebleCAD 3D
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6 pt-6">
+      
+      <CardContent className="space-y-6 pt-6 px-4">
         <div className="space-y-2">
-          <Label className="text-sm font-semibold">Seleccionar Mueble</Label>
+          <Label className="text-xs font-bold uppercase text-slate-500">Tipo de Mueble</Label>
           <Select value={type} onValueChange={(v) => onTypeChange(v as FurnitureType)}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Tipo de mueble" />
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder="Seleccionar mueble" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="placard">Placard</SelectItem>
@@ -46,52 +47,65 @@ export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChang
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Ancho (mm)</Label>
-            <Input name="width" type="number" value={dimensions.width} onChange={handleChange} />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Ancho (mm)</Label>
+            <Input name="width" type="number" value={dimensions.width} onChange={handleChange} className="bg-white h-9" />
           </div>
-          <div className="space-y-2">
-            <Label>Alto (mm)</Label>
-            <Input name="height" type="number" value={dimensions.height} onChange={handleChange} />
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Alto (mm)</Label>
+            <Input name="height" type="number" value={dimensions.height} onChange={handleChange} className="bg-white h-9" />
           </div>
-          <div className="space-y-2">
-            <Label>Profundidad (mm)</Label>
-            <Input name="depth" type="number" value={dimensions.depth} onChange={handleChange} />
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Prof. (mm)</Label>
+            <Input name="depth" type="number" value={dimensions.depth} onChange={handleChange} className="bg-white h-9" />
           </div>
-          <div className="space-y-2">
-            <Label>Espesor (mm)</Label>
-            <Input name="thickness" type="number" value={dimensions.thickness} onChange={handleChange} />
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Espesor (mm)</Label>
+            <Input name="thickness" type="number" value={dimensions.thickness} onChange={handleChange} className="bg-white h-9" />
           </div>
         </div>
 
-        <div className="space-y-3 pt-4">
-          <Button className="w-full bg-accent hover:bg-accent/80 text-accent-foreground font-bold" onClick={() => onAction('generate')}>
-            Generar Mueble
-          </Button>
-          
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" className="flex items-center gap-2" onClick={() => onAction('open-doors')}>
-              <DoorOpen className="w-4 h-4" /> Abrir Puertas
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2" onClick={() => onAction('close-doors')}>
-              <DoorClosed className="w-4 h-4" /> Cerrar Puertas
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2" onClick={() => onAction('open-drawers')}>
-              <MoveHorizontal className="w-4 h-4" /> Abrir Cajones
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2" onClick={() => onAction('close-drawers')}>
-              <MoveHorizontal className="w-4 h-4" /> Cerrar Cajones
-            </Button>
+        <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-bold shadow-sm" onClick={() => onAction('generate')}>
+          <RefreshCw className="w-4 h-4 mr-2" /> Generar Mueble
+        </Button>
+
+        <div className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Simulación de Puertas</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" className="bg-white text-xs" onClick={() => onAction('open-doors')}>
+                <DoorOpen className="w-3.5 h-3.5 mr-1" /> Abrir
+              </Button>
+              <Button variant="outline" size="sm" className="bg-white text-xs" onClick={() => onAction('close-doors')}>
+                <DoorClosed className="w-3.5 h-3.5 mr-1" /> Cerrar
+              </Button>
+            </div>
           </div>
 
-          <Button variant="secondary" className="w-full flex items-center justify-center gap-2" onClick={() => onAction('explode')}>
-            <Maximize className="w-4 h-4" /> Vista Explotada
-          </Button>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Simulación de Cajones</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" className="bg-white text-xs" onClick={() => onAction('open-drawers')}>
+                <MoveHorizontal className="w-3.5 h-3.5 mr-1" /> Extraer
+              </Button>
+              <Button variant="outline" size="sm" className="bg-white text-xs" onClick={() => onAction('close-drawers')}>
+                <MoveHorizontal className="w-3.5 h-3.5 mr-1" /> Retraer
+              </Button>
+            </div>
+          </div>
 
-          <Button variant="ghost" className="w-full text-destructive hover:text-destructive flex items-center justify-center gap-2" onClick={() => onAction('reset')}>
-            <Trash2 className="w-4 h-4" /> Resetear Vista
-          </Button>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Visualización Avanzada</Label>
+            <div className="space-y-2">
+              <Button variant="secondary" className="w-full text-xs font-bold" onClick={() => onAction('explode')}>
+                <Maximize className="w-4 h-4 mr-2" /> Vista Explotada
+              </Button>
+              <Button variant="ghost" className="w-full text-xs font-bold border border-slate-200 bg-white" onClick={() => onAction('reset')}>
+                <Layers className="w-4 h-4 mr-2" /> Rearmar Mueble
+              </Button>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
