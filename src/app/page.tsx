@@ -28,7 +28,7 @@ import { bookshelfEngine } from '@/engines/bookshelfEngine';
 
 export default function Home() {
   const [type, setType] = useState<FurnitureType>('placard');
-  const [color, setColor] = useState<FurnitureColor>('alerce-blanco');
+  const [color, setColor] = useState<FurnitureColor>('alarce-blanco');
   const [dimensions, setDimensions] = useState<FurnitureDimensions>({
     width: 1200,
     height: 1800,
@@ -38,7 +38,6 @@ export default function Home() {
   const [action, setAction] = useState<string>('');
   const [parts, setParts] = useState<Part[]>([]);
 
-  // Motores paramétricos independientes
   const generateFurniture = () => {
     let result;
     switch (type) {
@@ -113,11 +112,9 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Visor 3D */}
         <div className="flex-1 relative bg-slate-100 cursor-move">
           <FurnitureViewer parts={parts} action={action} color={color} />
           
-          {/* Instrucciones flotantes */}
           <div className="absolute top-4 right-4 md:top-6 md:right-6 pointer-events-none">
             <div className="bg-white/80 backdrop-blur-md p-3 rounded-xl shadow-lg border border-slate-200 text-[10px] text-slate-600">
               <p className="font-bold flex items-center gap-1 mb-1 text-primary">
@@ -132,7 +129,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Tabla de Despiece Responsiva */}
         <section className="h-[40%] md:h-[35%] bg-white border-t border-slate-200 z-10 shadow-inner overflow-hidden">
           <CutlistTable parts={parts} />
         </section>

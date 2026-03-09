@@ -1,5 +1,5 @@
 export type FurnitureType = 'placard' | 'escritorio' | 'bajoMesada' | 'alacena' | 'rackTV' | 'biblioteca';
-export type FurnitureColor = 'alerce-blanco' | 'alerce-marron';
+export type FurnitureColor = 'alarce-blanco' | 'alarce-marron';
 
 export interface Part {
   id: string;
