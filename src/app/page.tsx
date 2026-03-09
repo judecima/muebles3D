@@ -88,20 +88,28 @@ export default function Home() {
     const doc = new jsPDF();
     const BRAND_COLOR = [174, 26, 226];
 
+    // Portada
     doc.setFontSize(22);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.text("RED ARQUIMAX - Ficha Técnica", 105, 30, { align: 'center' });
     
-    if (viewerRef.current && view === '3d') {
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Mueble: ${type.toUpperCase()}`, 105, 40, { align: 'center' });
+    doc.text(`Dimensiones: ${dimensions.width}x${dimensions.height}x${dimensions.depth} mm`, 105, 48, { align: 'center' });
+
+    // Captura 3D si está disponible
+    if (viewerRef.current) {
       const img = viewerRef.current.getScreenshot();
       if (img) {
-        doc.addImage(img, 'PNG', 15, 60, 180, 100);
+        doc.addImage(img, 'PNG', 15, 60, 180, 120);
       }
     }
 
     doc.addPage();
     doc.setFontSize(16);
-    doc.text("Listado de Cortes", 15, 20);
+    doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+    doc.text("Listado Detallado de Cortes", 15, 20);
     
     const panelRows = parts.filter(p => !p.isHardware).map(p => [
       p.name, p.cutLargo, p.cutAncho, p.cutEspesor, 1, p.grainDirection
@@ -111,10 +119,11 @@ export default function Home() {
       head: [['Pieza', 'Largo (mm)', 'Ancho (mm)', 'Espesor', 'Cant.', 'Veta']],
       body: panelRows,
       startY: 30,
-      headStyles: { fillColor: BRAND_COLOR }
+      headStyles: { fillColor: BRAND_COLOR },
+      styles: { fontSize: 9 }
     });
 
-    doc.save(`mueble-red-arquimax-${type}.pdf`);
+    doc.save(`tecnico-red-arquimax-${type}-${Date.now()}.pdf`);
   };
 
   return (
@@ -180,7 +189,7 @@ export default function Home() {
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="h-8 px-2 md:px-3 text-[10px] font-bold" onClick={() => handleAction('export-pdf')}>
                 <FileDown className="w-3.5 h-3.5 md:mr-2" /> 
-                <span className="hidden sm:inline">EXPORTAR</span>
+                <span className="hidden sm:inline">EXPORTAR PDF</span>
               </Button>
             </div>
           </div>

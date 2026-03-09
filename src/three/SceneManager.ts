@@ -9,7 +9,6 @@ export class SceneManager {
   private controls: OrbitControls;
   private furnitureGroup: THREE.Group;
   private partsMap: Map<string, THREE.Object3D> = new Map();
-  private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
   private container: HTMLElement;
 
@@ -58,63 +57,12 @@ export class SceneManager {
     this.scene.add(this.furnitureGroup);
 
     this.animate();
-    this.initInteraction();
     window.addEventListener('resize', this.onWindowResize);
-  }
-
-  private initInteraction() {
-    this.container.addEventListener('pointerdown', (event) => {
-      const rect = this.container.getBoundingClientRect();
-      this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-      this.raycaster.setFromCamera(this.mouse, this.camera);
-      const intersects = this.raycaster.intersectObjects(this.furnitureGroup.children, true);
-
-      if (intersects.length > 0) {
-        let object = intersects[0].object;
-        while (object.parent && object.parent !== this.furnitureGroup && !object.userData.id) {
-          object = object.parent;
-        }
-        
-        const type = object.userData.type;
-        const id = object.userData.id;
-
-        if (type?.includes('door')) {
-          this.toggleDoor(id);
-        } else if (type === 'drawer') {
-          const groupId = id.split('-').slice(0, 2).join('-');
-          this.toggleDrawer(groupId);
-        }
-      }
-    });
-  }
-
-  private toggleDoor(id: string) {
-    const door = this.partsMap.get(id);
-    if (!door) return;
-    const isOpen = !this.itemStates.get(id);
-    this.itemStates.set(id, isOpen);
-    
-    const angle = door.userData.type === 'door-left' ? -Math.PI / 2 : Math.PI / 2;
-    door.rotation.y = isOpen ? angle : 0;
-  }
-
-  private toggleDrawer(groupId: string) {
-    const isOpen = !this.itemStates.get(groupId);
-    this.itemStates.set(groupId, isOpen);
-
-    this.partsMap.forEach((obj, id) => {
-      if (obj.userData.type === 'drawer' && id.startsWith(groupId)) {
-        const orig = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = isOpen ? orig.z + 400 : orig.z;
-      }
-    });
   }
 
   private onWindowResize = () => {
     if (!this.container || !this.camera || !this.renderer) return;
-    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+    this.camera.aspect = this.container.clientWidth / container.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
   };
@@ -187,7 +135,7 @@ export class SceneManager {
     this.fitCameraToFurniture();
   }
 
-  private fitCameraToFurniture() {
+  public fitCameraToFurniture() {
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
     const center = new THREE.Vector3();
     box.getCenter(center);
@@ -198,9 +146,8 @@ export class SceneManager {
     const fov = this.camera.fov * (Math.PI / 180);
     let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
 
-    cameraDistance *= 2.2; // Factor de zoom para dejar margen
+    cameraDistance *= 2.2;
 
-    // Mantenemos el ángulo de visión diagonal por defecto
     const direction = new THREE.Vector3(1, 0.7, 1).normalize();
     this.camera.position.copy(direction.multiplyScalar(cameraDistance).add(center));
 
@@ -259,8 +206,19 @@ export class SceneManager {
 
   public getScreenshot(): string {
     if (!this.renderer || !this.scene || !this.camera) return '';
+    
+    const originalPos = this.camera.position.clone();
+    const originalTarget = this.controls.target.clone();
+    
+    this.fitCameraToFurniture();
     this.renderer.render(this.scene, this.camera);
-    return this.renderer.domElement.toDataURL('image/png');
+    const data = this.renderer.domElement.toDataURL('image/png');
+    
+    this.camera.position.copy(originalPos);
+    this.controls.target.copy(originalTarget);
+    this.controls.update();
+    
+    return data;
   }
 
   private disposeObject(obj: THREE.Object3D) {

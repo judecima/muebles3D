@@ -264,7 +264,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                 const scaleY = 100 / selectedPanel.height;
                 const trimPctX = result.trim * scaleX;
                 const trimPctY = result.trim * scaleY;
-                // El área utilizable se escala según el tamaño del panel menos el trim de ambos lados
                 const usableWidthPct = (selectedPanel.width - 2 * result.trim) * scaleX;
                 const usableHeightPct = (selectedPanel.height - 2 * result.trim) * scaleY;
 
@@ -281,13 +280,11 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     <div className="relative bg-slate-200 shadow-2xl rounded-sm mx-auto overflow-hidden" 
                          style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                       
-                      {/* Zona de Trim (Descarte) - Visualizada con precisión matemática */}
                       <div className="absolute inset-0 bg-slate-300/30 pointer-events-none z-10 border-slate-400/20" 
                            style={{ borderStyle: 'solid', borderWidth: `${trimPctY}% ${trimPctX}%` }}>
                         <div className="absolute top-1 left-1 text-[8px] font-bold text-slate-400">ZONA DE DESCARTE</div>
                       </div>
 
-                      {/* Área Utilizable - Aquí es donde viven las piezas */}
                       <div className="absolute bg-white" style={{ 
                         left: `${trimPctX}%`, 
                         top: `${trimPctY}%`, 
@@ -300,10 +297,10 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                           <div key={pIdx} title={`${p.name}: ${p.width}x${p.height}mm`}
                                className="absolute border border-slate-900/60 flex items-center justify-center hover:brightness-90 transition-all cursor-help" 
                                style={{ 
-                                 left: `${(p.x) * (usableWidthPct / (selectedPanel.width - 2 * result.trim))}%`, 
-                                 top: `${(p.y) * (usableHeightPct / (selectedPanel.height - 2 * result.trim))}%`, 
-                                 width: `${(p.width) * (usableWidthPct / (selectedPanel.width - 2 * result.trim))}%`, 
-                                 height: `${(p.height) * (usableHeightPct / (selectedPanel.height - 2 * result.trim))}%`,
+                                 left: `${(p.x / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                                 top: `${(p.y / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
+                                 width: `${(p.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                                 height: `${(p.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
                                  backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
                                }}>
                             <div className="flex flex-col items-center justify-center text-center leading-none p-1">
