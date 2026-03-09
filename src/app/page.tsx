@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -20,15 +19,6 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { SceneManager } from '@/three/SceneManager';
-
-import { closetEngine } from '@/engines/closetEngine';
-import { deskEngine } from '@/engines/deskEngine';
-import { kitchenBaseEngine } from '@/engines/kitchenBaseEngine';
-import { kitchenWallEngine } from '@/engines/kitchenWallEngine';
-import { tvRackEngine } from '@/engines/tvRackEngine';
-import { bookshelfEngine } from '@/engines/bookshelfEngine';
-
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
@@ -46,7 +36,18 @@ export default function Home() {
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
+  // Colores de marca para PDF
+  const BRAND_RGB = [174, 26, 226]; // #ae1ae2
+
   const generateFurniture = () => {
+    // Importación dinámica para evitar problemas de carga
+    const { closetEngine } = require('@/engines/closetEngine');
+    const { deskEngine } = require('@/engines/deskEngine');
+    const { kitchenBaseEngine } = require('@/engines/kitchenBaseEngine');
+    const { kitchenWallEngine } = require('@/engines/kitchenWallEngine');
+    const { tvRackEngine } = require('@/engines/tvRackEngine');
+    const { bookshelfEngine } = require('@/engines/bookshelfEngine');
+
     let result;
     switch (type) {
       case 'placard': result = closetEngine(dimensions); break;
@@ -87,7 +88,7 @@ export default function Home() {
       pdf.saveGraphicsState();
       pdf.setGState(new pdf.GState({ opacity: 0.1 }));
       pdf.setFontSize(60);
-      pdf.setTextColor(150);
+      pdf.setTextColor(BRAND_RGB[0], BRAND_RGB[1], BRAND_RGB[2]);
       pdf.text(waterMarkText, 40, 150, { angle: 45 });
       pdf.restoreGraphicsState();
     };
@@ -98,22 +99,24 @@ export default function Home() {
     doc.setTextColor(40, 44, 41);
     doc.text("Despiece Técnico de Mueble", 105, 30, { align: 'center' });
     doc.setFontSize(16);
+    doc.setTextColor(BRAND_RGB[0], BRAND_RGB[1], BRAND_RGB[2]);
     doc.text(companyName, 105, 40, { align: 'center' });
     doc.setFontSize(10);
+    doc.setTextColor(100);
     doc.text(`Proyecto: ${type.toUpperCase()} | Fecha: ${new Date().toLocaleDateString()}`, 105, 50, { align: 'center' });
 
     // Capturar Render Armado
     setAction('reset');
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
     const imgArmado = viewerRef.current.getScreenshot();
     doc.addImage(imgArmado, 'PNG', 15, 60, 180, 100);
     doc.text("VISTA MUEBLE ARMADO", 105, 165, { align: 'center' });
 
     // Capturar Render Explotado
     setAction('explode');
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
     const imgExplotado = viewerRef.current.getScreenshot();
-    doc.addImage(imgExplotado, 'PNG', 15, 175, 180, 100);
+    doc.addImage(imgExlotado, 'PNG', 15, 175, 180, 100);
     doc.text("VISTA EXPLOTADA", 105, 280, { align: 'center' });
     setAction('reset');
 
@@ -121,6 +124,7 @@ export default function Home() {
     doc.addPage();
     addWatermark(doc);
     doc.setFontSize(16);
+    doc.setTextColor(BRAND_RGB[0], BRAND_RGB[1], BRAND_RGB[2]);
     doc.text("Listado de Paneles MDF", 15, 20);
 
     const panels = parts.filter(p => !p.isHardware);
@@ -144,13 +148,14 @@ export default function Home() {
       body: panelRows,
       startY: 30,
       theme: 'grid',
-      headStyles: { fillStyle: [204, 44, 41] }
+      headStyles: { fillColor: BRAND_RGB }
     });
 
     // PÁGINA 3: HERRAJES
     doc.addPage();
     addWatermark(doc);
     doc.setFontSize(16);
+    doc.setTextColor(BRAND_RGB[0], BRAND_RGB[1], BRAND_RGB[2]);
     doc.text("Listado de Herrajes y Accesorios", 15, 20);
 
     const hardware = parts.filter(p => p.isHardware);
@@ -172,7 +177,7 @@ export default function Home() {
       body: hardwareRows,
       startY: 30,
       theme: 'striped',
-      headStyles: { fillStyle: [180, 64, 63] }
+      headStyles: { fillColor: [150, 150, 150] } // Gris neutro para herrajes
     });
 
     doc.save('mueble-red-arquimax.pdf');
@@ -200,7 +205,7 @@ export default function Home() {
             <Maximize2 className="w-5 h-5" />
             Red Arquimax
           </div>
-          <span className="text-[8px] opacity-70">SISTEMA DE DISEÑO 3D</span>
+          <span className="text-[8px] opacity-70 uppercase tracking-widest">DISEÑO TÉCNICO PROFESIONAL</span>
         </div>
         <Sheet>
           <SheetTrigger asChild>
@@ -210,7 +215,7 @@ export default function Home() {
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-80">
             <SheetHeader className="sr-only">
-              <SheetTitle>Panel de Configuración de Mueble</SheetTitle>
+              <SheetTitle>Panel de Control Red Arquimax</SheetTitle>
             </SheetHeader>
             <ControlPanel 
               type={type} 
@@ -231,7 +236,7 @@ export default function Home() {
           <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
           
           {/* MARCA DE AGUA VISUAL */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] rotate-[-25deg]">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] rotate-[-25deg]">
             <h1 className="text-[12vw] font-black tracking-widest text-primary whitespace-nowrap">RED ARQUIMAX</h1>
           </div>
 
@@ -257,7 +262,7 @@ export default function Home() {
             <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">© 2024 RED ARQUIMAX - Todos los derechos reservados</span>
             <div className="flex items-center gap-4">
                <span className="text-[9px] text-slate-300">SOPORTE TÉCNICO</span>
-               <span className="text-[9px] text-slate-300">V.1.0.4</span>
+               <span className="text-[9px] text-slate-300 font-bold">#AE1AE2 BRAND</span>
             </div>
           </footer>
         </section>
