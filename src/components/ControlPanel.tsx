@@ -184,15 +184,19 @@ export function ControlPanel({
 
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1">
-            <Palette className="w-3.5 h-3.5" /> Acabado Alarce
+            <Palette className="w-3.5 h-3.5" /> Acabado Mueble
           </Label>
           <Select value={color} onValueChange={(v) => onColorChange(v as FurnitureColor)}>
             <SelectTrigger className="w-full bg-slate-50">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="alarce-blanco">Alarce Blanco</SelectItem>
-              <SelectItem value="alarce-marron">Alarce Marrón</SelectItem>
+              <SelectItem value="blanco">Blanco</SelectItem>
+              <SelectItem value="gris_claro">Gris Claro</SelectItem>
+              <SelectItem value="grafito">Grafito</SelectItem>
+              <SelectItem value="roble_claro">Roble Claro</SelectItem>
+              <SelectItem value="nogal">Nogal</SelectItem>
+              <SelectItem value="negro">Negro</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Part, FurnitureColor } from '@/lib/types';
+import { Part, FurnitureColor, COLOR_PALETTE } from '@/lib/types';
 
 export class SceneManager {
   private scene: THREE.Scene;
@@ -18,10 +18,14 @@ export class SceneManager {
   private itemStates: Map<string, boolean> = new Map();
 
   private colors = {
-    panel: 0xE8D9B5,
-    border: 0xC8B08A,
     outline: 0x444444,
-    background: 0xf1f5f9
+    background: 0xf1f5f9,
+    mdf_back: 0xC8C8C8,
+    hinge: 0x9A9A9A,
+    rail: 0x8A8A8A,
+    piston_body: 0x1F1F1F,
+    piston_rod: 0xD9D9D9,
+    highlight: 0x4A90E2
   };
 
   constructor(container: HTMLElement) {
@@ -46,15 +50,25 @@ export class SceneManager {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    // Iluminación mejorada (Superior Frontal)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dirLight.position.set(2000, 3000, 1000);
+    dirLight.position.set(1000, 2000, 1500);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
+
+    // Sombra de contacto suave
+    const groundGeom = new THREE.PlaneGeometry(10000, 10000);
+    const groundMat = new THREE.ShadowMaterial({ opacity: 0.15 });
+    const ground = new THREE.Mesh(groundGeom, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -1;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
 
     this.furnitureGroup = new THREE.Group();
     this.scene.add(this.furnitureGroup);
@@ -80,13 +94,16 @@ export class SceneManager {
     const intersects = this.raycaster.intersectObjects(this.furnitureGroup.children, true);
 
     if (intersects.length > 0) {
-      let object = intersects[0].object;
+      let object = intersects[0].object as THREE.Mesh;
       while (object.parent && object.parent !== this.furnitureGroup) {
-        object = object.parent;
+        object = object.parent as THREE.Mesh;
       }
 
       const id = object.userData.id;
       const type = object.userData.type;
+
+      // Resaltado de selección
+      this.highlightObject(object);
 
       if (type?.includes('door')) {
         const isOpen = !this.itemStates.get(id);
@@ -98,6 +115,26 @@ export class SceneManager {
       }
     }
   };
+
+  private highlightObject(object: THREE.Object3D) {
+    object.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const originalMaterial = child.material as THREE.MeshStandardMaterial;
+        const originalColor = originalMaterial.color.clone();
+        
+        child.material = originalMaterial.clone();
+        (child.material as THREE.MeshStandardMaterial).emissive.setHex(this.colors.highlight);
+        (child.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.4;
+
+        setTimeout(() => {
+          if (child.material) {
+            (child.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
+            (child.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
+          }
+        }, 300);
+      }
+    });
+  }
 
   private toggleSingleDoor(id: string, open: boolean) {
     const obj = this.partsMap.get(id);
@@ -111,7 +148,7 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      obj.rotation.x = open ? -1.745 : 0;
+      obj.rotation.x = open ? -1.745 : 0; // ~100 grados
     }
   }
 
@@ -172,7 +209,9 @@ export class SceneManager {
     this.partsMap.clear();
     this.itemStates.clear();
 
-    const visualGap = 1.0;
+    const hexBase = COLOR_PALETTE[color];
+    const baseColor = new THREE.Color(hexBase);
+    const interiorColor = baseColor.clone().offsetHSL(0, 0, 0.1); // +10% luminosidad
 
     parts.forEach(part => {
       if (part.type === 'piston-body') {
@@ -192,21 +231,28 @@ export class SceneManager {
           geometry.rotateZ(Math.PI / 2); 
         }
       } else {
-        const w = Math.max(0.1, part.width - (part.isHardware ? 0 : visualGap));
-        const h = Math.max(0.1, part.height - (part.isHardware ? 0 : visualGap));
-        const d = Math.max(0.1, part.depth - (part.isHardware ? 0 : visualGap));
-        geometry = new THREE.BoxGeometry(w, h, d);
+        geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
       }
 
       let material: THREE.MeshStandardMaterial;
 
       if (part.isHardware) {
-        const colorVal = part.name.includes('Blanco') ? 0xffffff : 0x94a3b8;
+        let colorVal = this.colors.hinge;
+        if (part.name.includes('Riel')) colorVal = this.colors.rail;
+        if (part.name.includes('Pistón')) colorVal = this.colors.piston_body;
         material = new THREE.MeshStandardMaterial({ color: colorVal, roughness: 0.2, metalness: 0.8 });
+      } else if (part.name.includes('Fondo')) {
+        material = new THREE.MeshStandardMaterial({ color: this.colors.mdf_back, roughness: 0.9 });
       } else {
+        // Determinar si es interior (estantes, cajas de cajón, refuerzos)
+        const isInternal = part.name.includes('Estante') || 
+                           part.name.includes('Cajón') && !part.name.includes('Frente') ||
+                           part.name.includes('Refuerzo') ||
+                           part.name.includes('Divisor');
+        
         material = new THREE.MeshStandardMaterial({ 
-          color: color === 'alarce-blanco' ? 0xffffff : 0x4a3728, 
-          roughness: 0.8, 
+          color: isInternal ? interiorColor : baseColor, 
+          roughness: 0.7, 
           metalness: 0.05 
         });
       }
@@ -214,9 +260,10 @@ export class SceneManager {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = mesh.receiveShadow = true;
 
+      // Sistema de bordes (Estilo Sketch)
       if (!part.isHardware) {
         const edges = new THREE.EdgesGeometry(geometry);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.15 }));
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.5 }));
         mesh.add(line);
       }
 
@@ -267,14 +314,14 @@ export class SceneManager {
     const cylinderGeom = new THREE.CylinderGeometry(5, 5, cylLen, 16);
     cylinderGeom.rotateX(Math.PI / 2); 
     cylinderGeom.translate(0, 0, cylLen / 2);
-    const cylinderMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    const cylinderMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_body, roughness: 0.9 });
     const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
     group.add(cylinder);
 
     const rodGeom = new THREE.CylinderGeometry(3, 3, rodLen, 16);
     rodGeom.rotateX(Math.PI / 2);
     rodGeom.translate(0, 0, rodLen / 2);
-    const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
+    const rodMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_rod, metalness: 1, roughness: 0.1 });
     const rod = new THREE.Mesh(rodGeom, rodMat);
     rod.name = 'rod';
     rod.position.z = cylLen;

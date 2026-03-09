@@ -34,7 +34,7 @@ const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
 export default function Home() {
   const [view, setView] = useState<'3d' | 'optimize'>('3d');
   const [type, setType] = useState<FurnitureType>('bajoMesada');
-  const [color, setColor] = useState<FurnitureColor>('alarce-blanco');
+  const [color, setColor] = useState<FurnitureColor>('blanco');
   const [dimensions, setDimensions] = useState<FurnitureDimensions>(DEFAULT_DIMENSIONS.bajoMesada);
   const [action, setAction] = useState<string>('');
   const [parts, setParts] = useState<Part[]>([]);

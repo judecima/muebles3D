@@ -1,6 +1,15 @@
 export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca' | 'alacenaFlip' | 'bajomesada-cajonera' | 'porta-anafe';
-export type FurnitureColor = 'alarce-blanco' | 'alarce-marron';
+export type FurnitureColor = 'blanco' | 'gris_claro' | 'grafito' | 'roble_claro' | 'nogal' | 'negro';
 export type GrainDirection = 'vertical' | 'horizontal' | 'libre';
+
+export const COLOR_PALETTE: Record<FurnitureColor, string> = {
+  blanco: '#FFFFFF',
+  gris_claro: '#D9D9D9',
+  grafito: '#3A3A3A',
+  roble_claro: '#D2B48C',
+  nogal: '#7A5230',
+  negro: '#1F1F1F'
+};
 
 export interface Part {
   id: string;
