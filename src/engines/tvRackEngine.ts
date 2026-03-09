@@ -9,11 +9,33 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H - 2*T, depth: D, x: T/2, y: H/2, z: 0, type: 'static' },
     { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H - 2*T, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static' },
     { id: 'divisor', name: 'Divisor Central', width: T, height: H - 2*T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static' },
-    
-    // Dos cajones inferiores
-    { id: 'cajon-1', name: 'Frente Cajón 1', width: (W - 3*T)/2 - 4, height: H - 2*T - 10, depth: T, x: T + (W-3*T)/4 + 2, y: H/2, z: D/2 + T/2, type: 'drawer' },
-    { id: 'cajon-2', name: 'Frente Cajón 2', width: (W - 3*T)/2 - 4, height: H - 2*T - 10, depth: T, x: W - T - (W-3*T)/4 - 2, y: H/2, z: D/2 + T/2, type: 'drawer' },
   ];
 
-  return { parts, summary: 'Rack para TV minimalista con dos amplios cajones.' };
+  // Dos cajones grandes
+  const drawerW = (W - 3*T) / 2 - 10;
+  const drawerH = H - 2*T - 20;
+  const drawerD = D * 0.8;
+
+  const drawerConfigs = [
+    { x: T + drawerW/2 + 5, id: '1' },
+    { x: W - T - drawerW/2 - 5, id: '2' }
+  ];
+
+  drawerConfigs.forEach((config) => {
+    const prefix = `cajon-${config.id}`;
+    const posY = H/2;
+    const posZ_frente = D/2 + T/2;
+
+    // Frente
+    parts.push({ id: `${prefix}-frente`, name: `Frente Cajón ${config.id}`, width: drawerW, height: drawerH, depth: T, x: config.x, y: posY, z: posZ_frente, type: 'drawer' });
+    // Laterales
+    parts.push({ id: `${prefix}-lat-izq`, name: `Lat. Izq. Cajón ${config.id}`, width: T, height: drawerH * 0.6, depth: drawerD, x: config.x - drawerW/2 + T/2 + 5, y: posY, z: posZ_frente - drawerD/2 - T/2, type: 'drawer' });
+    parts.push({ id: `${prefix}-lat-der`, name: `Lat. Der. Cajón ${config.id}`, width: T, height: drawerH * 0.6, depth: drawerD, x: config.x + drawerW/2 - T/2 - 5, y: posY, z: posZ_frente - drawerD/2 - T/2, type: 'drawer' });
+    // Fondo
+    parts.push({ id: `${prefix}-fondo`, name: `Contrafrente Cajón ${config.id}`, width: drawerW - 2*T - 10, height: drawerH * 0.6, depth: T, x: config.x, y: posY, z: posZ_frente - drawerD, type: 'drawer' });
+    // Piso
+    parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${config.id}`, width: drawerW - 2*T - 10, height: 3, depth: drawerD - T, x: config.x, y: posY - (drawerH * 0.6)/2 + 1.5, z: posZ_frente - drawerD/2, type: 'drawer' });
+  });
+
+  return { parts, summary: 'Rack para TV con cajones de estructura completa.' };
 }
