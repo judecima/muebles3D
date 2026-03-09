@@ -111,37 +111,43 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      obj.rotation.x = open ? -1.745 : 0; // 100 degrees
-      this.updatePistons(open, obj);
+      // Ángulo de apertura de 100 grados
+      obj.rotation.x = open ? -1.745 : 0;
     }
   }
 
-  private updatePistons(open: boolean, doorObj: THREE.Object3D) {
-    this.partsMap.forEach((obj) => {
-      if (obj.userData.type === 'piston-body' && obj.userData.config) {
-        const config = obj.userData.config;
-        const rod = obj.getObjectByName('rod');
+  private updateAllPistons() {
+    this.partsMap.forEach((pistonObj) => {
+      if (pistonObj.userData.type === 'piston-body' && pistonObj.userData.config) {
+        const config = pistonObj.userData.config;
+        const doorGroup = this.partsMap.get(config.doorId);
+        if (!doorGroup) return;
+
+        // La puerta real es el primer hijo del grupo de pivote
+        const doorMesh = doorGroup.children[0];
+        const rod = pistonObj.getObjectByName('rod');
         
-        const actualAnchorLocal = new THREE.Vector3(
-          config.anchorPuerta.x - doorObj.position.x,
-          config.anchorPuerta.y - doorObj.position.y,
-          config.anchorPuerta.z - doorObj.position.z
-        );
+        // Obtener la posición del anclaje en la puerta en el espacio del mundo
+        const worldAnchorPuerta = doorMesh.localToWorld(new THREE.Vector3(
+          config.anchorPuertaLocal.x,
+          config.anchorPuertaLocal.y,
+          config.anchorPuertaLocal.z
+        ));
 
-        const worldAnchorPuerta = actualAnchorLocal.clone().applyMatrix4(doorObj.matrixWorld);
-        obj.lookAt(worldAnchorPuerta);
+        // Orientar el cuerpo del pistón hacia el anclaje móvil de la puerta
+        pistonObj.lookAt(worldAnchorPuerta);
 
-        const distance = obj.position.distanceTo(worldAnchorPuerta);
+        // Calcular distancia actual entre anclajes
+        const currentDistance = pistonObj.position.distanceTo(worldAnchorPuerta);
         
         if (rod) {
           const cylinderLen = config.lengthClosed * 0.6;
-          const currentExtension = distance - cylinderLen;
-          // Limitar extensión para evitar que el vástago "vuele"
-          const maxExtension = config.lengthOpen - cylinderLen;
-          const extensionFactor = Math.min(Math.max(currentExtension, 0), maxExtension);
+          const extension = currentDistance - cylinderLen;
           
-          rod.scale.z = extensionFactor / (config.lengthClosed * 0.4); 
-          rod.position.z = (cylinderLen / 2) + (extensionFactor / 2);
+          // Escalar el vástago para alcanzar el anclaje
+          const baseRodLen = config.lengthClosed * 0.4;
+          rod.scale.z = Math.max(0.1, extension / baseRodLen);
+          rod.position.z = (cylinderLen / 2) + (extension / 2);
         }
       }
     });
@@ -161,6 +167,7 @@ export class SceneManager {
     if (!this.renderer || !this.scene || !this.camera) return;
     requestAnimationFrame(this.animate);
     this.controls.update();
+    this.updateAllPistons(); // Actualizar pistones en cada frame para suavidad
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -264,13 +271,15 @@ export class SceneManager {
     const cylLen = L_closed * 0.6;
     const rodLen = L_closed * 0.4;
 
-    const cylinderGeom = new THREE.CylinderGeometry(4, 4, cylLen, 16);
+    // Cuerpo del pistón (Cilindro)
+    const cylinderGeom = new THREE.CylinderGeometry(5, 5, cylLen, 16);
     cylinderGeom.rotateX(Math.PI / 2);
     const cylinderMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
     const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
     group.add(cylinder);
 
-    const rodGeom = new THREE.CylinderGeometry(2.5, 2.5, rodLen, 16);
+    // Vástago telescópico
+    const rodGeom = new THREE.CylinderGeometry(3, 3, rodLen, 16);
     rodGeom.rotateX(Math.PI / 2);
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
     const rod = new THREE.Mesh(rodGeom, rodMat);
@@ -278,19 +287,17 @@ export class SceneManager {
     rod.position.z = cylLen / 2; 
     group.add(rod);
 
-    const supportGeom = new THREE.SphereGeometry(6, 16, 16);
-    const supportMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 });
+    // Soportes/Rótulas de fijación
+    const ballGeom = new THREE.SphereGeometry(7, 16, 16);
+    const ballMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8 });
     
-    const supportMueble = new THREE.Mesh(supportGeom, supportMat);
-    supportMueble.position.z = -cylLen / 2;
-    group.add(supportMueble);
+    const ballMueble = new THREE.Mesh(ballGeom, ballMat);
+    ballMueble.position.z = -cylLen / 2;
+    group.add(ballMueble);
 
-    const supportPuerta = new THREE.Mesh(supportGeom, supportMat);
-    supportPuerta.position.z = rodLen / 2;
-    rod.add(supportPuerta);
-
-    const p2 = new THREE.Vector3(config.anchorPuerta.x, config.anchorPuerta.y, config.anchorPuerta.z);
-    group.lookAt(p2);
+    const ballPuerta = new THREE.Mesh(ballGeom, ballMat);
+    ballPuerta.position.z = rodLen / 2;
+    rod.add(ballPuerta);
     
     group.userData.id = part.id;
     group.userData.type = 'piston-body';
@@ -363,17 +370,6 @@ export class SceneManager {
       if (obj.userData.type === 'drawer') {
         const prefix = id.split('-').slice(0, 2).join('-');
         this.itemStates.set(prefix, false);
-      }
-      
-      if (obj.userData.type === 'piston-body' && obj.userData.config) {
-        const config = obj.userData.config;
-        const p2 = new THREE.Vector3(config.anchorPuerta.x, config.anchorPuerta.y, config.anchorPuerta.z);
-        obj.lookAt(p2);
-        const rod = obj.getObjectByName('rod');
-        if (rod) {
-          rod.scale.z = 1;
-          rod.position.z = (config.lengthClosed * 0.6 / 2) + (config.lengthClosed * 0.4 / 2);
-        }
       }
     });
   }

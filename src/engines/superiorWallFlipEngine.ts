@@ -39,12 +39,12 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     hingeCount
   });
 
-  // Bisagras circulares internas (Cazoleta)
+  // Bisagras cazoleta internas (circulares)
   for (let i = 0; i < hingeCount; i++) {
     const posX = i === 0 ? 70 : (i === 1 ? W - 70 : W/2);
     parts.push({
       id: `hinge-flip-${i}`, name: 'Bisagra Interna 90°', width: 35, height: 35, depth: 12,
-      x: posX, y: H - T, z: D/2 - 10, type: 'hardware', isHardware: true,
+      x: posX, y: H - 10, z: D/2 - 5, type: 'hardware', isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
     });
   }
@@ -58,7 +58,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   });
 
-  // Pistones Neumáticos
+  // Pistones Neumáticos Paramétricos
   const pistonCount = W <= 800 ? 1 : 2;
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
@@ -67,20 +67,25 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
 
   sides.forEach(side => {
     const sideX = side === 'left' ? T + 2 : W - T - 2;
-    const doorX = side === 'left' ? 60 : W - 60; // Alineado cerca de la bisagra (70mm)
-
+    
     parts.push({
       id: `piston-${side}`,
       name: 'Pistón a Gas',
       width: 15, height: 15, depth: L_closed,
-      x: sideX, y: T + 5, z: D/2 - 20, // Comienza sobre la base
+      x: sideX, y: T + 60, z: D/2 - 20, // Anclaje inferior en lateral (Interior)
       type: 'piston-body',
       isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre',
       pistonConfig: {
         side,
-        anchorMueble: { x: sideX, y: T + 5, z: D/2 - 20 },
-        anchorPuerta: { x: doorX, y: H - 40, z: D/2 + T }, // Finaliza en la puerta cerca de la bisagra
+        anchorMueble: { x: sideX, y: T + 60, z: D/2 - 20 },
+        // Coordenada local relativa al centro de la puerta para SceneManager
+        anchorPuertaLocal: { 
+          x: side === 'left' ? -W/2 + 40 : W/2 - 40, 
+          y: H/2 - 30, 
+          z: -T/2 
+        },
+        doorId: 'door-flip',
         lengthClosed: L_closed,
         lengthOpen: L_open
       }
@@ -89,7 +94,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
 
   return { 
     parts, 
-    summary: `Alacena horizontal compacta Red Arquimax con pistón a gas y bisagras calculadas.`, 
+    summary: `Alacena horizontal compacta Red Arquimax con pistón a gas y bisagras cazoleta.`, 
     hasDoors: true, 
     hasDrawers: false 
   };
