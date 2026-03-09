@@ -1,7 +1,6 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel {
-  // Ajuste a dimensiones compactas solicitadas o las del usuario
   const { width: W, height: H, depth: D, thickness: T, hasBack } = dim;
   const innerW = W - 2 * T;
 
@@ -22,7 +21,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   }
 
-  // Puerta Abatible (Flip-up) que cubre todo el frente
+  // Puerta Abatible (Flip-up)
   const doorW = W;
   const doorH = H;
   const doorY = H / 2;
@@ -37,7 +36,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'horizontal'
   });
 
-  // Herrajes: Soportes regulables blancos para colgar
+  // Herrajes: Soportes regulables blancos
   parts.push({
     id: 'hang-L', name: 'Soporte Regulable Blanco', width: 40, height: 40, depth: 20, 
     x: T + 30, y: H - 30, z: -D/2 + 10, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
@@ -47,38 +46,60 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     x: W - T - 30, y: H - 30, z: -D/2 + 10, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
   });
 
-  // Cálculo de Pistones (Referencia: X=95 desde frente, Y=70 desde base)
-  const pistonCount = W >= 600 ? 2 : 1;
-  const pistonSides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
+  // CÁLCULO PARAMÉTRICO DEL PISTÓN
+  // Anclaje Lateral: X=30% Prof, Y=25% Alto
+  const anchorLatZ = D/2 - (D * 0.30);
+  const anchorLatY = H * 0.25;
 
-  pistonSides.forEach(side => {
+  // Anclaje Puerta (Cerrada): X=16% Ancho (desde lateral), Y=22% Alto (desde arriba)
+  const anchorDoorXRel = W * 0.16;
+  const anchorDoorY = H - (H * 0.22);
+  const anchorDoorZ = D/2 + T;
+
+  // Cálculo de longitud base (distancia entre anclajes con puerta cerrada)
+  // Como están en el mismo plano lateral (aprox), usamos Pitágoras en Y y Z
+  const distY = Math.abs(anchorDoorY - anchorLatY);
+  const distZ = Math.abs(anchorDoorZ - anchorLatZ);
+  const lengthBase = Math.sqrt(distY * distY + distZ * distZ);
+
+  // Longitudes paramétricas
+  let lengthClosed = lengthBase * 0.90;
+  const lengthOpen = lengthBase * 1.35;
+
+  // Regla de seguridad: no exceder 90% de profundidad
+  const maxLength = D * 0.9;
+  if (lengthClosed > maxLength) {
+    lengthClosed = maxLength;
+  }
+
+  const pistonCount = W >= 600 ? 2 : 1;
+  const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
+
+  sides.forEach(side => {
     const sideX = side === 'left' ? T + 2 : W - T - 2;
-    
+    const doorX = side === 'left' ? anchorDoorXRel : W - anchorDoorXRel;
+
     parts.push({
       id: `piston-${side}`,
-      name: `Pistón a Gas ${side === 'left' ? 'Izquierdo' : 'Derecho'}`,
-      width: 15, height: 15, depth: 220, // Longitud cerrada base
-      x: sideX, y: 70, z: D/2 - 95,
+      name: `Pistón Paramétrico ${side === 'left' ? 'Izq' : 'Der'}`,
+      width: 15, height: 15, depth: lengthClosed,
+      x: sideX, y: anchorLatY, z: anchorLatZ,
       type: 'piston-body',
       isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre',
       pistonConfig: {
         side,
-        // Anclaje Mueble: 95mm desde el frente, 70mm desde la base
-        anchorMueble: { x: sideX, y: 70, z: D/2 - 95 },
-        // Anclaje Puerta: 80mm desde lateral, 65mm desde borde superior
-        anchorPuerta: { 
-          x: side === 'left' ? 80 : W - 80, 
-          y: H - 65, 
-          z: D/2 + T 
-        }
+        anchorMueble: { x: sideX, y: anchorLatY, z: anchorLatZ },
+        anchorPuerta: { x: doorX, y: anchorDoorY, z: anchorDoorZ },
+        lengthClosed,
+        lengthOpen
       }
     });
   });
 
   return { 
     parts, 
-    summary: `Alacena horizontal compacta de 50x30x32cm con puerta abatible de 100° y pistón a gas.`, 
+    summary: `Alacena horizontal con pistón paramétrico auto-ajustable.`, 
     hasDoors: true, 
     hasDrawers: false 
   };

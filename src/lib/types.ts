@@ -25,6 +25,8 @@ export interface Part {
     side: 'left' | 'right';
     anchorMueble: { x: number; y: number; z: number };
     anchorPuerta: { x: number; y: number; z: number };
+    lengthClosed: number;
+    lengthOpen: number;
   };
 }
 
