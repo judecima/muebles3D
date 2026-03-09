@@ -15,8 +15,8 @@ interface PartToCut {
 }
 
 /**
- * Motor de optimización industrial "ArquiMax Industrial Engine v2.5"
- * Implementa Guillotine Bin Packing con búsqueda estocástica profunda.
+ * Motor de optimización industrial "ArquiMax Industrial Engine v2.6"
+ * Implementa Guillotine Bin Packing con búsqueda estocástica profunda y estrategias de split duales.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection }[],
@@ -47,6 +47,7 @@ export function runOptimization(
   let bestLayouts: OptimizedPanel[] = [];
 
   const heuristics = ['BAF', 'BSSF', 'BLSF'];
+  const splitStrategies = ['horizontal', 'vertical', 'shorter', 'longer'];
 
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = [...flatParts];
@@ -60,27 +61,26 @@ export function runOptimization(
     }
 
     const heuristic = heuristics[i % heuristics.length];
-    // Alternar estrategia de split inicial para explorar diferentes estructuras de guillotina
-    const splitStrategy = i % 2 === 0 ? 'horizontal' : 'vertical';
+    const splitStrategy = splitStrategies[i % splitStrategies.length];
 
     const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, heuristic, splitStrategy, partColors);
     const currentScore = calculateScore(currentLayouts);
 
-    // PERSISTENCIA CRÍTICA: Asegurar que guardamos el mejor resultado absoluto
+    // Persistencia Crítica: Guardar el mejor resultado absoluto basado en eficiencia y número de tableros
     if (currentScore > bestScore) {
       bestScore = currentScore;
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
 
-    // Early exit si alcanzamos la perfección teórica
-    if (calculateTotalEfficiency(currentLayouts) > 99 && currentLayouts.length === 1) break;
+    // Early exit si alcanzamos la perfección teórica en un solo tablero
+    if (currentLayouts.length === 1 && calculateTotalEfficiency(currentLayouts) > 95) break;
   }
 
   return {
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: calculateTotalEfficiency(bestLayouts),
-    summary: `Optimización industrial completa. Evaluadas ${ITERATIONS} combinaciones de guillotina.`,
+    summary: `Optimización industrial completa. Evaluadas ${ITERATIONS} combinaciones de guillotina con split dual.`,
     kerf,
     trim
   };
@@ -103,7 +103,6 @@ function executeLayout(
     const freeRects: Rect[] = [{ x: 0, y: 0, w: w, h: h }];
     const placedIndices = new Set<number>();
 
-    // Intentar colocar cada pieza en el tablero actual
     for (let i = 0; i < remainingParts.length; i++) {
       const part = remainingParts[i];
       let bestRectIdx = -1;
@@ -134,7 +133,6 @@ function executeLayout(
         }
       }
 
-      // Si encontramos un lugar, colocar la pieza y dividir el espacio (Guillotina)
       if (bestRectIdx !== -1) {
         const rect = freeRects.splice(bestRectIdx, 1)[0];
         const pw = rotated ? part.height : part.width;
@@ -150,28 +148,33 @@ function executeLayout(
           color: partColors[part.name]
         });
 
-        // Split Guillotina: Crear dos nuevos rectángulos libres
         const dw = rect.w - pw;
         const dh = rect.h - ph;
 
-        // Estrategia de split dinámica para evitar atrapar espacios útiles
-        if (splitStrategy === 'horizontal' || (splitStrategy === 'auto' && dw > dh)) {
-          // Corte vertical primero
-          if (dw >= 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: rect.h });
-          if (dh >= 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: Math.max(0, dh - kerf) });
+        // Decisión de Split de Guillotina (Corte de lado a lado)
+        let splitHorizontal = false;
+        if (splitStrategy === 'horizontal') splitHorizontal = true;
+        else if (splitStrategy === 'vertical') splitHorizontal = false;
+        else if (splitStrategy === 'shorter') splitHorizontal = dw <= dh;
+        else if (splitStrategy === 'longer') splitHorizontal = dw > dh;
+
+        if (splitHorizontal) {
+          // Primero cortamos a lo ancho del tablero restante
+          if (dh > 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: Math.max(0, dh - kerf) });
+          if (dw > 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: ph });
         } else {
-          // Corte horizontal primero
-          if (dh >= 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: Math.max(0, dh - kerf) });
-          if (dw >= 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: ph });
+          // Primero cortamos a lo alto del tablero restante
+          if (dw > 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: rect.h });
+          if (dh > 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: Math.max(0, dh - kerf) });
         }
 
         placedIndices.add(i);
-        // Mantener los espacios pequeños al principio para rellenarlos primero (Best Area Fit)
+        // Ordenar rectángulos libres para favorecer el relleno de huecos pequeños (Best Area Fit)
         freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
 
-    if (placedIndices.size === 0) break; // Evitar bucles infinitos
+    if (placedIndices.size === 0) break;
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
     panels.push({
@@ -199,13 +202,16 @@ function getHeuristicValue(rect: Rect, w: number, h: number, heuristic: string):
 
 function calculateScore(layouts: OptimizedPanel[]): number {
   if (layouts.length === 0) return -Infinity;
-  const used = layouts.reduce((acc, l) => acc + l.usedArea, 0);
-  const total = layouts.reduce((acc, l) => acc + l.totalArea, 0);
-  const efficiency = (used / total) * 100;
+  const usedArea = layouts.reduce((acc, l) => acc + l.usedArea, 0);
+  const totalArea = layouts.reduce((acc, l) => acc + l.totalArea, 0);
+  const efficiency = (usedArea / totalArea) * 100;
   
-  // Penalización masiva por cada tablero adicional para forzar la compactación en el primero
-  // El factor 1000000 asegura que 1 tablero siempre sea mejor que 2, sin importar la eficiencia
-  return (efficiency * 1000) - (layouts.length * 1000000);
+  // Penalización masiva por cada tablero adicional. 
+  // Esto asegura que 1 tablero al 90% sea mejor que 2 tableros al 45%.
+  const panelPenalty = layouts.length * 1000000;
+  
+  // Bonificación por eficiencia de área
+  return (efficiency * 1000) - panelPenalty;
 }
 
 function calculateTotalEfficiency(layouts: OptimizedPanel[]): number {
@@ -227,7 +233,6 @@ function generateColors(parts: PartToCut[]): Record<string, string> {
   const colors: Record<string, string> = {};
   const hueStep = 360 / Math.max(1, uniqueNames.length);
   uniqueNames.forEach((name, i) => {
-    // Colores tipo "material" translúcidos para el plano técnico
     colors[name] = `hsla(${i * hueStep}, 65%, 45%, 0.25)`;
   });
   return colors;
