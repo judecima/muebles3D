@@ -1,6 +1,6 @@
 export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca';
 export type FurnitureColor = 'alarce-blanco' | 'alarce-marron';
-export type GrainDirection = 'vertical' | 'horizontal' | 'libre';
+export type GrainDirection = 'vertical' | 'horizontal' | 'free';
 
 export interface Part {
   id: string;
@@ -29,7 +29,7 @@ export interface FurnitureDimensions {
   depth: number;
   thickness: number;
   hasBack?: boolean; 
-  hasShelf?: boolean; // Opción para estante interior
+  hasShelf?: boolean;
 }
 
 export interface FurnitureModel {
