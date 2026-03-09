@@ -15,8 +15,8 @@ interface PartToCut {
 }
 
 /**
- * Motor de optimización industrial "ArquiMax Industrial Engine v2.0"
- * Implementa Guillotine Bin Packing con búsqueda estocástica de 3000 iteraciones.
+ * Motor de optimización industrial "ArquiMax Industrial Engine v2.5"
+ * Implementa Guillotine Bin Packing con búsqueda estocástica profunda.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection }[],
@@ -51,35 +51,36 @@ export function runOptimization(
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = [...flatParts];
     
-    // Mutaciones: Barajado aleatorio excepto en la primera iteración (orden industrial)
+    // Mutaciones: Barajado aleatorio y variaciones de orden industrial
     if (i > 0) {
       shuffle(currentParts);
     } else {
+      // Primera iteración: Orden industrial por área descendente
       currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     }
 
     const heuristic = heuristics[i % heuristics.length];
+    // Alternar estrategia de split inicial para explorar diferentes estructuras de guillotina
     const splitStrategy = i % 2 === 0 ? 'horizontal' : 'vertical';
 
     const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, heuristic, splitStrategy, partColors);
     const currentScore = calculateScore(currentLayouts);
 
-    // CRITICAL: Persistencia de la mejor solución encontrada
+    // PERSISTENCIA CRÍTICA: Asegurar que guardamos el mejor resultado absoluto
     if (currentScore > bestScore) {
       bestScore = currentScore;
-      // Clonado profundo para asegurar que el resultado sea inmutable
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
 
-    // Early exit si alcanzamos la eficiencia teórica máxima
-    if (calculateTotalEfficiency(currentLayouts) > 98.5 && currentLayouts.length === 1) break;
+    // Early exit si alcanzamos la perfección teórica
+    if (calculateTotalEfficiency(currentLayouts) > 99 && currentLayouts.length === 1) break;
   }
 
   return {
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: calculateTotalEfficiency(bestLayouts),
-    summary: `Optimización industrial completa. Evaluadas ${ITERATIONS} combinaciones.`,
+    summary: `Optimización industrial completa. Evaluadas ${ITERATIONS} combinaciones de guillotina.`,
     kerf,
     trim
   };
@@ -91,7 +92,7 @@ function executeLayout(
   h: number, 
   kerf: number, 
   heuristic: string,
-  splitStrategy: 'horizontal' | 'vertical',
+  splitStrategy: string,
   partColors: Record<string, string>
 ): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
@@ -102,6 +103,7 @@ function executeLayout(
     const freeRects: Rect[] = [{ x: 0, y: 0, w: w, h: h }];
     const placedIndices = new Set<number>();
 
+    // Intentar colocar cada pieza en el tablero actual
     for (let i = 0; i < remainingParts.length; i++) {
       const part = remainingParts[i];
       let bestRectIdx = -1;
@@ -111,7 +113,7 @@ function executeLayout(
       for (let j = 0; j < freeRects.length; j++) {
         const rect = freeRects[j];
 
-        // Intento 1: Normal
+        // Intento 1: Orientación Original
         if (part.width <= rect.w && part.height <= rect.h) {
           const val = getHeuristicValue(rect, part.width, part.height, heuristic);
           if (val < bestFitVal) {
@@ -121,7 +123,7 @@ function executeLayout(
           }
         }
 
-        // Intento 2: Rotado (si es libre)
+        // Intento 2: Rotación 90° (solo si la veta es 'libre')
         if (part.grainDirection === 'libre' && part.height <= rect.w && part.width <= rect.h) {
           const val = getHeuristicValue(rect, part.height, part.width, heuristic);
           if (val < bestFitVal) {
@@ -132,6 +134,7 @@ function executeLayout(
         }
       }
 
+      // Si encontramos un lugar, colocar la pieza y dividir el espacio (Guillotina)
       if (bestRectIdx !== -1) {
         const rect = freeRects.splice(bestRectIdx, 1)[0];
         const pw = rotated ? part.height : part.width;
@@ -147,26 +150,28 @@ function executeLayout(
           color: partColors[part.name]
         });
 
-        // Guillotine Split: División dinámica
+        // Split Guillotina: Crear dos nuevos rectángulos libres
         const dw = rect.w - pw;
         const dh = rect.h - ph;
 
-        // Decisión local de split basada en el remanente (evita piezas atrapadas)
-        if (dw > dh) {
-          if (dw >= kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: rect.h });
-          if (dh >= kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: dh - kerf });
+        // Estrategia de split dinámica para evitar atrapar espacios útiles
+        if (splitStrategy === 'horizontal' || (splitStrategy === 'auto' && dw > dh)) {
+          // Corte vertical primero
+          if (dw >= 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: rect.h });
+          if (dh >= 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: Math.max(0, dh - kerf) });
         } else {
-          if (dh >= kerf) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: dh - kerf });
-          if (dw >= kerf) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: dw - kerf, h: ph });
+          // Corte horizontal primero
+          if (dh >= 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: Math.max(0, dh - kerf) });
+          if (dw >= 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: ph });
         }
 
         placedIndices.add(i);
-        // Ordenar espacios libres para favorecer el rellenado de huecos pequeños
+        // Mantener los espacios pequeños al principio para rellenarlos primero (Best Area Fit)
         freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
 
-    if (placedIndices.size === 0) break; // Seguridad
+    if (placedIndices.size === 0) break; // Evitar bucles infinitos
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
     panels.push({
@@ -198,8 +203,9 @@ function calculateScore(layouts: OptimizedPanel[]): number {
   const total = layouts.reduce((acc, l) => acc + l.totalArea, 0);
   const efficiency = (used / total) * 100;
   
-  // Penalización severa por cada tablero adicional para forzar compactación
-  return (efficiency * 100) - (layouts.length * 10000);
+  // Penalización masiva por cada tablero adicional para forzar la compactación en el primero
+  // El factor 1000000 asegura que 1 tablero siempre sea mejor que 2, sin importar la eficiencia
+  return (efficiency * 1000) - (layouts.length * 1000000);
 }
 
 function calculateTotalEfficiency(layouts: OptimizedPanel[]): number {
@@ -221,7 +227,8 @@ function generateColors(parts: PartToCut[]): Record<string, string> {
   const colors: Record<string, string> = {};
   const hueStep = 360 / Math.max(1, uniqueNames.length);
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${i * hueStep}, 70%, 45%, 0.3)`;
+    // Colores tipo "material" translúcidos para el plano técnico
+    colors[name] = `hsla(${i * hueStep}, 65%, 45%, 0.25)`;
   });
   return colors;
 }
