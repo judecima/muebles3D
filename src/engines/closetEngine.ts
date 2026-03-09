@@ -9,7 +9,7 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const drawerD = D - 40;
   const drawerH = 160;
   const frontH = 200;
-  const gap = 4;
+  const gap = 2; // Reducido para un ajuste más preciso
 
   // 1. Estructura Principal
   const parts: Part[] = [
@@ -20,15 +20,15 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'fondo', name: 'Fondo Mueble', width: W - T, height: H - T, depth: 3, x: W/2, y: H/2, z: -D/2 + 1.5, type: 'static' },
   ];
 
-  // 2. Módulo de Cajones (Posicionamiento desde abajo)
+  // 2. Módulo de Cajones (Ajuste de espacios para eliminar huecos vacíos)
   const numDrawers = 2;
-  const startY = T + 100; // Zócalo o altura inicial
+  const startY = T + 10; // Zócalo técnico mínimo de 10mm sobre la base inferior para evitar espacio vacío
   
   for (let i = 0; i < numDrawers; i++) {
     const posY = startY + (i * (frontH + gap)) + frontH/2;
     const prefix = `cajon-${i}`;
     
-    // Frente de Cajón (Cubre el hueco interno)
+    // Frente de Cajón
     parts.push({ 
       id: `${prefix}-frente`, 
       name: `Frente Cajón ${i+1}`, 
@@ -37,13 +37,13 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
       type: 'drawer' 
     });
     
-    // Caja del Cajón (Calculada para rieles de 13mm)
+    // Caja del Cajón
     parts.push({ id: `${prefix}-lat-izq`, name: `Lateral Izq. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
     parts.push({ id: `${prefix}-lat-der`, name: `Lateral Der. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer' });
     parts.push({ id: `${prefix}-trasera`, name: `Trasera Cajón ${i+1}`, width: drawerW - 2*T, height: drawerH, depth: T, x: W/2, y: posY, z: D/2 - drawerD + T/2, type: 'drawer' });
     parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, x: W/2, y: posY - drawerH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer' });
 
-    // Rieles Telescópicos (Fijos a los laterales internos)
+    // Rieles Telescópicos (Fijos a los laterales)
     parts.push({ 
       id: `${prefix}-riel-izq`, name: `Riel Telescópico ${drawerD}mm`, 
       width: 13, height: 35, depth: drawerD, 
@@ -58,9 +58,8 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   }
 
-  // 3. Base Cajonera (Estante Estructural)
-  // Se posiciona 30mm por encima del último cajón
-  const lastDrawerTopY = startY + (numDrawers * (frontH + gap));
+  // 3. Base Cajonera (Ubicada exactamente 30mm sobre el frente del último cajón)
+  const lastDrawerTopY = startY + (numDrawers * frontH) + ((numDrawers - 1) * gap);
   const baseCajoneraY = lastDrawerTopY + 30 + T/2;
   
   parts.push({
@@ -101,5 +100,5 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ id: `bis-${i}`, name: 'Bisagra Cazoleta 90°', width: 0, height: 0, depth: 0, x: 0, y: 0, z: 0, type: 'hardware', isHardware: true });
   }
 
-  return { parts, summary: 'Placard Red Arquimax con módulo de cajones técnico, rieles de 13mm y base estructural divisoria.' };
+  return { parts, summary: 'Placard Red Arquimax con módulo de cajones ajustado técnicamente para eliminar espacios vacíos superior e inferior.' };
 }
