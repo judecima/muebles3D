@@ -100,6 +100,7 @@ export class SceneManager {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
 
+      // Guardar metadatos en el mesh
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
 
@@ -107,13 +108,17 @@ export class SceneManager {
         const hingeGroup = new THREE.Group();
         hingeGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
         
+        // Posición local del mesh respecto al pivote
         const offsetX = part.type === 'door-left' ? part.width / 2 : -part.width / 2;
         mesh.position.set(offsetX, 0, part.z - part.pivot.z);
         
         hingeGroup.add(mesh);
         this.furnitureGroup.add(hingeGroup);
+        
+        // Guardar el grupo de la bisagra en el mapa para controlarlo
         this.partsMap.set(part.id, hingeGroup);
         hingeGroup.userData.originalPosition = hingeGroup.position.clone();
+        hingeGroup.userData.type = part.type;
       } else {
         mesh.position.set(part.x, part.y, part.z);
         this.furnitureGroup.add(mesh);
@@ -121,6 +126,7 @@ export class SceneManager {
       }
     });
 
+    // Centrar cámara
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
     const center = new THREE.Vector3();
     box.getCenter(center);
@@ -128,21 +134,23 @@ export class SceneManager {
   }
 
   public setDoors(open: boolean) {
+    const angle90 = Math.PI / 2;
     this.partsMap.forEach((obj) => {
-      const firstChild = obj.children[0];
-      const partType = firstChild?.userData?.type || obj.userData?.type;
+      // Intentar obtener el tipo desde el grupo o desde el primer hijo (mesh)
+      const partType = obj.userData.type || obj.children[0]?.userData?.type;
       
-      if (partType === 'door-left' || partType === 'door-right') {
-        const angle90 = Math.PI / 2;
-        const targetAngle = open ? (partType === 'door-left' ? angle90 : -angle90) : 0;
-        obj.rotation.y = targetAngle;
+      if (partType === 'door-left') {
+        obj.rotation.y = open ? angle90 : 0;
+      } else if (partType === 'door-right') {
+        obj.rotation.y = open ? -angle90 : 0;
       }
     });
   }
 
   public setDrawers(open: boolean) {
     this.partsMap.forEach((obj) => {
-      if (obj.userData.type === 'drawer') {
+      const partType = obj.userData.type || obj.children[0]?.userData?.type;
+      if (partType === 'drawer') {
         const offset = open ? 350 : 0;
         const originalPos = obj.userData.originalPosition as THREE.Vector3;
         obj.position.z = originalPos.z + offset;
