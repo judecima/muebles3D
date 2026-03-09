@@ -61,11 +61,11 @@ export function ControlPanel({
     onDimensionsChange({ ...dimensions, hasShelf: checked });
   };
 
-  const isHeightFixed = type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada';
+  const isHeightFixed = type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
   const isWidthSlider = type === 'escritorio';
-  const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip';
+  const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
   const forceBack = type === 'placard' || type === 'rackTV';
-  const canHaveShelf = type === 'bajoMesada' || type === 'alacena';
+  const canHaveShelf = type === 'bajoMesada' || type === 'alacena' || type === 'porta-anafe';
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -89,7 +89,9 @@ export function ControlPanel({
             <SelectContent>
               <SelectItem value="placard">Placard</SelectItem>
               <SelectItem value="escritorio">Escritorio</SelectItem>
-              <SelectItem value="bajoMesada">Bajo Mesada</SelectItem>
+              <SelectItem value="bajoMesada">Bajo Mesada (Puertas)</SelectItem>
+              <SelectItem value="bajomesada-cajonera">Bajo Mesada (Cajonera)</SelectItem>
+              <SelectItem value="porta-anafe">Porta-Anafe</SelectItem>
               <SelectItem value="alacena">Alacena Superior (Batiente)</SelectItem>
               <SelectItem value="alacenaFlip">Alacena Superior (Abatible Pistón)</SelectItem>
               <SelectItem value="rackTV">Rack TV</SelectItem>

@@ -27,6 +27,8 @@ const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   placard: { width: 1800, height: 2100, depth: 600, thickness: 18, hasBack: true },
   biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasBack: true },
   alacenaFlip: { width: 500, height: 300, depth: 320, thickness: 18, hasBack: true, hasShelf: false },
+  'bajomesada-cajonera': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true },
+  'porta-anafe': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
 };
 
 export default function Home() {
@@ -52,6 +54,8 @@ export default function Home() {
       case 'placard': return require('@/engines/closetEngine').closetEngine;
       case 'biblioteca': return require('@/engines/bookshelfEngine').bookshelfEngine;
       case 'alacenaFlip': return require('@/engines/superiorWallFlipEngine').superiorWallFlipEngine;
+      case 'bajomesada-cajonera': return require('@/engines/kitchenDrawerEngine').kitchenDrawerEngine;
+      case 'porta-anafe': return require('@/engines/kitchenCooktopEngine').kitchenCooktopEngine;
       default: return () => ({ parts: [], summary: '', hasDoors: false, hasDrawers: false });
     }
   };

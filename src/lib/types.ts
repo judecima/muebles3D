@@ -1,4 +1,4 @@
-export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca' | 'alacenaFlip';
+export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca' | 'alacenaFlip' | 'bajomesada-cajonera' | 'porta-anafe';
 export type FurnitureColor = 'alarce-blanco' | 'alarce-marron';
 export type GrainDirection = 'vertical' | 'horizontal' | 'libre';
 
@@ -24,7 +24,8 @@ export interface Part {
   pistonConfig?: {
     side: 'left' | 'right';
     anchorMueble: { x: number; y: number; z: number };
-    anchorPuerta: { x: number; y: number; z: number };
+    anchorPuertaLocal: { x: number; y: number; z: number };
+    doorId: string;
     lengthClosed: number;
     lengthOpen: number;
   };
