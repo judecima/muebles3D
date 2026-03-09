@@ -9,14 +9,17 @@ import { FurnitureType, FurnitureDimensions, Part, FurnitureColor, AVAILABLE_PAN
 import { 
   FileDown,
   LayoutGrid,
-  Box as BoxIcon
+  Box as BoxIcon,
+  Menu as MenuIcon,
+  Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
-// Importación de motores de ingeniería
+// Motores de ingeniería
 import { kitchenBaseEngine } from '@/engines/kitchenBaseEngine';
 import { deskEngine } from '@/engines/deskEngine';
 import { tvRackEngine } from '@/engines/tvRackEngine';
@@ -37,6 +40,7 @@ export default function Home() {
   const [action, setAction] = useState<string>('');
   const [parts, setParts] = useState<Part[]>([]);
   const [selectedPanel, setSelectedPanel] = useState<PanelSize>(AVAILABLE_PANELS[0]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
@@ -102,7 +106,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-50">
-      <aside className="hidden md:block w-85 h-full border-r bg-white shadow-xl overflow-y-auto">
+      {/* Sidebar Desktop */}
+      <aside className="hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto">
         <ControlPanel 
           type={type} 
           dimensions={dimensions} 
@@ -114,28 +119,67 @@ export default function Home() {
         />
       </aside>
 
+      {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden">
         <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full h-full flex flex-col">
-          <div className="flex items-center justify-between px-6 py-2 bg-white border-b shadow-sm z-30">
-            <TabsList className="bg-slate-100">
-              <TabsTrigger value="3d" className="gap-2"><BoxIcon className="w-4 h-4" /> Diseño 3D</TabsTrigger>
-              <TabsTrigger value="optimize" className="gap-2"><LayoutGrid className="w-4 h-4" /> Optimización</TabsTrigger>
+          {/* Header Bar */}
+          <div className="flex items-center justify-between px-4 md:px-6 py-2 bg-white border-b shadow-sm z-30">
+            <div className="flex items-center gap-2">
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <MenuIcon className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-80">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Configuración del Mueble</SheetTitle>
+                  </SheetHeader>
+                  <ControlPanel 
+                    type={type} 
+                    dimensions={dimensions} 
+                    color={color}
+                    onTypeChange={(v) => { setType(v); setIsMobileMenuOpen(false); }} 
+                    onDimensionsChange={setDimensions} 
+                    onColorChange={setColor}
+                    onAction={(a) => { handleAction(a); setIsMobileMenuOpen(false); }} 
+                  />
+                </SheetContent>
+              </Sheet>
+              <div className="md:hidden flex items-center gap-1">
+                <Settings2 className="w-4 h-4 text-primary" />
+                <span className="text-xs font-bold uppercase text-slate-700">RED ARQUIMAX</span>
+              </div>
+            </div>
+
+            <TabsList className="bg-slate-100 h-9">
+              <TabsTrigger value="3d" className="gap-2 text-xs md:text-sm">
+                <BoxIcon className="w-3.5 h-3.5" /> 
+                <span className="hidden xs:inline">Diseño</span>
+              </TabsTrigger>
+              <TabsTrigger value="optimize" className="gap-2 text-xs md:text-sm">
+                <LayoutGrid className="w-3.5 h-3.5" /> 
+                <span className="hidden xs:inline">Optimización</span>
+              </TabsTrigger>
             </TabsList>
+
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleAction('export-pdf')}>
-                <FileDown className="w-4 h-4 mr-2" /> Exportar PDF
+              <Button variant="outline" size="sm" className="h-8 px-2 md:px-3" onClick={() => handleAction('export-pdf')}>
+                <FileDown className="w-4 h-4 md:mr-2" /> 
+                <span className="hidden sm:inline text-xs">Exportar PDF</span>
               </Button>
             </div>
           </div>
 
+          {/* Content Areas */}
           <TabsContent value="3d" className="flex-1 m-0 relative bg-slate-100 overflow-hidden flex flex-col">
             <div className="flex-1 relative">
               <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
-              <div className="absolute bottom-6 left-6 pointer-events-none opacity-10">
-                <h2 className="text-6xl font-black text-primary">RED ARQUIMAX</h2>
+              <div className="absolute bottom-4 left-4 pointer-events-none opacity-10">
+                <h2 className="text-3xl md:text-6xl font-black text-primary">RED ARQUIMAX</h2>
               </div>
             </div>
-            <div className="h-1/3 border-t bg-white">
+            <div className="h-1/3 md:h-1/3 border-t bg-white min-h-[200px]">
               <CutlistTable parts={parts} />
             </div>
           </TabsContent>
