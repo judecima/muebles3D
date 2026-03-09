@@ -25,7 +25,65 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'free'
   });
 
-  // Puertas (Agregadas para corregir el error visual)
+  // Cajonera Interna (2 cajones)
+  const drawerFrontH = 200;
+  const drawerGap = 10;
+  const railSpace = 25; // total rieles
+  const drawerW = innerW - railSpace;
+  const drawerD = D - 50;
+  const drawerBoxH = 140;
+
+  for (let i = 0; i < 2; i++) {
+    const prefix = `closet-drawer-${i}`;
+    const posY = T + 100 + (i * (drawerFrontH + drawerGap)) + (drawerFrontH / 2);
+    
+    // Frente
+    parts.push({ 
+      id: `${prefix}-front`, name: `Frente Cajón ${i+1}`, width: innerW - 4, height: drawerFrontH, depth: T, 
+      x: W/2, y: posY, z: D/2 - T/2 - 10, type: 'drawer', 
+      cutLargo: drawerFrontH, cutAncho: innerW - 4, cutEspesor: T, grainDirection: 'horizontal' 
+    });
+    
+    // Laterales
+    parts.push({ 
+      id: `${prefix}-side-L`, name: `Lat. Izq. Cajón ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, 
+      x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2 - T - 10, type: 'drawer', 
+      cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'free' 
+    });
+    parts.push({ 
+      id: `${prefix}-side-R`, name: `Lat. Der. Cajón ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, 
+      x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2 - T - 10, type: 'drawer', 
+      cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'free' 
+    });
+    
+    // Trasera
+    parts.push({ 
+      id: `${prefix}-back`, name: `Trasera Cajón ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, 
+      x: W/2, y: posY, z: D/2 - drawerD - T - 10 + T/2, type: 'drawer', 
+      cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'free' 
+    });
+    
+    // Piso (MDF 3mm)
+    parts.push({ 
+      id: `${prefix}-bottom`, name: `Piso Cajón ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, 
+      x: W/2, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T - 10 + T/2, type: 'drawer', 
+      cutLargo: drawerD - T, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'free' 
+    });
+
+    // Rieles (Hardware)
+    parts.push({ 
+      id: `${prefix}-rail-L`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, 
+      x: T + 6.5, y: posY, z: D/2 - drawerD/2 - T - 10, type: 'hardware', isHardware: true, 
+      cutLargo: 0, cutAncho: 0, cutEspesor: 0 
+    });
+    parts.push({ 
+      id: `${prefix}-rail-R`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, 
+      x: W - T - 6.5, y: posY, z: D/2 - drawerD/2 - T - 10, type: 'hardware', isHardware: true, 
+      cutLargo: 0, cutAncho: 0, cutEspesor: 0 
+    });
+  }
+
+  // Puertas
   const doorW = W / 2 - 2;
   const doorH = H - 10;
   parts.push({ 
@@ -43,8 +101,8 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
 
   return { 
     parts, 
-    summary: 'Placard estándar Red Arquimax con fondo de 3mm y barra de colgar.', 
+    summary: 'Placard Red Arquimax con cajonera interna de 2 cajones, barra de colgar y fondo de 3mm.', 
     hasDoors: true, 
-    hasDrawers: false 
+    hasDrawers: true 
   };
 }

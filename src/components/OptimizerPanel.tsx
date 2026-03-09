@@ -27,7 +27,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setError(null);
     setResult(null);
     
-    // Timeout para simular proceso industrial y asegurar render del spinner
+    // Timeout para asegurar que el spinner se renderice y simular proceso industrial
     setTimeout(() => {
       try {
         const cutlist = generateCutListFromModel(parts);
@@ -38,15 +38,19 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           return;
         }
 
+        // Aplicar Trim perimetral (10mm por lado)
+        const usableWidth = selectedPanel.width - 20;
+        const usableHeight = selectedPanel.height - 20;
+
         const res = runOptimization(
           cutlist,
-          selectedPanel.width - 20, // Trim 10mm cada lado
-          selectedPanel.height - 20,
-          4.5 // Kerf estándar
+          usableWidth,
+          usableHeight,
+          4.5 // Kerf estándar de sierra
         );
 
         if (res.optimizedLayout.length === 0) {
-          setError("Algunas piezas son más grandes que el tablero seleccionado.");
+          setError("Error crítico: Las piezas no caben en el tablero seleccionado.");
         } else {
           setResult(res);
         }
@@ -56,7 +60,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
       } finally {
         setLoading(false);
       }
-    }, 600);
+    }, 800);
   };
 
   const exportCSV = () => {
@@ -83,7 +87,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           </CardHeader>
           <CardContent className="space-y-4 p-4 pt-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tablero MDF 18mm</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tablero MDF Seleccionado</label>
               <Select value={selectedPanel.id} onValueChange={(id) => onPanelChange(AVAILABLE_PANELS.find(p => p.id === id)!)}>
                 <SelectTrigger className="h-10 border-slate-200"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -102,23 +106,25 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
 
         {result && (
           <Card className="bg-white border-primary/20 shadow-md">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] uppercase text-primary font-bold">Estadísticas Técnicas</CardTitle></CardHeader>
+            <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] uppercase text-primary font-bold">Estadísticas de Aprovechamiento</CardTitle></CardHeader>
             <CardContent className="space-y-4 p-4 pt-0">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-bold text-slate-700">
-                  <span>Aprovechamiento</span>
+                  <span>Eficiencia Útil</span>
                   <span>{result.totalEfficiency.toFixed(1)}%</span>
                 </div>
                 <Progress value={result.totalEfficiency} className="h-2 bg-slate-100" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
                   <span className="text-[8px] text-slate-400 font-bold uppercase block">Tableros</span>
                   <span className="text-xl font-black text-slate-900">{result.totalPanels}</span>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <span className="text-[8px] text-slate-400 font-bold uppercase block">Eficiencia</span>
-                  <span className="text-xl font-black text-primary">{result.totalEfficiency.toFixed(0)}%</span>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                  <span className="text-[8px] text-slate-400 font-bold uppercase block">Piezas</span>
+                  <span className="text-xl font-black text-primary">
+                    {result.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0)}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -141,9 +147,9 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
               <Button variant="outline" size="sm" onClick={() => setError(null)}>Reintentar</Button>
             </div>
           ) : !result ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 py-20">
-              <LayoutGrid className="w-16 h-16 opacity-20" />
-              <p className="font-bold text-center text-sm text-slate-400">Configure los parámetros y presione "Ejecutar Optimización"</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4 py-20 opacity-40">
+              <LayoutGrid className="w-16 h-16" />
+              <p className="font-bold text-center text-sm">Presione "Ejecutar Optimización" para generar el plano técnico</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-16 pb-20">
@@ -155,17 +161,18 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                       <span className="ml-3 text-primary font-bold">({panel.efficiency.toFixed(1)}% Útil)</span>
                     </h3>
                   </div>
-                  {/* El factor /4 escala el tablero de 2600mm a ~650px para visualización */}
+                  
+                  {/* Factor de escala /4 para visualización adecuada */}
                   <div className="relative border-[3px] border-slate-900 bg-slate-50 shadow-2xl overflow-hidden" 
                        style={{ width: (selectedPanel.width) / 4, height: (selectedPanel.height) / 4 }}>
                     
-                    {/* Visualización del Trim (Margen de limpieza) */}
-                    <div className="absolute inset-[2.5px] border border-dashed border-red-500/30 bg-white pointer-events-none" />
+                    {/* Visualización del Trim (Margen de 10mm) */}
+                    <div className="absolute inset-[2.5px] border border-dashed border-red-500/20 bg-white pointer-events-none" />
                     
                     {panel.parts.map((p, pIdx) => (
                       <div 
                         key={pIdx} 
-                        className="absolute border border-slate-900 bg-[#E8D9B5] hover:bg-primary/20 transition-colors flex items-center justify-center group cursor-help overflow-hidden" 
+                        className="absolute border border-slate-900 bg-[#E8D9B5] hover:bg-primary/20 transition-colors flex items-center justify-center overflow-hidden" 
                         title={`${p.name}: ${p.width}x${p.height}mm`} 
                         style={{ 
                           left: (p.x + 10) / 4, 
@@ -174,11 +181,11 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                           height: p.height / 4 
                         }}
                       >
-                        <div className="flex flex-col items-center justify-center p-1 pointer-events-none text-center">
-                           <span className="text-[8px] font-black text-slate-900 leading-tight">
-                             {p.width}<span className="text-[6px] mx-0.5 text-slate-500">x</span>{p.height}
+                        <div className="flex flex-col items-center justify-center p-0.5 pointer-events-none text-center">
+                           <span className="text-[7px] font-black text-slate-900 leading-none">
+                             {p.width}<span className="text-[5px] mx-0.5 opacity-40">x</span>{p.height}
                            </span>
-                           <span className="text-[7px] text-slate-600 font-bold uppercase truncate max-w-full hidden sm:block">
+                           <span className="text-[6px] text-slate-600 font-bold uppercase truncate max-w-full mt-0.5">
                              {p.name}
                            </span>
                         </div>
@@ -187,7 +194,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   </div>
                   <div className="flex gap-4 text-[9px] text-slate-400 font-bold uppercase">
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#E8D9B5] border border-slate-400" /> Piezas MDF</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 border border-dashed border-red-500/30" /> Trim (10mm)</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 border border-dashed border-red-500/20" /> Margen Trim (10mm)</div>
                   </div>
                 </div>
               ))}
