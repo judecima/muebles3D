@@ -26,7 +26,6 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
   const doorH = H;
   const doorY = H / 2;
 
-  // Cálculo automático de bisagras por puerta (Hinges are circular/cazoleta internally)
   const hingeCount = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
 
   parts.push({ 
@@ -40,17 +39,15 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     hingeCount
   });
 
-  // Bisagras cazoleta internas (visual circular)
   for (let i = 0; i < hingeCount; i++) {
     const posX = i === 0 ? 100 : (i === 1 ? W - 100 : W/2);
     parts.push({
       id: `hinge-flip-${i}`, name: 'Bisagra Interna 90°', width: 35, height: 35, depth: 12,
-      x: posX, y: H - 20, z: D/2 - 6, type: 'hardware', isHardware: true,
+      x: posX, y: H - 10, z: D/2 - 6, type: 'hardware', isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
     });
   }
 
-  // Soportes para colgar traseros
   [40, W - 40].forEach((posX, i) => {
     parts.push({
       id: `hang-support-${i}`, name: 'Soporte Regulable Blanco', width: 40, height: 40, depth: 20, 
@@ -59,15 +56,12 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   });
 
-  // PISTONES PARAMÉTRICOS AJUSTADOS A FÍSICA REAL
   const pistonCount = W <= 800 ? 1 : 2;
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
-  // Parámetros de anclaje proporcionales para cinemática ideal
-  // Ajustados para que el pistón acompañe a la puerta en la zona de bisagra
-  const anchorMuebleX_fromFront = 20; // Según referencia: casi al borde frontal
-  const anchorMuebleY_fromBase = 60;   // Según referencia: 60mm desde base
-  const anchorPuertaY_fromTop = 35;    // Cerca de la bisagra (35mm desde el borde superior)
+  const anchorMuebleX_fromFront = 20; 
+  const anchorMuebleY_fromBase = 60;   
+  const anchorPuertaY_fromTop = 30;    
 
   sides.forEach(side => {
     const sideX = side === 'left' ? T + 5 : W - T - 5;

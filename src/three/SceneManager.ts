@@ -111,7 +111,6 @@ export class SceneManager {
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      // Ángulo de apertura de 100 grados (1.745 rad) solicitado
       obj.rotation.x = open ? -1.745 : 0;
     }
   }
@@ -123,30 +122,24 @@ export class SceneManager {
         const doorPivotGroup = this.partsMap.get(config.doorId);
         if (!doorPivotGroup) return;
 
-        // La malla de la puerta real
         const doorMesh = doorPivotGroup.children[0];
         const rod = pistonObj.getObjectByName('rod');
         
-        // 1. Obtener la posición del anclaje móvil en espacio de mundo
         const worldAnchorPuerta = doorMesh.localToWorld(new THREE.Vector3(
           config.anchorPuertaLocal.x,
           config.anchorPuertaLocal.y,
           config.anchorPuertaLocal.z
         ));
 
-        // 2. El pistón pivota en su posición de grupo (anclaje mueble) hacia el anclaje puerta
         pistonObj.lookAt(worldAnchorPuerta);
 
-        // 3. Ajustar extensión del vástago
         const currentDistance = pistonObj.position.distanceTo(worldAnchorPuerta);
         
         if (rod) {
           const cylinderLen = config.lengthClosed * 0.6;
           const extension = currentDistance - cylinderLen;
           const baseRodLen = config.lengthClosed * 0.4;
-          
-          // Escalar el vástago para que su punta toque el anclaje de la puerta
-          rod.scale.z = Math.max(0.1, extension / baseRodLen);
+          rod.scale.z = Math.max(0.01, extension / baseRodLen);
         }
       }
     });
@@ -166,10 +159,7 @@ export class SceneManager {
     if (!this.renderer || !this.scene || !this.camera) return;
     requestAnimationFrame(this.animate);
     this.controls.update();
-    
-    // Sincronización continua de herrajes móviles
     this.updateAllPistons(); 
-    
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -193,7 +183,7 @@ export class SceneManager {
       let geometry: THREE.BufferGeometry;
       
       if (part.isHardware && part.name.includes('Bisagra')) {
-        const radius = 17.5; // Cazoleta 35mm
+        const radius = 17.5; 
         const height = 12;
         geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
         if (part.id.includes('flip')) {
@@ -267,7 +257,6 @@ export class SceneManager {
     if (!part.pistonConfig) return;
     const config = part.pistonConfig;
     
-    // El grupo pivota en el anclaje del mueble (fijo)
     const group = new THREE.Group();
     group.position.set(config.anchorMueble.x, config.anchorMueble.y, config.anchorMueble.z);
 
@@ -275,34 +264,30 @@ export class SceneManager {
     const cylLen = L_closed * 0.6;
     const rodLen = L_closed * 0.4;
 
-    // Cuerpo del pistón (Cilindro Negro)
     const cylinderGeom = new THREE.CylinderGeometry(5, 5, cylLen, 16);
     cylinderGeom.rotateX(Math.PI / 2); 
-    cylinderGeom.translate(0, 0, cylLen / 2); // Origen en la base
+    cylinderGeom.translate(0, 0, cylLen / 2);
     const cylinderMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
     const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
     group.add(cylinder);
 
-    // Vástago telescópico (Cromado)
     const rodGeom = new THREE.CylinderGeometry(3, 3, rodLen, 16);
     rodGeom.rotateX(Math.PI / 2);
-    rodGeom.translate(0, 0, rodLen / 2); // Origen en la base del vástago
+    rodGeom.translate(0, 0, rodLen / 2);
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
     const rod = new THREE.Mesh(rodGeom, rodMat);
     rod.name = 'rod';
-    rod.position.z = cylLen; // Empieza donde termina el cilindro
+    rod.position.z = cylLen;
     group.add(rod);
 
-    // Soportes/Rótulas
     const ballGeom = new THREE.SphereGeometry(6, 16, 16);
     const ballMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8 });
     
     const ballMueble = new THREE.Mesh(ballGeom, ballMat);
-    ballMueble.position.set(0,0,0); // En el pivote
     group.add(ballMueble);
 
     const ballPuerta = new THREE.Mesh(ballGeom, ballMat);
-    ballPuerta.position.z = rodLen; // En la punta del vástago
+    ballPuerta.position.z = rodLen;
     rod.add(ballPuerta);
     
     group.userData.id = part.id;
