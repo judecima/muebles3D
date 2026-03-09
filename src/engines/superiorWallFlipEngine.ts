@@ -1,7 +1,7 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel {
-  const T = 18; 
+  const T = 18; // Melamina Masisa 18mm
   const { width: W, height: H, depth: D, hasBack } = dim;
   const innerW = W - 2 * T;
 
@@ -26,6 +26,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
   const doorH = H;
   const doorY = H / 2;
 
+  // Cálculo automático de bisagras por puerta (Hinges are circular/cazoleta internally)
   const hingeCount = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
 
   parts.push({ 
@@ -63,9 +64,10 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
   // Parámetros de anclaje proporcionales para cinemática ideal
-  const anchorMuebleX_fromFront = D * 0.30;
-  const anchorMuebleY_fromBase = H * 0.25;
-  const anchorPuertaY_fromTop = H * 0.20; // Cerca de la bisagra
+  // Ajustados para que el pistón acompañe a la puerta en la zona de bisagra
+  const anchorMuebleX_fromFront = 20; // Según referencia: casi al borde frontal
+  const anchorMuebleY_fromBase = 60;   // Según referencia: 60mm desde base
+  const anchorPuertaY_fromTop = 35;    // Cerca de la bisagra (35mm desde el borde superior)
 
   sides.forEach(side => {
     const sideX = side === 'left' ? T + 5 : W - T - 5;
@@ -73,7 +75,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     parts.push({
       id: `piston-${side}`,
       name: 'Pistón a Gas',
-      width: 15, height: 15, depth: 220, // Longitud visual inicial
+      width: 15, height: 15, depth: 220, 
       x: sideX, y: anchorMuebleY_fromBase, z: D/2 - anchorMuebleX_fromFront, 
       type: 'piston-body',
       isHardware: true,
@@ -82,7 +84,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
         side,
         anchorMueble: { x: sideX, y: anchorMuebleY_fromBase, z: D/2 - anchorMuebleX_fromFront },
         anchorPuertaLocal: { 
-          x: side === 'left' ? -W/2 + 50 : W/2 - 50, 
+          x: side === 'left' ? -W/2 + 40 : W/2 - 40, 
           y: H/2 - anchorPuertaY_fromTop, 
           z: -T/2 
         },
@@ -95,7 +97,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
 
   return { 
     parts, 
-    summary: `Alacena horizontal con pistón a gas. Herrajes calculados según dimensiones de ${W}x${H}mm.`, 
+    summary: `Alacena horizontal con pistón a gas. Herrajes calculados para apertura de 100°.`, 
     hasDoors: true, 
     hasDrawers: false 
   };
