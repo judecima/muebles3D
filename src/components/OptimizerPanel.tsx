@@ -8,7 +8,7 @@ import { Part, AVAILABLE_PANELS, PanelSize } from '@/lib/types';
 import { runOptimization, OptimizationResult } from '@/optimizer/cutOptimizer';
 import { generateCutListFromModel } from '@/utils/cutlistGenerator';
 import { Progress } from '@/components/ui/progress';
-import { Scissors, Loader2, LayoutGrid, FileSpreadsheet, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Scissors, Loader2, LayoutGrid, FileSpreadsheet, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface OptimizerPanelProps {
@@ -22,7 +22,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset results only if pieces change in number or panel size changes
   useEffect(() => {
     setResult(null);
     setError(null);
@@ -33,7 +32,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setError(null);
     setResult(null);
     
-    // Pequeño delay para feedback visual
     setTimeout(() => {
       try {
         const cutlist = generateCutListFromModel(parts);
@@ -44,7 +42,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           return;
         }
 
-        // Aplicar Trim de 10mm por lado (Total 20mm)
         const usableWidth = selectedPanel.width - 20; 
         const usableHeight = selectedPanel.height - 20;
 
@@ -52,7 +49,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           cutlist,
           usableWidth,
           usableHeight,
-          4.5 // Kerf estándar de sierra industrial
+          4.5 
         );
 
         if (!res || res.optimizedLayout.length === 0 || res.optimizedLayout[0].parts.length === 0) {
@@ -83,11 +80,11 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-full w-full gap-4 p-4 md:p-6 bg-slate-50 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full w-full gap-4 p-4 md:p-6 bg-slate-100 overflow-hidden">
       {/* Panel Lateral de Configuración */}
-      <div className="w-full md:w-80 flex flex-col gap-4 shrink-0 h-fit">
-        <Card className="shadow-lg border-slate-200 overflow-hidden">
-          <CardHeader className="p-4 bg-primary text-white">
+      <div className="w-full md:w-80 flex flex-col gap-4 shrink-0 overflow-y-auto pb-4">
+        <Card className="shadow-lg border-slate-200 overflow-hidden bg-white">
+          <CardHeader className="p-4 bg-primary text-white shrink-0">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Scissors className="w-4 h-4" /> Configuración de Corte
             </CardTitle>
@@ -113,7 +110,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
               >
                 {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Optimizar Corte'}
               </Button>
-              <Button variant="outline" className="w-full h-11 font-bold text-xs border-slate-300" onClick={exportCSV}>
+              <Button variant="outline" className="w-full h-11 font-bold text-xs border-slate-300 bg-white" onClick={exportCSV}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" /> Exportar CSV
               </Button>
             </div>
@@ -148,15 +145,27 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   </span>
                 </div>
               </div>
+
+              {result.totalPanels > 1 && (
+                <div className="pt-2 border-t border-slate-50 space-y-1">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase">Detalle por Tablero</span>
+                  {result.optimizedLayout.map((p, i) => (
+                    <div key={i} className="flex justify-between text-[10px] text-slate-600">
+                      <span>Tablero #{p.panelNumber}</span>
+                      <span className="font-bold">{p.efficiency.toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
       </div>
 
       {/* Visualización del Plano de Corte */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-inner overflow-hidden relative min-h-[400px]">
-        <ScrollArea className="h-full w-full">
-          <div className="p-6 md:p-10 flex flex-col items-center gap-10">
+      <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-inner overflow-hidden relative min-h-0 flex flex-col">
+        <ScrollArea className="flex-1 w-full">
+          <div className="p-6 md:p-10 flex flex-col items-center gap-16 min-h-full pb-20">
             {loading ? (
               <div className="py-24 flex flex-col items-center gap-6 text-slate-400">
                 <div className="relative">
@@ -165,7 +174,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                 </div>
                 <div className="text-center">
                   <p className="font-bold text-slate-700">Calculando Algoritmo de Guillotina...</p>
-                  <p className="text-xs">Probando 100 combinaciones para máxima eficiencia</p>
+                  <p className="text-xs">Probando combinaciones para máxima eficiencia</p>
                 </div>
               </div>
             ) : error ? (
@@ -179,64 +188,70 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                 <div className="bg-slate-50 p-10 rounded-full">
                   <LayoutGrid className="w-24 h-24 opacity-20" />
                 </div>
-                <div className="text-center">
+                <div className="text-center px-4">
                   <p className="font-bold text-slate-400 text-lg">Plano de Corte Vacío</p>
-                  <p className="text-sm">Configura el tablero y presiona optimizar para ver los cortes</p>
+                  <p className="text-sm max-w-xs mx-auto">Configura el tablero industrial y presiona optimizar para generar el despiece</p>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-10 w-full max-w-screen-xl">
+              <div className="flex flex-col gap-12 w-full max-w-5xl">
                 {result.optimizedLayout.map((panel, idx) => (
-                  <div key={idx} className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
-                    <div className="flex items-center justify-between px-2">
-                      <h3 className="text-sm font-black uppercase text-slate-800 tracking-wider">
-                        Tablero Industrial #{panel.panelNumber} 
-                      </h3>
-                      <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-                        {panel.efficiency.toFixed(1)}% de aprovechamiento
-                      </span>
+                  <div key={idx} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2 border-l-4 border-primary pl-4">
+                      <div>
+                        <h3 className="text-lg font-black uppercase text-slate-800 tracking-wider">
+                          Tablero Industrial #{panel.panelNumber} 
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">Área: {selectedPanel.width} x {selectedPanel.height} mm</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-primary bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20 shadow-sm">
+                          {panel.efficiency.toFixed(1)}% Usado
+                        </span>
+                      </div>
                     </div>
                     
                     {/* Visualizador del Tablero con Escala Dinámica */}
-                    <div className="relative border-4 border-slate-900 bg-[#f8f5ee] shadow-2xl rounded-sm mx-auto overflow-hidden transition-all duration-300" 
+                    <div className="relative border-2 border-slate-900 bg-[#f4f1ea] shadow-xl rounded-sm mx-auto overflow-hidden" 
                          style={{ 
                            width: '100%', 
-                           maxWidth: selectedPanel.width / 3, 
+                           maxWidth: '1000px',
                            aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}`,
-                           backgroundImage: 'radial-gradient(#00000010 1px, transparent 0)',
-                           backgroundSize: '20px 20px'
+                           backgroundImage: 'radial-gradient(#00000008 1.5px, transparent 0)',
+                           backgroundSize: '30px 30px'
                          }}>
                       
-                      {/* Margen de Trim Perimetral (Visualización del área desperdiciada) */}
-                      <div className="absolute inset-0 border-[8px] border-red-500/5 pointer-events-none" />
-                      <div className="absolute inset-[3px] border border-dashed border-red-500/10 pointer-events-none" />
+                      {/* Margen de Trim Perimetral */}
+                      <div className="absolute inset-0 border-[10px] border-red-500/10 pointer-events-none" />
                       
-                      {/* Contenedor de piezas relativas al tablero */}
-                      <div className="absolute inset-0" style={{ transform: 'scale(1)' }}>
+                      {/* Contenedor de piezas */}
+                      <div className="absolute inset-0">
                         {panel.parts.map((p, pIdx) => {
-                          const scale = 100 / selectedPanel.width;
+                          const scaleX = 100 / selectedPanel.width;
                           const scaleY = 100 / selectedPanel.height;
                           return (
                             <div 
                               key={pIdx} 
-                              className="absolute border border-slate-800 bg-[#E8D9B5] hover:bg-primary/30 hover:z-20 transition-all cursor-help group shadow-sm" 
+                              className="absolute border border-slate-800 bg-[#D4C4A8] hover:bg-primary/40 hover:z-20 transition-colors cursor-help group shadow-sm flex items-center justify-center" 
                               style={{ 
-                                left: `${(p.x + 10) * scale}%`, 
+                                left: `${(p.x + 10) * scaleX}%`, 
                                 top: `${(p.y + 10) * scaleY}%`, 
-                                width: `${p.width * scale}%`, 
+                                width: `${p.width * scaleX}%`, 
                                 height: `${p.height * scaleY}%` 
                               }}
                             >
-                              <div className="flex flex-col items-center justify-center h-full w-full p-1 overflow-hidden">
-                                 <span className="text-[min(1.2vw,10px)] font-black leading-none text-slate-900 mb-0.5">
+                              <div className="flex flex-col items-center justify-center w-full h-full p-0.5 overflow-hidden text-center">
+                                 <span className="text-[min(1.8vw,12px)] font-black leading-none text-slate-900 mb-0.5 pointer-events-none">
                                    {p.width}x{p.height}
                                  </span>
-                                 <span className="text-[min(1vw,8px)] text-slate-600 uppercase truncate max-w-full font-bold">
+                                 <span className="text-[min(1.4vw,9px)] text-slate-700 uppercase truncate w-full font-bold pointer-events-none">
                                    {p.name}
                                  </span>
-                                 {/* Tooltip personalizado */}
-                                 <div className="hidden group-hover:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap z-30 font-bold">
-                                   {p.name} ({p.width}x{p.height}mm)
+                                 
+                                 {/* Tooltip mejorado */}
+                                 <div className="hidden group-hover:flex absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] py-2 px-3 rounded-lg shadow-2xl whitespace-nowrap z-50 font-bold items-center gap-2 border border-white/20">
+                                   <ChevronRight className="w-3 h-3 text-primary" />
+                                   {p.name}: {p.width} x {p.height} mm {p.rotated ? '(Rotada)' : ''}
                                  </div>
                               </div>
                             </div>
@@ -250,6 +265,14 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
             )}
           </div>
         </ScrollArea>
+        
+        {/* Indicador de más contenido si hay múltiples tableros */}
+        {result && result.totalPanels > 1 && (
+          <div className="absolute bottom-4 right-8 pointer-events-none flex items-center gap-2 bg-slate-900/80 backdrop-blur-sm text-white text-[10px] py-2 px-4 rounded-full animate-bounce">
+            <span>Desliza para ver más tableros</span>
+            <ChevronRight className="w-3 h-3 rotate-90" />
+          </div>
+        )}
       </div>
     </div>
   );
