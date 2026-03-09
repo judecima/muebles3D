@@ -51,3 +51,30 @@ export const AVAILABLE_PANELS: PanelSize[] = [
   { id: 'standard-2', width: 2440, height: 1830, name: '2440 x 1830 mm' },
   { id: 'standard-3', width: 2800, height: 2100, name: '2800 x 2100 mm' },
 ];
+
+export interface OptimizedPart {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotated: boolean;
+  color?: string;
+}
+
+export interface OptimizedPanel {
+  panelNumber: number;
+  parts: OptimizedPart[];
+  efficiency: number;
+  usedArea: number;
+  totalArea: number;
+}
+
+export interface OptimizationResult {
+  optimizedLayout: OptimizedPanel[];
+  totalPanels: number;
+  totalEfficiency: number;
+  summary: string;
+  kerf: number;
+  trim: number;
+}
