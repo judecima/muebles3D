@@ -136,10 +136,10 @@ export default function Home() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full h-full flex flex-col">
+      <main className="flex-1 flex flex-col relative overflow-hidden h-full">
+        <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full h-full flex flex-col m-0 p-0">
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-4 md:px-6 py-2 bg-white border-b shadow-sm z-30">
+          <div className="flex items-center justify-between px-4 md:px-6 py-2 bg-white border-b shadow-sm z-30 shrink-0">
             <div className="flex items-center gap-2">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
@@ -171,11 +171,11 @@ export default function Home() {
             </div>
 
             <TabsList className="bg-slate-100 h-9">
-              <TabsTrigger value="3d" className="gap-2 text-xs md:text-sm">
+              <TabsTrigger value="3d" className="gap-2 text-xs md:text-sm h-7">
                 <BoxIcon className="w-3.5 h-3.5" /> 
                 <span className="hidden xs:inline">Diseño</span>
               </TabsTrigger>
-              <TabsTrigger value="optimize" className="gap-2 text-xs md:text-sm">
+              <TabsTrigger value="optimize" className="gap-2 text-xs md:text-sm h-7">
                 <LayoutGrid className="w-3.5 h-3.5" /> 
                 <span className="hidden xs:inline">Optimización</span>
               </TabsTrigger>
@@ -190,7 +190,7 @@ export default function Home() {
           </div>
 
           {/* Content Areas */}
-          <TabsContent value="3d" className="flex-1 m-0 relative bg-slate-100 overflow-hidden flex flex-col">
+          <TabsContent value="3d" className="flex-1 m-0 relative bg-slate-100 overflow-hidden flex flex-col data-[state=inactive]:hidden">
             <div className="flex-1 relative">
               <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
               <div className="absolute bottom-4 left-4 pointer-events-none opacity-10">
@@ -202,7 +202,7 @@ export default function Home() {
             </div>
           </TabsContent>
 
-          <TabsContent value="optimize" className="flex-1 m-0 overflow-hidden">
+          <TabsContent value="optimize" className="flex-1 m-0 overflow-hidden flex flex-col data-[state=inactive]:hidden">
             <OptimizerPanel parts={parts} selectedPanel={selectedPanel} onPanelChange={setSelectedPanel} />
           </TabsContent>
         </Tabs>
