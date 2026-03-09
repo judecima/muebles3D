@@ -1,7 +1,7 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
-  const { width: W, depth: D, thickness: T, hasBack } = dim;
+  const { width: W, depth: D, thickness: T, hasBack, hasShelf } = dim;
   const H = 870; // Altura fija Red Arquimax
   const innerW = W - 2 * T;
 
@@ -20,6 +20,25 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
       width: W, height: H, depth: 3, 
       x: W/2, y: H/2, z: -D/2 - 1.5, 
       type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
+    });
+  }
+
+  // Estante opcional para Bajo Mesada
+  if (hasShelf) {
+    parts.push({
+      id: 'estante-interno',
+      name: 'Estante Interno',
+      width: innerW - 2,
+      height: T,
+      depth: D * 0.9,
+      x: W/2,
+      y: H/2,
+      z: 0,
+      type: 'static',
+      cutLargo: innerW - 2,
+      cutAncho: D * 0.9,
+      cutEspesor: T,
+      grainDirection: 'horizontal'
     });
   }
 
@@ -49,5 +68,5 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ id: `bis-${i}`, name: 'Bisagra Cazoleta', width: 35, height: 35, depth: 12, x: 0, y: 0, z: 0, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   }
 
-  return { parts, summary: 'Bajo mesada Red Arquimax con amarres estructurales.', hasDoors: true, hasDrawers: false };
+  return { parts, summary: 'Bajo mesada Red Arquimax con amarres estructurales y opción de estante.', hasDoors: true, hasDrawers: false };
 }

@@ -1,7 +1,7 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
-  const { width: W, height: H, depth: D, thickness: T, hasBack } = dim;
+  const { width: W, height: H, depth: D, thickness: T } = dim;
   
   const innerW = W - 2 * T;
   const railSpace = 26; // 13mm por lado
@@ -18,15 +18,14 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'base-inf', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
   ];
 
-  if (hasBack) {
-    parts.push({ 
-      id: 'fondo', 
-      name: 'Fondo Mueble', 
-      width: W, height: H, depth: 3, 
-      x: W/2, y: H/2, z: -D/2 - 1.5, 
-      type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
-    });
-  }
+  // Fondo obligatorio para Placard
+  parts.push({ 
+    id: 'fondo', 
+    name: 'Fondo Mueble', 
+    width: W, height: H, depth: 3, 
+    x: W/2, y: H/2, z: -D/2 - 1.5, 
+    type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
+  });
 
   const numDrawers = 2;
   const startY = T + 10;
@@ -96,5 +95,5 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical'
   });
 
-  return { parts, summary: 'Placard Red Arquimax con módulo de cajones y base estructural.', hasDoors: true, hasDrawers: true };
+  return { parts, summary: 'Placard Red Arquimax con módulo de cajones y fondo estructural.', hasDoors: true, hasDrawers: true };
 }

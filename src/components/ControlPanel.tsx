@@ -17,7 +17,8 @@ import {
   Settings2,
   Undo2,
   FileDown,
-  Layout
+  Layout,
+  Layers
 } from 'lucide-react';
 
 interface ControlPanelProps {
@@ -56,9 +57,15 @@ export function ControlPanel({
     onDimensionsChange({ ...dimensions, hasBack: checked });
   };
 
+  const handleShelfToggle = (checked: boolean) => {
+    onDimensionsChange({ ...dimensions, hasShelf: checked });
+  };
+
   const isHeightFixed = type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada';
   const isWidthSlider = type === 'escritorio';
   const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca';
+  const forceBack = type === 'placard' || type === 'rackTV';
+  const canHaveShelf = type === 'bajoMesada';
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -141,15 +148,37 @@ export function ControlPanel({
             </div>
           </div>
 
-          {canHaveBack && (
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-              <div className="flex items-center gap-2">
-                <Layout className="w-4 h-4 text-slate-500" />
-                <Label className="text-xs font-bold uppercase text-slate-600">Fondo (MDF 3mm)</Label>
+          <div className="space-y-2">
+            {(canHaveBack || forceBack) && (
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Layout className="w-4 h-4 text-slate-500" />
+                  <div className="flex flex-col">
+                    <Label className="text-xs font-bold uppercase text-slate-600">Fondo (MDF 3mm)</Label>
+                    {forceBack && <span className="text-[8px] text-primary/70 font-bold uppercase">Obligatorio</span>}
+                  </div>
+                </div>
+                <Switch 
+                  checked={forceBack ? true : dimensions.hasBack} 
+                  onCheckedChange={handleBackToggle} 
+                  disabled={forceBack}
+                />
               </div>
-              <Switch checked={dimensions.hasBack} onCheckedChange={handleBackToggle} />
-            </div>
-          )}
+            )}
+
+            {canHaveShelf && (
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-slate-500" />
+                  <Label className="text-xs font-bold uppercase text-slate-600">Estante Interior</Label>
+                </div>
+                <Switch 
+                  checked={dimensions.hasShelf} 
+                  onCheckedChange={handleShelfToggle} 
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Color */}

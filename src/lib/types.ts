@@ -28,7 +28,8 @@ export interface FurnitureDimensions {
   height: number;
   depth: number;
   thickness: number;
-  hasBack?: boolean; // Opción para fondo de 3mm
+  hasBack?: boolean; 
+  hasShelf?: boolean; // Opción para estante interior
 }
 
 export interface FurnitureModel {

@@ -12,6 +12,15 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'divisor', name: 'Divisor Central', width: T, height: H - 2*T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: H - 2*T, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' },
   ];
 
+  // Fondo obligatorio para Rack TV
+  parts.push({ 
+    id: 'fondo', 
+    name: 'Fondo Mueble', 
+    width: W, height: H, depth: 3, 
+    x: W/2, y: H/2, z: -D/2 - 1.5, 
+    type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
+  });
+
   const railSpace = 26;
   const compW = (W - 3*T) / 2;
   const drawerW = compW - railSpace;
@@ -47,5 +56,5 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   });
 
-  return { parts, summary: 'Rack TV Red Arquimax con altura fija de 500mm y cajones técnicos.', hasDoors: false, hasDrawers: true };
+  return { parts, summary: 'Rack TV Red Arquimax con altura fija de 500mm y fondo estructural.', hasDoors: false, hasDrawers: true };
 }
