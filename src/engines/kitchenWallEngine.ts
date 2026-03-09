@@ -50,8 +50,8 @@ export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
       }
 
       parts.push({
-        id: `hinge-wall-${isLeft ? 'L' : 'R'}-${i}`, name: 'Bisagra Interna 90°', width: 30, height: 15, depth: 45,
-        x: isLeft ? 10 : W - 10, y: posY, z: D/2 - 20, type: 'hardware', isHardware: true,
+        id: `hinge-wall-${isLeft ? 'L' : 'R'}-${i}`, name: 'Bisagra Interna 90°', width: 35, height: 35, depth: 12,
+        x: isLeft ? T : W - T, y: posY, z: D/2 - 10, type: 'hardware', isHardware: true,
         cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
       });
     }

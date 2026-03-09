@@ -44,7 +44,6 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
   const doorW = W / 2 - 2;
   const doorY = H / 2;
   
-  // Lógica Global de Bisagras
   const hingesPerDoor = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
 
   const doorTypes: ('door-left' | 'door-right')[] = ['door-left', 'door-right'];
@@ -63,7 +62,6 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
       hingeCount: hingesPerDoor
     });
 
-    // Agregar bisagras al despiece
     for (let i = 0; i < hingesPerDoor; i++) {
       let posY = 70;
       if (hingesPerDoor > 2) {
@@ -73,8 +71,8 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
       }
       
       parts.push({
-        id: `hinge-${isLeft ? 'L' : 'R'}-${i}`, name: 'Bisagra Interna 90°', width: 30, height: 15, depth: 45,
-        x: isLeft ? 10 : W - 10, y: posY, z: D/2 - 20, type: 'hardware', isHardware: true,
+        id: `hinge-${isLeft ? 'L' : 'R'}-${i}`, name: 'Bisagra Interna 90°', width: 35, height: 35, depth: 12,
+        x: isLeft ? T : W - T, y: posY, z: D/2 - 10, type: 'hardware', isHardware: true,
         cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
       });
     }

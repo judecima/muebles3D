@@ -1,9 +1,5 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
-/**
- * Motor Alacena Horizontal Compacta con Pistón a Gas - Red Arquimax
- * Diseño basado en parámetros reales: 500x300x320mm, 18mm espesor.
- */
 export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel {
   const T = 18; 
   const { width: W, height: H, depth: D, hasBack } = dim;
@@ -26,12 +22,10 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   }
 
-  // Puerta Abatible Superior
   const doorW = W;
   const doorH = H;
   const doorY = H / 2;
 
-  // Lógica Global de Bisagras (2 bisagras para alto 300mm)
   const hingeCount = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
 
   parts.push({ 
@@ -45,16 +39,15 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     hingeCount
   });
 
-  // Bisagras al despiece y visor
   for (let i = 0; i < hingeCount; i++) {
+    const posX = i === 0 ? 70 : (i === 1 ? W - 70 : W/2);
     parts.push({
-      id: `hinge-flip-${i}`, name: 'Bisagra Interna 90°', width: 30, height: 15, depth: 45,
-      x: i === 0 ? 70 : (i === 1 ? W - 70 : W/2), y: H - 35, z: D/2, type: 'hardware', isHardware: true,
+      id: `hinge-flip-${i}`, name: 'Bisagra Interna 90°', width: 35, height: 35, depth: 12,
+      x: posX, y: H - T, z: D/2 - 10, type: 'hardware', isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
     });
   }
 
-  // Soporte Regulable para Colgar
   [30, W - 30].forEach((posX, i) => {
     parts.push({
       id: `hang-support-${i}`, name: 'Soporte Regulable Blanco', width: 40, height: 40, depth: 20, 
@@ -63,9 +56,6 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   });
 
-  // PISTONES A GAS - Puntos de fijación según referencia visual
-  // Fijación Inferior (Lateral): X=20mm (desde frente), Y=60mm (desde base)
-  // Fijación Superior (Puerta): X=40mm (desde lateral), Y=30mm (desde borde superior)
   const pistonCount = W <= 800 ? 1 : 2;
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
@@ -86,7 +76,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre',
       pistonConfig: {
         side,
-        anchorMueble: { x: sideX, y: 60, z: D/2 - 20 },
+        anchorMueble: { x: 20, y: 60, z: D/2 - 20 },
         anchorPuerta: { x: doorX, y: H - 30, z: D/2 + T },
         lengthClosed: L_closed,
         lengthOpen: L_open

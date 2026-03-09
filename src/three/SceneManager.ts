@@ -106,13 +106,11 @@ export class SceneManager {
     this.itemStates.set(id, open);
     const type = obj.userData.type;
 
-    // Todas las puertas convencionales abren 90°, excepto la abatible que abre 100°
     if (type === 'door-left') {
       obj.rotation.y = open ? -Math.PI / 2 : 0;
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      // 100 grados = 1.745 rad
       obj.rotation.x = open ? -1.745 : 0; 
       this.updatePistons(open, obj);
     }
@@ -124,7 +122,6 @@ export class SceneManager {
         const config = obj.userData.config;
         const rod = obj.getObjectByName('rod');
         
-        // El anclaje de la puerta está en coordenadas del mueble, lo pasamos a mundo considerando la rotación de la puerta
         const actualAnchorLocal = new THREE.Vector3(
           config.anchorPuerta.x - doorObj.position.x,
           config.anchorPuerta.y - doorObj.position.y,
@@ -139,7 +136,6 @@ export class SceneManager {
         if (rod) {
           const cylinderLen = config.lengthClosed * 0.6;
           const currentExtension = distance - cylinderLen;
-          // El vástago se escala y se desplaza proporcionalmente
           rod.scale.z = currentExtension / (config.lengthClosed * 0.4); 
           rod.position.z = (cylinderLen / 2) + (currentExtension / 2);
         }
@@ -181,16 +177,29 @@ export class SceneManager {
         return;
       }
 
-      const w = Math.max(0.1, part.width - (part.isHardware ? 0 : visualGap));
-      const h = Math.max(0.1, part.height - (part.isHardware ? 0 : visualGap));
-      const d = Math.max(0.1, part.depth - (part.isHardware ? 0 : visualGap));
+      let geometry: THREE.BufferGeometry;
       
-      const geometry = new THREE.BoxGeometry(w, h, d);
+      if (part.isHardware && part.name.includes('Bisagra')) {
+        const radius = 17.5; 
+        const height = 12;
+        geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+        if (part.id.includes('flip')) {
+          geometry.rotateX(0); 
+        } else {
+          geometry.rotateZ(Math.PI / 2); 
+        }
+      } else {
+        const w = Math.max(0.1, part.width - (part.isHardware ? 0 : visualGap));
+        const h = Math.max(0.1, part.height - (part.isHardware ? 0 : visualGap));
+        const d = Math.max(0.1, part.depth - (part.isHardware ? 0 : visualGap));
+        geometry = new THREE.BoxGeometry(w, h, d);
+      }
+
       let material: THREE.MeshStandardMaterial;
 
       if (part.isHardware) {
-        const colorVal = part.name.includes('Blanco') ? 0xffffff : 0x64748b;
-        material = new THREE.MeshStandardMaterial({ color: colorVal, roughness: 0.2, metalness: 0.7 });
+        const colorVal = part.name.includes('Blanco') ? 0xffffff : 0x94a3b8;
+        material = new THREE.MeshStandardMaterial({ color: colorVal, roughness: 0.2, metalness: 0.8 });
       } else {
         material = new THREE.MeshStandardMaterial({ 
           color: color === 'alarce-blanco' ? 0xffffff : 0x4a3728, 
@@ -202,9 +211,11 @@ export class SceneManager {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = mesh.receiveShadow = true;
 
-      const edges = new THREE.EdgesGeometry(geometry);
-      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.15 }));
-      mesh.add(line);
+      if (!part.isHardware) {
+        const edges = new THREE.EdgesGeometry(geometry);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.15 }));
+        mesh.add(line);
+      }
 
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
@@ -249,14 +260,12 @@ export class SceneManager {
     const cylLen = L_closed * 0.6;
     const rodLen = L_closed * 0.4;
 
-    // Cilindro (Negro)
     const cylinderGeom = new THREE.CylinderGeometry(4, 4, cylLen, 16);
     cylinderGeom.rotateX(Math.PI / 2);
     const cylinderMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
     const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
     group.add(cylinder);
 
-    // Vástago (Metal cromado)
     const rodGeom = new THREE.CylinderGeometry(2.5, 2.5, rodLen, 16);
     rodGeom.rotateX(Math.PI / 2);
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
@@ -265,7 +274,6 @@ export class SceneManager {
     rod.position.z = cylLen / 2; 
     group.add(rod);
 
-    // Anclajes integrados (Esferas de acero)
     const supportGeom = new THREE.SphereGeometry(6, 16, 16);
     const supportMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 });
     
@@ -277,7 +285,6 @@ export class SceneManager {
     supportPuerta.position.z = rodLen / 2;
     rod.add(supportPuerta);
 
-    // Orientar hacia el anclaje de la puerta inicialmente
     const p2 = new THREE.Vector3(config.anchorPuerta.x, config.anchorPuerta.y, config.anchorPuerta.z);
     group.lookAt(p2);
     
@@ -380,7 +387,6 @@ export class SceneManager {
     box.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
     
-    // Posicionar cámara a 45 grados (isométrico técnico) para captura profesional
     const dist = maxDim * 2.5;
     this.camera.position.set(center.x + dist, center.y + dist, center.z + dist);
     this.controls.target.copy(center);
@@ -389,7 +395,6 @@ export class SceneManager {
     this.renderer.render(this.scene, this.camera);
     const data = this.renderer.domElement.toDataURL('image/png');
     
-    // Restaurar vista previa
     this.camera.position.copy(originalPos);
     this.controls.target.copy(originalTarget);
     this.controls.update();
