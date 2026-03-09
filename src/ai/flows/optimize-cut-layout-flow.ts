@@ -17,9 +17,9 @@ const OptimizeCutLayoutInputSchema = z.object({
         grainDirection: z.enum(['vertical', 'horizontal', 'libre']),
       })
     ),
-  panelWidth: z.number().positive().describe('Width after trim (e.g. 2580 for a 2600 panel)'),
-  panelHeight: z.number().positive().describe('Height after trim (e.g. 1810 for a 1830 panel)'),
-  kerf: z.number().describe('Thickness of the saw blade, default 4.5mm'),
+  panelWidth: z.number().positive().describe('Width after trim'),
+  panelHeight: z.number().positive().describe('Height after trim'),
+  kerf: z.number().describe('Thickness of the saw blade'),
 });
 export type OptimizeCutLayoutInput = z.infer<typeof OptimizeCutLayoutInputSchema>;
 
@@ -54,22 +54,22 @@ const prompt = ai.definePrompt({
   name: 'optimizeCutLayoutPrompt',
   input: { schema: OptimizeCutLayoutInputSchema },
   output: { schema: OptimizeCutLayoutOutputSchema },
-  prompt: `You are an expert MDF cutting optimizer. Use the GUILLOTINE ALGORITHM (Best Area Fit) to arrange parts.
+  prompt: `You are an expert MDF cutting optimizer for "Red Arquimax". 
+Use the GUILLOTINE ALGORITHM (Best Area Fit) to arrange these parts.
 
-Rules:
-1. TABLERO: {{{panelWidth}}} x {{{panelHeight}}} mm.
-2. KERF: {{{kerf}}} mm must be subtracted after each cut (except for the last piece in a strip).
-3. GRAIN DIRECTION:
-   - 'vertical': Width is aligned with the long side (panelWidth). Cannot rotate.
-   - 'horizontal': Height is aligned with the long side. Cannot rotate.
-   - 'libre': Can be rotated 90 degrees if it improves efficiency.
-4. OPTIMIZATION: Aim for >90% efficiency. If area used < 85%, rethink the arrangement.
-5. NO OVERLAPS. All cuts must be edge-to-edge (Guillotine).
+TABLERO ÚTIL: {{{panelWidth}}} x {{{panelHeight}}} mm.
+KERF: {{{kerf}}} mm.
 
-Parts to place:
+Reglas:
+1. Las piezas con 'vertical' u 'horizontal' NO se rotan.
+2. Las piezas 'libre' se pueden rotar para mejorar eficiencia.
+3. Maximiza el uso del tablero (>90%).
+4. Los cortes deben ser de lado a lado (Guillotine).
+
+Listado:
 {{{json cutlist}}}
 
-Return a JSON with the optimized arrangement for all panels needed.`,
+Devuelve el JSON con la disposición optimizada.`,
 });
 
 const optimizeCutLayoutFlow = ai.defineFlow(
@@ -79,7 +79,13 @@ const optimizeCutLayoutFlow = ai.defineFlow(
     outputSchema: OptimizeCutLayoutOutputSchema,
   },
   async input => {
-    const { output } = await prompt(input);
-    return output!;
+    try {
+      const { output } = await prompt(input);
+      if (!output) throw new Error("No output from AI");
+      return output;
+    } catch (error) {
+      console.error("AI Optimization Flow Error:", error);
+      throw error;
+    }
   }
 );

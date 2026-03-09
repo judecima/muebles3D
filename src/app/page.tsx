@@ -7,23 +7,22 @@ import { CutlistTable } from '@/components/CutlistTable';
 import { OptimizerPanel } from '@/components/OptimizerPanel';
 import { FurnitureType, FurnitureDimensions, Part, FurnitureColor, AVAILABLE_PANELS, PanelSize } from '@/lib/types';
 import { 
-  Menu, 
-  Maximize2,
   FileDown,
   LayoutGrid,
   Box as BoxIcon
 } from 'lucide-react';
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetTrigger,
-  SheetHeader,
-  SheetTitle
-} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+
+// Importación de motores de ingeniería
+import { kitchenBaseEngine } from '@/engines/kitchenBaseEngine';
+import { deskEngine } from '@/engines/deskEngine';
+import { tvRackEngine } from '@/engines/tvRackEngine';
+import { kitchenWallEngine } from '@/engines/kitchenWallEngine';
+import { closetEngine } from '@/engines/closetEngine';
+import { bookshelfEngine } from '@/engines/bookshelfEngine';
 
 export default function Home() {
   const [view, setView] = useState<'3d' | 'optimize'>('3d');
@@ -42,17 +41,14 @@ export default function Home() {
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
   const generateFurniture = () => {
-    const { kitchenBaseEngine } = require('@/engines/kitchenBaseEngine');
-    const { deskEngine } = require('@/engines/deskEngine');
-    const { tvRackEngine } = require('@/engines/tvRackEngine');
-    const { kitchenWallEngine } = require('@/engines/kitchenWallEngine');
-
     let result;
     switch (type) {
       case 'bajoMesada': result = kitchenBaseEngine(dimensions); break;
       case 'escritorio': result = deskEngine(dimensions); break;
       case 'rackTV': result = tvRackEngine(dimensions); break;
       case 'alacena': result = kitchenWallEngine(dimensions); break;
+      case 'placard': result = closetEngine(dimensions); break;
+      case 'biblioteca': result = bookshelfEngine(dimensions); break;
       default: result = { parts: [] };
     }
     setParts(result.parts);
@@ -76,12 +72,14 @@ export default function Home() {
     const BRAND_COLOR = [174, 26, 226];
 
     doc.setFontSize(22);
-    doc.setTextColor(40);
+    doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.text("RED ARQUIMAX - Despiece Técnico", 105, 30, { align: 'center' });
     
     if (viewerRef.current && view === '3d') {
       const img = viewerRef.current.getScreenshot();
-      doc.addImage(img, 'PNG', 15, 60, 180, 100);
+      if (img) {
+        doc.addImage(img, 'PNG', 15, 60, 180, 100);
+      }
     }
 
     doc.addPage();
