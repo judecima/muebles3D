@@ -28,12 +28,12 @@ import { closetEngine } from '@/engines/closetEngine';
 import { bookshelfEngine } from '@/engines/bookshelfEngine';
 
 const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
-  bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18, hasTop: false },
+  bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true },
   rackTV: { width: 1600, height: 500, depth: 400, thickness: 18 },
   escritorio: { width: 1200, height: 750, depth: 600, thickness: 18 },
-  alacena: { width: 800, height: 600, depth: 320, thickness: 18, hasTop: true },
+  alacena: { width: 800, height: 600, depth: 320, thickness: 18, hasBack: true },
   placard: { width: 1800, height: 2100, depth: 600, thickness: 18 },
-  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasTop: true },
+  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasBack: true },
 };
 
 export default function Home() {

@@ -1,17 +1,24 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
-  const { width: W, height: H, depth: D, thickness: T, hasTop } = dim;
+  const { width: W, height: H, depth: D, thickness: T, hasBack } = dim;
 
   const parts: Part[] = [
     { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
     { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
     { id: 'base', name: 'Base Inferior', width: W - 2*T, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'tapa', name: 'Tapa Superior', width: W - 2*T, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'estante', name: 'Estante Interior', width: W - 2*T - 2, height: T, depth: D * 0.85, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: W - 2*T - 2, cutAncho: D * 0.85, cutEspesor: T, grainDirection: 'horizontal' },
   ];
 
-  if (hasTop !== false) {
-    parts.push({ id: 'tapa', name: 'Tapa Superior', width: W - 2*T, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
+  if (hasBack) {
+    parts.push({ 
+      id: 'fondo', 
+      name: 'Fondo Mueble', 
+      width: W - T, height: H - T, depth: 3, 
+      x: W/2, y: H/2, z: -D/2 + 1.5, 
+      type: 'static', cutLargo: H - T, cutAncho: W - T, cutEspesor: 3, grainDirection: 'libre' 
+    });
   }
     
   parts.push({ 

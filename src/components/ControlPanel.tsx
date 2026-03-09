@@ -52,13 +52,13 @@ export function ControlPanel({
     onDimensionsChange({ ...dimensions, width: values[0] });
   };
 
-  const handleTopToggle = (checked: boolean) => {
-    onDimensionsChange({ ...dimensions, hasTop: checked });
+  const handleBackToggle = (checked: boolean) => {
+    onDimensionsChange({ ...dimensions, hasBack: checked });
   };
 
   const isHeightFixed = type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada';
   const isWidthSlider = type === 'escritorio';
-  const canHaveTop = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca';
+  const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca';
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -141,13 +141,13 @@ export function ControlPanel({
             </div>
           </div>
 
-          {canHaveTop && (
+          {canHaveBack && (
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
               <div className="flex items-center gap-2">
                 <Layout className="w-4 h-4 text-slate-500" />
-                <Label className="text-xs font-bold uppercase text-slate-600">Tapa Superior</Label>
+                <Label className="text-xs font-bold uppercase text-slate-600">Fondo (MDF 3mm)</Label>
               </div>
-              <Switch checked={dimensions.hasTop} onCheckedChange={handleTopToggle} />
+              <Switch checked={dimensions.hasBack} onCheckedChange={handleBackToggle} />
             </div>
           )}
         </div>

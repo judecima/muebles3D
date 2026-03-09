@@ -28,7 +28,7 @@ export interface FurnitureDimensions {
   height: number;
   depth: number;
   thickness: number;
-  hasTop?: boolean; // Opción para tapa superior
+  hasBack?: boolean; // Opción para fondo de 3mm
 }
 
 export interface FurnitureModel {
