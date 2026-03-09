@@ -18,10 +18,10 @@ export class SceneManager {
 
   constructor(container: HTMLElement) {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf8fafc);
+    this.scene.background = new THREE.Color(0xf1f5f9);
 
     this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10000);
-    this.camera.position.set(1500, 1000, 1500);
+    this.camera.position.set(1200, 1000, 1800);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -33,7 +33,7 @@ export class SceneManager {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     this.scene.add(ambientLight);
 
     const directLight = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -61,61 +61,44 @@ export class SceneManager {
     this.renderer.render(this.scene, this.camera);
   };
 
-  public clearFurniture() {
-    this.furnitureGroup.children.forEach((child) => {
-      this.disposeObject(child);
-    });
+  public buildFurniture(parts: Part[], color: FurnitureColor) {
+    // 1. Limpieza absoluta
+    this.furnitureGroup.children.forEach((child) => this.disposeObject(child));
     this.furnitureGroup.clear();
     this.partsMap.clear();
-  }
 
-  private disposeObject(obj: THREE.Object3D) {
-    obj.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        if (Array.isArray(child.material)) {
-          child.material.forEach(m => m.dispose());
-        } else {
-          child.material.dispose();
-        }
-      }
-    });
-  }
-
-  public buildFurniture(parts: Part[], color: FurnitureColor) {
-    this.clearFurniture();
-    
     const colorHex = this.colorMap[color];
 
     parts.forEach(part => {
-      if (part.type === 'hardware') return;
-
-      const geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
+      const geometry = new THREE.BoxGeometry(part.width || 1, part.height || 1, part.depth || 1);
+      
       const material = new THREE.MeshStandardMaterial({ 
-        color: colorHex, 
-        roughness: 0.8,
-        metalness: 0.1,
+        color: part.isHardware ? 0x94a3b8 : colorHex, 
+        roughness: 0.7,
+        metalness: part.isHardware ? 0.6 : 0.1,
       });
+
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
 
-      // Guardar metadatos en el mesh
+      // Guardar posición original para explosión
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
 
       if ((part.type === 'door-left' || part.type === 'door-right') && part.pivot) {
+        // SISTEMA DE BISAGRA REALISTA
         const hingeGroup = new THREE.Group();
         hingeGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
         
-        // Posición local del mesh respecto al pivote
-        const offsetX = part.type === 'door-left' ? part.width / 2 : -part.width / 2;
+        // Offset relativo al pivote
+        const offsetX = (part.type === 'door-left') ? part.width / 2 : -part.width / 2;
         mesh.position.set(offsetX, 0, part.z - part.pivot.z);
         
         hingeGroup.add(mesh);
         this.furnitureGroup.add(hingeGroup);
         
-        // Guardar el grupo de la bisagra en el mapa para controlarlo
+        // El hingeGroup es el que rotará
         this.partsMap.set(part.id, hingeGroup);
         hingeGroup.userData.originalPosition = hingeGroup.position.clone();
         hingeGroup.userData.type = part.type;
@@ -126,47 +109,50 @@ export class SceneManager {
       }
     });
 
-    // Centrar cámara
+    // Centrar la cámara en el nuevo mueble
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    this.controls.target.copy(center);
+    this.controls.target.lerp(center, 0.5);
   }
 
   public setDoors(open: boolean) {
     const angle90 = Math.PI / 2;
     this.partsMap.forEach((obj) => {
-      // Intentar obtener el tipo desde el grupo o desde el primer hijo (mesh)
-      const partType = obj.userData.type || obj.children[0]?.userData?.type;
-      
-      if (partType === 'door-left') {
-        obj.rotation.y = open ? angle90 : 0;
-      } else if (partType === 'door-right') {
-        obj.rotation.y = open ? -angle90 : 0;
+      const type = obj.userData.type;
+      if (type === 'door-left') {
+        obj.rotation.y = open ? -angle90 : 0; // Abre hacia afuera -90
+      } else if (type === 'door-right') {
+        obj.rotation.y = open ? angle90 : 0;  // Abre hacia afuera +90
       }
     });
   }
 
   public setDrawers(open: boolean) {
     this.partsMap.forEach((obj) => {
-      const partType = obj.userData.type || obj.children[0]?.userData?.type;
-      if (partType === 'drawer') {
-        const offset = open ? 350 : 0;
+      if (obj.userData.type === 'drawer') {
         const originalPos = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = originalPos.z + offset;
+        // Desliza hacia adelante (eje Z positivo)
+        // Límite: profundidad mueble aprox, usamos 350mm como estándar de apertura
+        obj.position.z = open ? originalPos.z + 350 : originalPos.z;
       }
     });
   }
 
   public explodeView(factor: number) {
-    const furnitureCenter = new THREE.Vector3();
-    new THREE.Box3().setFromObject(this.furnitureGroup).getCenter(furnitureCenter);
+    const box = new THREE.Box3().setFromObject(this.furnitureGroup);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
 
     this.partsMap.forEach((obj) => {
       const originalPos = obj.userData.originalPosition as THREE.Vector3;
-      const direction = new THREE.Vector3().subVectors(originalPos, furnitureCenter).normalize();
+      const direction = new THREE.Vector3().subVectors(originalPos, center).normalize();
+      
+      // Si está en el centro, forzar una dirección
       if (direction.length() < 0.1) direction.set(0, 1, 0);
-      obj.position.copy(originalPos).add(direction.multiplyScalar(factor * 300));
+      
+      const targetPos = originalPos.clone().add(direction.multiplyScalar(factor * 250));
+      obj.position.copy(targetPos);
     });
   }
 
@@ -175,6 +161,16 @@ export class SceneManager {
       const originalPos = obj.userData.originalPosition as THREE.Vector3;
       obj.position.copy(originalPos);
       obj.rotation.set(0, 0, 0);
+    });
+  }
+
+  private disposeObject(obj: THREE.Object3D) {
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
     });
   }
 

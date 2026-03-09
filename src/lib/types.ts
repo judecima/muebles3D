@@ -7,12 +7,12 @@ export interface Part {
   width: number;
   height: number;
   depth: number;
-  x: number; // Posición centro X relativo al mueble
-  y: number; // Posición centro Y relativo al mueble
-  z: number; // Posición centro Z relativo al mueble
+  x: number; // Centro X
+  y: number; // Centro Y
+  z: number; // Centro Z
   type: 'static' | 'door-left' | 'door-right' | 'drawer' | 'hardware';
-  pivot?: { x: number; y: number; z: number }; // Solo para puertas
-  isHardware?: boolean; // Para identificar herrajes en la tabla
+  pivot?: { x: number; y: number; z: number }; // Específico para puertas
+  isHardware?: boolean;
 }
 
 export interface FurnitureDimensions {
