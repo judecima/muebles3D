@@ -9,11 +9,17 @@ export class SceneManager {
   private controls: OrbitControls;
   private furnitureGroup: THREE.Group;
   private partsMap: Map<string, THREE.Object3D> = new Map();
+  private textureLoader: THREE.TextureLoader = new THREE.TextureLoader();
+  private textures: Map<FurnitureColor, THREE.Texture> = new Map();
 
-  private colorMap: Record<FurnitureColor, number> = {
-    'blanco': 0xffffff,
-    'marron': 0x5d4037,
-    'beige': 0xf5f5dc
+  private textureMap: Record<FurnitureColor, string> = {
+    'alerce-blanco': 'https://images.unsplash.com/photo-1610048764081-f35f553d1002?q=80&w=2000&auto=format&fit=crop',
+    'alerce-marron': 'https://images.unsplash.com/photo-1541123437800-1bb1317badc2?q=80&w=2070&auto=format&fit=crop'
+  };
+
+  private colorTintMap: Record<FurnitureColor, number> = {
+    'alerce-blanco': 0xffffff,
+    'alerce-marron': 0xffffff
   };
 
   constructor(container: HTMLElement) {
@@ -33,10 +39,10 @@ export class SceneManager {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     this.scene.add(ambientLight);
 
-    const directLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    const directLight = new THREE.DirectionalLight(0xffffff, 0.7);
     directLight.position.set(1000, 2000, 1000);
     directLight.castShadow = true;
     this.scene.add(directLight);
@@ -61,21 +67,40 @@ export class SceneManager {
     this.renderer.render(this.scene, this.camera);
   };
 
-  public buildFurniture(parts: Part[], color: FurnitureColor) {
+  private async getTexture(color: FurnitureColor): Promise<THREE.Texture> {
+    if (this.textures.has(color)) return this.textures.get(color)!;
+
+    return new Promise((resolve) => {
+      this.textureLoader.load(this.textureMap[color], (texture) => {
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(0.001, 0.001); // Escala para mm
+        this.textures.set(color, texture);
+        resolve(texture);
+      });
+    });
+  }
+
+  public async buildFurniture(parts: Part[], color: FurnitureColor) {
     // 1. Limpieza absoluta
     this.furnitureGroup.children.forEach((child) => this.disposeObject(child));
     this.furnitureGroup.clear();
     this.partsMap.clear();
 
-    const colorHex = this.colorMap[color];
+    const texture = await this.getTexture(color);
 
     parts.forEach(part => {
       const geometry = new THREE.BoxGeometry(part.width || 1, part.height || 1, part.depth || 1);
       
+      // Ajustar repetición de textura según tamaño de la pieza
+      const partTexture = texture.clone();
+      partTexture.repeat.set(part.width / 500, part.height / 500);
+
       const material = new THREE.MeshStandardMaterial({ 
-        color: part.isHardware ? 0x94a3b8 : colorHex, 
-        roughness: 0.7,
-        metalness: part.isHardware ? 0.6 : 0.1,
+        map: part.isHardware ? null : partTexture,
+        color: part.isHardware ? 0x94a3b8 : this.colorTintMap[color], 
+        roughness: 0.8,
+        metalness: part.isHardware ? 0.6 : 0.05,
       });
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -121,9 +146,9 @@ export class SceneManager {
     this.partsMap.forEach((obj) => {
       const type = obj.userData.type;
       if (type === 'door-left') {
-        obj.rotation.y = open ? -angle90 : 0; // Abre hacia afuera -90
+        obj.rotation.y = open ? -angle90 : 0;
       } else if (type === 'door-right') {
-        obj.rotation.y = open ? angle90 : 0;  // Abre hacia afuera +90
+        obj.rotation.y = open ? angle90 : 0;
       }
     });
   }
@@ -132,8 +157,6 @@ export class SceneManager {
     this.partsMap.forEach((obj) => {
       if (obj.userData.type === 'drawer') {
         const originalPos = obj.userData.originalPosition as THREE.Vector3;
-        // Desliza hacia adelante (eje Z positivo)
-        // Límite: profundidad mueble aprox, usamos 350mm como estándar de apertura
         obj.position.z = open ? originalPos.z + 350 : originalPos.z;
       }
     });
@@ -148,7 +171,6 @@ export class SceneManager {
       const originalPos = obj.userData.originalPosition as THREE.Vector3;
       const direction = new THREE.Vector3().subVectors(originalPos, center).normalize();
       
-      // Si está en el centro, forzar una dirección
       if (direction.length() < 0.1) direction.set(0, 1, 0);
       
       const targetPos = originalPos.clone().add(direction.multiplyScalar(factor * 250));

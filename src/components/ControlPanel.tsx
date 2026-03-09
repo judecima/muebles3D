@@ -90,9 +90,8 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="blanco">Blanco Ártico</SelectItem>
-              <SelectItem value="marron">Nogal Terracota</SelectItem>
-              <SelectItem value="beige">Beige Arena</SelectItem>
+              <SelectItem value="alerce-blanco">Alarce Blanco</SelectItem>
+              <SelectItem value="alerce-marron">Alarce Marrón</SelectItem>
             </SelectContent>
           </Select>
         </div>

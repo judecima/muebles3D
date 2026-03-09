@@ -28,7 +28,7 @@ import { bookshelfEngine } from '@/engines/bookshelfEngine';
 
 export default function Home() {
   const [type, setType] = useState<FurnitureType>('placard');
-  const [color, setColor] = useState<FurnitureColor>('blanco');
+  const [color, setColor] = useState<FurnitureColor>('alerce-blanco');
   const [dimensions, setDimensions] = useState<FurnitureDimensions>({
     width: 1200,
     height: 1800,
