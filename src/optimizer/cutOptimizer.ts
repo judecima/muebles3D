@@ -45,7 +45,7 @@ export function runOptimization(
     return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas del espesor seleccionado", kerf, trim, selectedThickness };
   }
 
-  // 2. El área utilizable es el panel menos los márgenes de trim
+  // 2. El área utilizable es el panel menos los márgenes de trim (10mm por lado)
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
@@ -55,7 +55,7 @@ export function runOptimization(
   let bestLayouts: OptimizedPanel[] = [];
 
   const strategies = ['BAF', 'BSSF', 'BLSF'];
-  const sortMethods = ['area', 'width', 'height', 'shuffle'];
+  const sortMethods = ['area', 'width', 'height', 'shuffle', 'perim'];
 
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = [...flatParts];
@@ -64,10 +64,14 @@ export function runOptimization(
     if (sortMethod === 'area') currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     else if (sortMethod === 'width') currentParts.sort((a, b) => b.width - a.width || b.height - a.height);
     else if (sortMethod === 'height') currentParts.sort((a, b) => b.height - a.height || b.width - a.width);
+    else if (sortMethod === 'perim') currentParts.sort((a, b) => (2 * (b.width + b.height)) - (2 * (a.width + a.height)));
     else shuffle(currentParts);
 
     const strategy = strategies[i % strategies.length];
-    const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, strategy, partColors, i % 2 === 0);
+    // Alternar preferencia de corte (Horizontal/Vertical)
+    const preferHorizontalSplit = i % 2 === 0;
+    
+    const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, strategy, partColors, preferHorizontalSplit);
     const score = calculateScore(currentLayouts);
 
     if (score > bestScore) {
@@ -75,6 +79,7 @@ export function runOptimization(
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
 
+    // Si encontramos una solución perfecta (1 tablero y >95% eficiencia), paramos
     if (currentLayouts.length === 1 && calculateTotalEfficiency(currentLayouts) > 96) break;
   }
 
@@ -82,7 +87,7 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: calculateTotalEfficiency(bestLayouts),
-    summary: `Optimización v3.5: 3000 ciclos. Espesor: ${selectedThickness}mm. Trim: ${trim}mm.`,
+    summary: `Optimización v3.5: 3000 ciclos. Espesor: ${selectedThickness}mm. Trim: ${trim}mm aplicado.`,
     kerf,
     trim,
     selectedThickness
@@ -115,6 +120,7 @@ function executeLayout(
       for (let j = 0; j < freeRects.length; j++) {
         const rect = freeRects[j];
 
+        // Sin rotar
         if (part.width <= rect.w && part.height <= rect.h) {
           const val = getHeuristicValue(rect, part.width, part.height, strategy);
           if (val < bestFitVal) {
@@ -124,6 +130,7 @@ function executeLayout(
           }
         }
 
+        // Rotado (solo si grainDirection es 'libre')
         if (part.grainDirection === 'libre' && part.height <= rect.w && part.width <= rect.h) {
           const val = getHeuristicValue(rect, part.height, part.width, strategy);
           if (val < bestFitVal) {
@@ -149,6 +156,7 @@ function executeLayout(
           color: partColors[part.name]
         });
 
+        // Split de Guillotina
         const dw = rect.w - pw;
         const dh = rect.h - ph;
         const splitVertical = preferHorizontalSplit ? dw < dh : dw > dh;
@@ -162,6 +170,7 @@ function executeLayout(
         }
 
         placedIndices.add(i);
+        // Reordenar rectángulos libres para favorecer espacios pequeños (BSSF)
         freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
@@ -197,7 +206,11 @@ function calculateScore(layouts: OptimizedPanel[]): number {
   const used = layouts.reduce((acc, l) => acc + l.usedArea, 0);
   const total = layouts.reduce((acc, l) => acc + l.totalArea, 0);
   const efficiency = (used / total) * 100;
+  
+  // Penalización masiva por cada tablero adicional para forzar el aprovechamiento del primero
   const panelPenalty = (layouts.length - 1) * 1000000;
+  
+  // Penalización por fragmentación excesiva (opcional, para cortes industriales limpios)
   return efficiency - panelPenalty;
 }
 

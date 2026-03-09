@@ -51,7 +51,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setResult(null);
     setError(null);
     
-    // Auto-seleccionar espesor dominante si el actual no existe
     if (!availableThicknesses.includes(targetThickness) && availableThicknesses.length > 0) {
       setTargetThickness(availableThicknesses[0]);
     }
@@ -265,6 +264,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                 const scaleY = 100 / selectedPanel.height;
                 const trimPctX = result.trim * scaleX;
                 const trimPctY = result.trim * scaleY;
+                // El área utilizable se escala según el tamaño del panel menos el trim de ambos lados
                 const usableWidthPct = (selectedPanel.width - 2 * result.trim) * scaleX;
                 const usableHeightPct = (selectedPanel.height - 2 * result.trim) * scaleY;
 
@@ -281,12 +281,13 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     <div className="relative bg-slate-200 shadow-2xl rounded-sm mx-auto overflow-hidden" 
                          style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                       
-                      {/* Margen de Trim Visual */}
-                      <div className="absolute inset-0 border-[10px] border-slate-300/50 pointer-events-none z-10">
+                      {/* Zona de Trim (Descarte) - Visualizada con precisión matemática */}
+                      <div className="absolute inset-0 bg-slate-300/30 pointer-events-none z-10 border-slate-400/20" 
+                           style={{ borderStyle: 'solid', borderWidth: `${trimPctY}% ${trimPctX}%` }}>
                         <div className="absolute top-1 left-1 text-[8px] font-bold text-slate-400">ZONA DE DESCARTE</div>
                       </div>
 
-                      {/* Área Utilizable */}
+                      {/* Área Utilizable - Aquí es donde viven las piezas */}
                       <div className="absolute bg-white" style={{ 
                         left: `${trimPctX}%`, 
                         top: `${trimPctY}%`, 
