@@ -99,6 +99,20 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     }, 100);
   };
 
+  const drawWatermark = (doc: any) => {
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setTextColor(240, 240, 240);
+      doc.setFontSize(30);
+      for (let y = -50; y < 400; y += 80) {
+        for (let x = -50; x < 300; x += 120) {
+          doc.text("RED ARQUIMAX", x, y, { angle: 45 });
+        }
+      }
+    }
+  };
+
   const exportPDF = async () => {
     if (!result) return;
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -119,6 +133,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
       headStyles: { fillColor: BRAND_COLOR }
     });
 
+    drawWatermark(doc);
     doc.save(`planocorte-${targetThickness}mm-${Date.now()}.pdf`);
   };
 
@@ -183,7 +198,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" className="w-full flex justify-between items-center px-4 py-2 bg-slate-50 text-slate-600 rounded-none">
                     <span className="text-xs font-bold flex items-center gap-2">
-                      <Ruler className="w-3.5 h-3.5" /> Editar Vetas ({targetThickness}mm)
+                      <Ruler className="w-3.5 h-3.5" /> Ver/Editar Vetas ({targetThickness}mm)
                     </span>
                     {isPartsListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
@@ -280,9 +295,10 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     <div className="relative bg-slate-200 shadow-2xl rounded-sm mx-auto overflow-hidden" 
                          style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                       
-                      <div className="absolute inset-0 bg-slate-300/30 pointer-events-none z-10 border-slate-400/20" 
+                      {/* Zona de Descarte (Trim) */}
+                      <div className="absolute inset-0 bg-slate-400/20 pointer-events-none z-10 border-slate-500/30" 
                            style={{ borderStyle: 'solid', borderWidth: `${trimPctY}% ${trimPctX}%` }}>
-                        <div className="absolute top-1 left-1 text-[8px] font-bold text-slate-400">ZONA DE DESCARTE</div>
+                        <div className="absolute top-1 left-1 text-[8px] font-bold text-slate-500">ZONA DE DESCARTE (TRIM)</div>
                       </div>
 
                       <div className="absolute bg-white" style={{ 

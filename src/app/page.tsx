@@ -84,6 +84,20 @@ export default function Home() {
     }
   };
 
+  const drawWatermark = (doc: any) => {
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setTextColor(240, 240, 240);
+      doc.setFontSize(30);
+      for (let y = -50; y < 400; y += 80) {
+        for (let x = -50; x < 300; x += 120) {
+          doc.text("RED ARQUIMAX", x, y, { angle: 45 });
+        }
+      }
+    }
+  };
+
   const generatePDF = async () => {
     const doc = new jsPDF();
     const BRAND_COLOR = [174, 26, 226];
@@ -98,7 +112,7 @@ export default function Home() {
     doc.text(`Mueble: ${type.toUpperCase()}`, 105, 40, { align: 'center' });
     doc.text(`Dimensiones: ${dimensions.width}x${dimensions.height}x${dimensions.depth} mm`, 105, 48, { align: 'center' });
 
-    // Captura 3D si está disponible
+    // Captura 3D Técnica (Ángulo 45°)
     if (viewerRef.current) {
       const img = viewerRef.current.getScreenshot();
       if (img) {
@@ -123,6 +137,7 @@ export default function Home() {
       styles: { fontSize: 9 }
     });
 
+    drawWatermark(doc);
     doc.save(`tecnico-red-arquimax-${type}-${Date.now()}.pdf`);
   };
 
