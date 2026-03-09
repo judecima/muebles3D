@@ -4,16 +4,6 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T } = dim;
   
   const innerW = W - 2 * T;
-  const railSpace = 26; 
-  const drawerW = innerW - railSpace;
-  const drawerD = D - 40;
-  
-  const drawerModuleH = 500;
-  const numDrawers = 2;
-  const topBuffer = 30;
-  const frontH = (drawerModuleH - topBuffer) / numDrawers - 2;
-  const drawerH = frontH - 40;
-
   const parts: Part[] = [
     { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
     { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
@@ -21,49 +11,40 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'base-inf', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
   ];
 
-  // Fondo obligatorio
+  // Fondo obligatorio (3mm)
   parts.push({ 
     id: 'fondo', name: 'Fondo Mueble', width: W, height: H, depth: 3, 
     x: W/2, y: H/2, z: -D/2 - 1.5, 
     type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'free' 
   });
 
-  // Cajonera
-  const startY = T + 10;
-  for (let i = 0; i < numDrawers; i++) {
-    const posY = startY + (i * (frontH + 2)) + frontH/2;
-    const prefix = `cajon-${i}`;
-    
-    parts.push({ 
-      id: `${prefix}-frente`, name: `Frente Cajón ${i+1}`, width: innerW - 4, height: frontH, depth: T, 
-      x: W/2, y: posY, z: D/2 + T/2, type: 'drawer', cutLargo: frontH, cutAncho: innerW - 4, cutEspesor: T, grainDirection: 'horizontal'
-    });
-    
-    parts.push({ id: `${prefix}-lat-izq`, name: `Lateral Izq. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerH, cutEspesor: T, grainDirection: 'free' });
-    parts.push({ id: `${prefix}-lat-der`, name: `Lateral Der. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerH, cutEspesor: T, grainDirection: 'free' });
-    parts.push({ id: `${prefix}-trasera`, name: `Trasera Cajón ${i+1}`, width: drawerW - 2*T, height: drawerH, depth: T, x: W/2, y: posY, z: D/2 - drawerD + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerH, cutEspesor: T, grainDirection: 'free' });
-    parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, x: W/2, y: posY - drawerH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer', cutLargo: drawerD - T, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'free' });
-
-    // Rieles
-    parts.push({ id: `${prefix}-riel-izq`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: T + 6.5, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'free' });
-    parts.push({ id: `${prefix}-riel-der`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: W - T - 6.5, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'free' });
-  }
-
-  // Barra de colgar
-  const barY = 1700;
+  // Barra de colgar (Hardware)
   parts.push({
-    id: 'hanger-bar',
-    name: 'Barra de Colgar 25mm',
-    width: innerW,
-    height: 25,
-    depth: 25,
-    x: W/2,
-    y: barY,
-    z: 0,
-    type: 'hardware',
-    isHardware: true,
+    id: 'hanger-bar', name: 'Barra de Colgar 25mm', width: innerW, height: 25, depth: 25,
+    x: W/2, y: H * 0.8, z: 0, type: 'hardware', isHardware: true,
     cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'free'
   });
 
-  return { parts, summary: 'Placard profesional con barra de colgar y cajonera optimizada.', hasDoors: true, hasDrawers: true };
+  // Puertas (Agregadas para corregir el error visual)
+  const doorW = W / 2 - 2;
+  const doorH = H - 10;
+  parts.push({ 
+    id: 'p-door-L', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, 
+    x: doorW / 2, y: H/2, z: D / 2 + T / 2, type: 'door-left',
+    pivot: { x: 0, y: H/2, z: D / 2 },
+    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical'
+  });
+  parts.push({ 
+    id: 'p-door-R', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, 
+    x: W - doorW / 2, y: H/2, z: D / 2 + T / 2, type: 'door-right',
+    pivot: { x: W, y: H/2, z: D / 2 },
+    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical'
+  });
+
+  return { 
+    parts, 
+    summary: 'Placard estándar Red Arquimax con fondo de 3mm y barra de colgar.', 
+    hasDoors: true, 
+    hasDrawers: false 
+  };
 }
