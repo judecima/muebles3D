@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -37,11 +36,9 @@ export default function Home() {
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
-  // Colores de marca para PDF
   const BRAND_RGB = [174, 26, 226]; // #ae1ae2
 
   const generateFurniture = () => {
-    // Importación dinámica para evitar problemas de carga
     const { closetEngine } = require('@/engines/closetEngine');
     const { deskEngine } = require('@/engines/deskEngine');
     const { kitchenBaseEngine } = require('@/engines/kitchenBaseEngine');
@@ -63,7 +60,6 @@ export default function Home() {
     setAction('reset');
   };
 
-  // Ajustar dimensiones fijas cuando cambia el tipo de mueble
   useEffect(() => {
     if (type === 'rackTV') {
       setDimensions(prev => ({ ...prev, height: 500 }));
@@ -108,7 +104,6 @@ export default function Home() {
       pdf.restoreGraphicsState();
     };
 
-    // PÁGINA 1: PORTADA Y RENDERS
     addWatermark(doc);
     doc.setFontSize(22);
     doc.setTextColor(40, 44, 41);
@@ -120,14 +115,12 @@ export default function Home() {
     doc.setTextColor(100);
     doc.text(`Proyecto: ${type.toUpperCase()} | Fecha: ${new Date().toLocaleDateString()}`, 105, 50, { align: 'center' });
 
-    // Capturar Render Armado
     setAction('reset');
     await new Promise(r => setTimeout(r, 400));
     const imgArmado = viewerRef.current.getScreenshot();
     doc.addImage(imgArmado, 'PNG', 15, 60, 180, 100);
     doc.text("VISTA MUEBLE ARMADO", 105, 165, { align: 'center' });
 
-    // Capturar Render Explotado
     setAction('explode');
     await new Promise(r => setTimeout(r, 400));
     const imgExplotado = viewerRef.current.getScreenshot();
@@ -135,16 +128,15 @@ export default function Home() {
     doc.text("VISTA EXPLOTADA", 105, 280, { align: 'center' });
     setAction('reset');
 
-    // PÁGINA 2: TABLA MDF
     doc.addPage();
     addWatermark(doc);
     doc.setFontSize(16);
     doc.setTextColor(BRAND_RGB[0], BRAND_RGB[1], BRAND_RGB[2]);
-    doc.text("Listado de Paneles MDF", 15, 20);
+    doc.text("Listado de Paneles MDF (Cortes)", 15, 20);
 
     const panels = parts.filter(p => !p.isHardware);
     const aggregatedPanels = Object.values(panels.reduce((acc, part) => {
-      const key = `${part.name}-${part.width}-${part.height}-${part.depth}`;
+      const key = `${part.name}-${part.cutLargo}-${part.cutAncho}-${part.cutEspesor}`;
       if (!acc[key]) acc[key] = { ...part, quantity: 0 };
       acc[key].quantity += 1;
       return acc;
@@ -152,9 +144,9 @@ export default function Home() {
 
     const panelRows = aggregatedPanels.map((p: any) => [
       p.name,
-      `${p.height} mm`,
-      `${p.width} mm`,
-      `${p.depth} mm`,
+      `${p.cutLargo} mm`,
+      `${p.cutAncho} mm`,
+      `${p.cutEspesor} mm`,
       p.quantity
     ]);
 
@@ -166,7 +158,6 @@ export default function Home() {
       headStyles: { fillColor: BRAND_RGB }
     });
 
-    // PÁGINA 3: HERRAJES
     doc.addPage();
     addWatermark(doc);
     doc.setFontSize(16);
@@ -192,7 +183,7 @@ export default function Home() {
       body: hardwareRows,
       startY: 30,
       theme: 'striped',
-      headStyles: { fillColor: [100, 116, 139] } // Gris neutro para herrajes
+      headStyles: { fillColor: [100, 116, 139] } 
     });
 
     doc.save('mueble-red-arquimax.pdf');
@@ -200,7 +191,6 @@ export default function Home() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-50 text-slate-900 font-body relative">
-      {/* Sidebar Desktop */}
       <aside className="hidden md:block w-80 h-full border-r border-slate-200 bg-white z-20 shadow-xl overflow-y-auto">
         <ControlPanel 
           type={type} 
@@ -213,7 +203,6 @@ export default function Home() {
         />
       </aside>
 
-      {/* Header Mobile */}
       <header className="md:hidden flex items-center justify-between p-4 bg-primary text-white z-30 shadow-md">
         <div className="flex flex-col font-bold">
           <div className="flex items-center gap-2">
@@ -245,12 +234,10 @@ export default function Home() {
         </Sheet>
       </header>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden">
         <div className="flex-1 relative bg-slate-100 cursor-move">
           <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
           
-          {/* MARCA DE AGUA VISUAL */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] rotate-[-25deg]">
             <h1 className="text-[12vw] font-black tracking-widest text-primary whitespace-nowrap">RED ARQUIMAX</h1>
           </div>
@@ -261,9 +248,9 @@ export default function Home() {
                 <Info className="w-3 h-3" /> NAVEGACIÓN 3D
               </p>
               <ul className="space-y-0.5">
-                <li>Rotar: 1 dedo / Click</li>
-                <li>Zoom: Pellizcar / Scroll</li>
-                <li>Pan: 2 dedos / Der. Click</li>
+                <li>Rotar: Click Izq</li>
+                <li>Zoom: Scroll</li>
+                <li>Pan: Click Der</li>
               </ul>
             </div>
           </div>

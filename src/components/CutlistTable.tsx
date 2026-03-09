@@ -13,9 +13,9 @@ export function CutlistTable({ parts }: CutlistTableProps) {
   const panels = parts.filter(p => !p.isHardware);
   const hardware = parts.filter(p => p.isHardware);
 
-  // Agrupar paneles por dimensiones (MDF)
+  // Agrupar paneles por dimensiones reales de corte
   const aggregatedPanels = panels.reduce((acc, part) => {
-    const key = `${part.name}-${part.width}-${part.height}-${part.depth}`;
+    const key = `${part.name}-${part.cutLargo}-${part.cutAncho}-${part.cutEspesor}`;
     if (!acc[key]) {
       acc[key] = { ...part, quantity: 0 };
     }
@@ -40,7 +40,7 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
       <CardHeader className="py-3 px-6 bg-slate-50 shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
-          <ListChecks className="w-4 h-4" /> Despiece de Materiales (Cálculo Técnico)
+          <ListChecks className="w-4 h-4" /> Despiece de Materiales (Cálculo Técnico Red Arquimax)
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-y-auto flex-1 flex flex-col md:flex-row">
@@ -50,9 +50,9 @@ export function CutlistTable({ parts }: CutlistTableProps) {
             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
               <TableRow>
                 <TableHead className="text-[10px] font-bold uppercase py-2">Pieza (Panel MDF)</TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Largo</TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Ancho</TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Espesor</TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Largo (mm)</TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Ancho (mm)</TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Espesor (mm)</TableHead>
                 <TableHead className="text-right text-[10px] font-bold uppercase py-2">Cant.</TableHead>
               </TableRow>
             </TableHeader>
@@ -63,9 +63,9 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                 panelList.map((part, idx) => (
                   <TableRow key={idx} className="hover:bg-slate-50 transition-colors h-8">
                     <TableCell className="font-medium text-[11px] py-1">{part.name}</TableCell>
-                    <TableCell className="text-right text-[11px] py-1">{part.height} mm</TableCell>
-                    <TableCell className="text-right text-[11px] py-1">{part.width} mm</TableCell>
-                    <TableCell className="text-right text-[11px] py-1">{part.depth} mm</TableCell>
+                    <TableCell className="text-right text-[11px] py-1">{part.cutLargo} mm</TableCell>
+                    <TableCell className="text-right text-[11px] py-1">{part.cutAncho} mm</TableCell>
+                    <TableCell className="text-right text-[11px] py-1">{part.cutEspesor} mm</TableCell>
                     <TableCell className="text-right text-[11px] py-1 font-bold">{part.quantity}</TableCell>
                   </TableRow>
                 ))
@@ -82,7 +82,7 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                 <TableHead className="text-[10px] font-bold uppercase py-2 flex items-center gap-1">
                   <Settings className="w-3 h-3" /> Herrajes
                 </TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Largo</TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase py-2">Largo/Medida</TableHead>
                 <TableHead className="text-right text-[10px] font-bold uppercase py-2">Cant.</TableHead>
               </TableRow>
             </TableHeader>
