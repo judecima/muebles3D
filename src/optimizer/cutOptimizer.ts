@@ -12,34 +12,40 @@ interface PartToCut {
   width: number;
   height: number;
   grainDirection: GrainDirection;
+  thickness: number;
 }
 
 /**
- * Motor Industrial "ArquiMax Deep Engine v3.1"
+ * Motor Industrial "ArquiMax Deep Engine v3.5"
  * Implementa Guillotine Bin Packing con Búsqueda Estocástica de 3000 ciclos.
- * Garantiza respeto absoluto al TRIM y optimización de KERF.
+ * Filtra por espesor de material y respeta estrictamente el TRIM.
  */
 export function runOptimization(
-  parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection }[],
+  parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
   panelWidth: number,
   panelHeight: number,
+  selectedThickness: number,
   kerf: number = 4.5,
   trim: number = 10
 ): OptimizationResult {
-  const flatParts: PartToCut[] = parts.flatMap(p => 
+  // 1. Filtrar piezas por el espesor seleccionado
+  const filteredParts = parts.filter(p => p.thickness === selectedThickness);
+  
+  const flatParts: PartToCut[] = filteredParts.flatMap(p => 
     Array.from({ length: p.quantity }, () => ({
       name: p.name,
       width: p.width,
       height: p.height,
-      grainDirection: p.grainDirection
+      grainDirection: p.grainDirection,
+      thickness: p.thickness
     }))
   );
 
   if (flatParts.length === 0) {
-    return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas", kerf, trim };
+    return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas del espesor seleccionado", kerf, trim, selectedThickness };
   }
 
-  // El área utilizable es el panel menos los dos márgenes de trim
+  // 2. El área utilizable es el panel menos los márgenes de trim
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
@@ -55,24 +61,20 @@ export function runOptimization(
     const currentParts = [...flatParts];
     const sortMethod = sortMethods[i % sortMethods.length];
     
-    // Diferentes órdenes de inserción para explorar el espacio de soluciones
     if (sortMethod === 'area') currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     else if (sortMethod === 'width') currentParts.sort((a, b) => b.width - a.width || b.height - a.height);
     else if (sortMethod === 'height') currentParts.sort((a, b) => b.height - a.height || b.width - a.width);
     else shuffle(currentParts);
 
     const strategy = strategies[i % strategies.length];
-    // Ejecutamos la disposición considerando el eje de corte (horizontal o vertical)
     const currentLayouts = executeLayout(currentParts, usableW, usableH, kerf, strategy, partColors, i % 2 === 0);
     const score = calculateScore(currentLayouts);
 
     if (score > bestScore) {
       bestScore = score;
-      // Clonación profunda para asegurar que no se pierda la mejor solución
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
 
-    // Si todo entra en un panel con alta eficiencia, podemos terminar
     if (currentLayouts.length === 1 && calculateTotalEfficiency(currentLayouts) > 96) break;
   }
 
@@ -80,9 +82,10 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: calculateTotalEfficiency(bestLayouts),
-    summary: `Optimización v3.1: 3000 ciclos completados. Respeto estricto a márgenes de ${trim}mm.`,
+    summary: `Optimización v3.5: 3000 ciclos. Espesor: ${selectedThickness}mm. Trim: ${trim}mm.`,
     kerf,
-    trim
+    trim,
+    selectedThickness
   };
 }
 
@@ -112,7 +115,6 @@ function executeLayout(
       for (let j = 0; j < freeRects.length; j++) {
         const rect = freeRects[j];
 
-        // Intento 1: Sin rotar
         if (part.width <= rect.w && part.height <= rect.h) {
           const val = getHeuristicValue(rect, part.width, part.height, strategy);
           if (val < bestFitVal) {
@@ -122,7 +124,6 @@ function executeLayout(
           }
         }
 
-        // Intento 2: Rotado (si es libre)
         if (part.grainDirection === 'libre' && part.height <= rect.w && part.width <= rect.h) {
           const val = getHeuristicValue(rect, part.height, part.width, strategy);
           if (val < bestFitVal) {
@@ -148,11 +149,8 @@ function executeLayout(
           color: partColors[part.name]
         });
 
-        // Guillotine Split: Decidimos el eje de corte para minimizar fragmentación
         const dw = rect.w - pw;
         const dh = rect.h - ph;
-
-        // Estrategia de split dinámica
         const splitVertical = preferHorizontalSplit ? dw < dh : dw > dh;
 
         if (splitVertical) {
@@ -164,7 +162,6 @@ function executeLayout(
         }
 
         placedIndices.add(i);
-        // Ordenar espacios libres para priorizar los mejores ajustes en la siguiente pieza
         freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
@@ -200,10 +197,7 @@ function calculateScore(layouts: OptimizedPanel[]): number {
   const used = layouts.reduce((acc, l) => acc + l.usedArea, 0);
   const total = layouts.reduce((acc, l) => acc + l.totalArea, 0);
   const efficiency = (used / total) * 100;
-  
-  // Penalización crítica por tablero adicional
-  const panelPenalty = (layouts.length - 1) * 200000;
-  
+  const panelPenalty = (layouts.length - 1) * 1000000;
   return efficiency - panelPenalty;
 }
 

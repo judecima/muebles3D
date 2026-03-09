@@ -77,4 +77,5 @@ export interface OptimizationResult {
   summary: string;
   kerf: number;
   trim: number;
+  selectedThickness: number;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,7 +20,8 @@ import {
   FileDown,
   ZoomIn,
   ZoomOut,
-  Info
+  Info,
+  Layers
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -40,12 +41,20 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   const [localCutlist, setLocalCutlist] = useState<CutlistPart[]>([]);
   const [isPartsListOpen, setIsPartsListOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [targetThickness, setTargetThickness] = useState<number>(18);
+
+  const availableThicknesses = Array.from(new Set(parts.map(p => p.cutEspesor))).sort((a, b) => b - a);
 
   useEffect(() => {
     const newList = generateCutListFromModel(parts);
     setLocalCutlist(newList);
     setResult(null);
     setError(null);
+    
+    // Auto-seleccionar espesor dominante si el actual no existe
+    if (!availableThicknesses.includes(targetThickness) && availableThicknesses.length > 0) {
+      setTargetThickness(availableThicknesses[0]);
+    }
   }, [parts]);
 
   const updateGrain = (index: number, grain: GrainDirection) => {
@@ -56,23 +65,25 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   };
 
   const handleOptimize = () => {
-    if (localCutlist.length === 0) {
-      setError("No hay piezas para optimizar.");
+    const filteredParts = localCutlist.filter(p => p.thickness === targetThickness);
+    
+    if (filteredParts.length === 0) {
+      setError(`No hay piezas de ${targetThickness}mm para optimizar.`);
       return;
     }
 
     setLoading(true);
     setError(null);
     
-    // Ejecución asíncrona para no bloquear el hilo de la UI durante 3000 ciclos
     setTimeout(() => {
       try {
         const res = runOptimization(
           localCutlist,
           selectedPanel.width,
           selectedPanel.height,
-          4.5, // Kerf estándar industrial
-          10   // Trim obligatorio
+          targetThickness,
+          4.5, // Kerf
+          10   // Trim
         );
 
         if (res.optimizedLayout.length === 0) {
@@ -82,7 +93,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
         }
       } catch (e) {
         console.error(e);
-        setError("Error en el cálculo de optimización.");
+        setError("Error en el cálculo industrial.");
       } finally {
         setLoading(false);
       }
@@ -100,28 +111,27 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
-    doc.text(`Tablero: ${selectedPanel.name} | Eficiencia: ${result.totalEfficiency.toFixed(1)}% | Kerf: 4.5mm | Trim: 10mm`, 20, 35);
+    doc.text(`Espesor: ${targetThickness}mm | Tablero: ${selectedPanel.name} | Eficiencia: ${result.totalEfficiency.toFixed(1)}%`, 20, 35);
 
     (doc as any).autoTable({
       head: [['Pieza', 'Largo (mm)', 'Ancho (mm)', 'Cant.', 'Veta']],
-      body: localCutlist.map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection]),
+      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection]),
       startY: 40,
       headStyles: { fillColor: BRAND_COLOR }
     });
 
-    doc.save(`planocorte-arquimax-${Date.now()}.pdf`);
+    doc.save(`planocorte-${targetThickness}mm-${Date.now()}.pdf`);
   };
 
   return (
     <div className="flex-1 w-full bg-slate-50 overflow-y-auto">
       <div className="flex flex-col gap-6 p-4 md:p-8 max-w-7xl mx-auto pb-40">
         
-        {/* Panel de Control Industrial */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> Motor Industrial ArquiMax v3.1
+                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v3.5
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}>
@@ -133,8 +143,20 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <div className="flex flex-col sm:flex-row items-end gap-4">
-                <div className="flex-1 space-y-2 w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Espesor de Material</Label>
+                  <Select value={targetThickness.toString()} onValueChange={(v) => { setTargetThickness(parseInt(v)); setResult(null); }}>
+                    <SelectTrigger className="h-10 bg-slate-50 border-slate-200">
+                      <Layers className="w-4 h-4 mr-2 text-slate-400" />
+                      <SelectValue placeholder="Espesor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableThicknesses.map(t => <SelectItem key={t} value={t.toString()}>{t} mm</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label className="text-[10px] font-bold text-slate-500 uppercase">Selección de Tablero</Label>
                   <Select value={selectedPanel.id} onValueChange={(id) => onPanelChange(AVAILABLE_PANELS.find(p => p.id === id)!)}>
                     <SelectTrigger className="h-10 bg-slate-50 border-slate-200">
@@ -145,45 +167,42 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Button 
-                    className="flex-1 sm:w-48 font-bold uppercase text-xs h-10 shadow-lg bg-slate-900 hover:bg-black" 
-                    onClick={handleOptimize} 
-                    disabled={loading}
-                  >
-                    {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Calcular 3000 Ciclos'}
+              </div>
+
+              <div className="flex gap-2">
+                <Button className="flex-1 font-bold uppercase text-xs h-10 bg-slate-900 hover:bg-black" onClick={handleOptimize} disabled={loading}>
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Optimizar 3000 Ciclos'}
+                </Button>
+                {result && (
+                  <Button variant="outline" className="h-10 border-primary text-primary" onClick={exportPDF}>
+                    <FileDown className="w-4 h-4" />
                   </Button>
-                  {result && (
-                    <Button variant="outline" className="h-10 border-primary text-primary" onClick={exportPDF} title="Descargar Planos">
-                      <FileDown className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
+                )}
               </div>
 
               <Collapsible open={isPartsListOpen} onOpenChange={setIsPartsListOpen} className="border rounded-lg overflow-hidden">
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full flex justify-between items-center px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-none">
+                  <Button variant="ghost" className="w-full flex justify-between items-center px-4 py-2 bg-slate-50 text-slate-600 rounded-none">
                     <span className="text-xs font-bold flex items-center gap-2">
-                      <Ruler className="w-3.5 h-3.5" /> Editar Configuración de Vetas
+                      <Ruler className="w-3.5 h-3.5" /> Editar Vetas ({targetThickness}mm)
                     </span>
                     {isPartsListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="p-4 bg-white border-t">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {localCutlist.map((part, idx) => (
+                    {localCutlist.filter(p => p.thickness === targetThickness).map((part, idx) => (
                       <div key={idx} className="p-2.5 bg-slate-50 rounded border border-slate-100 flex flex-col gap-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold truncate max-w-[120px]">{part.name}</span>
+                          <span className="text-[10px] font-bold truncate">{part.name}</span>
                           <span className="text-[10px] font-black text-primary px-1.5 py-0.5 bg-white rounded border">x{part.quantity}</span>
                         </div>
-                        <Select value={part.grainDirection} onValueChange={(val) => updateGrain(idx, val as GrainDirection)}>
+                        <Select value={part.grainDirection} onValueChange={(val) => updateGrain(localCutlist.findIndex(p => p === part), val as GrainDirection)}>
                           <SelectTrigger className="h-8 text-[9px] bg-white">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="libre">Veta: Libre (Auto)</SelectItem>
+                            <SelectItem value="libre">Veta: Libre</SelectItem>
                             <SelectItem value="vertical">Veta: Vertical</SelectItem>
                             <SelectItem value="horizontal">Veta: Horizontal</SelectItem>
                           </SelectContent>
@@ -198,57 +217,46 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
 
           <Card className={`shadow-sm border-slate-200 bg-white transition-all flex flex-col ${result ? 'opacity-100' : 'opacity-50'}`}>
             <CardHeader className="py-4 px-6 border-b">
-              <CardTitle className="text-xs font-bold uppercase text-slate-500">Métricas Industriales</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase text-slate-500">Métricas de Aprovechamiento</CardTitle>
             </CardHeader>
             <CardContent className="p-6 flex-1 flex flex-col justify-center gap-6">
               <div className="space-y-2">
                 <div className="flex justify-between items-end">
-                  <Label className="text-[10px] font-bold text-slate-400 uppercase">Aprovechamiento Total</Label>
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase">Eficiencia Total</Label>
                   <span className="text-2xl font-black text-primary">{result ? result.totalEfficiency.toFixed(1) : '0.0'}%</span>
                 </div>
                 <Progress value={result ? result.totalEfficiency : 0} className="h-2.5 bg-slate-100" />
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="p-3 bg-slate-50 rounded-lg border">
                   <p className="text-[9px] font-bold text-slate-400 uppercase">Tableros</p>
                   <p className="text-lg font-black text-slate-700">{result ? result.totalPanels : '-'}</p>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">Trim/Kerf</p>
-                  <p className="text-lg font-black text-slate-700">{result ? `${result.trim}/${result.kerf}` : '-'}</p>
+                <div className="p-3 bg-slate-50 rounded-lg border">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">Trim</p>
+                  <p className="text-lg font-black text-slate-700">{result ? `${result.trim}mm` : '-'}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Visualización de Tableros */}
         <div className="w-full">
           {loading ? (
-            <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-              <div className="relative">
-                <Loader2 className="w-16 h-16 animate-spin text-primary" />
-                <Scissors className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-400" />
-              </div>
-              <div className="text-center">
-                <p className="font-black text-slate-700 uppercase text-lg">Procesando 3000 Combinaciones</p>
-                <p className="text-xs text-slate-400 italic">Buscando la configuración de guillotina más eficiente...</p>
-              </div>
+            <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed">
+              <Loader2 className="w-16 h-16 animate-spin text-primary" />
+              <p className="font-black text-slate-700 uppercase text-lg">Procesando 3000 Iteraciones...</p>
             </div>
           ) : error ? (
-            <div className="py-20 flex flex-col items-center gap-4 text-red-500 bg-red-50 p-10 rounded-2xl border border-red-100 shadow-sm">
+            <div className="py-20 flex flex-col items-center gap-4 text-red-500 bg-red-50 p-10 rounded-2xl border border-red-100">
               <AlertTriangle className="w-12 h-12" />
               <p className="font-bold text-center text-lg">{error}</p>
-              <Button variant="outline" onClick={() => setError(null)} className="mt-2">Reintentar</Button>
+              <Button variant="outline" onClick={() => setError(null)}>Reintentar</Button>
             </div>
           ) : !result ? (
-            <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
               <LayoutGrid className="w-24 h-24 opacity-10" />
-              <div className="text-center">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Cálculo de Optimización Requerido</p>
-                <Button variant="secondary" onClick={handleOptimize} className="font-bold">Iniciar Motor Industrial</Button>
-              </div>
+              <Button variant="secondary" onClick={handleOptimize} className="font-bold uppercase tracking-wider">Calcular Optimización de {targetThickness}mm</Button>
             </div>
           ) : (
             <div className="space-y-12 py-8" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
@@ -261,29 +269,25 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                 const usableHeightPct = (selectedPanel.height - 2 * result.trim) * scaleY;
 
                 return (
-                  <div key={idx} className="space-y-4 max-w-full">
+                  <div key={idx} className="space-y-4">
                     <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
                       <div className="flex flex-col">
-                        <h3 className="text-xs font-black uppercase">Plano de Corte #{panel.panelNumber}</h3>
-                        <span className="text-[10px] text-slate-400 font-bold">{selectedPanel.width} x {selectedPanel.height} mm (Trim: {result.trim}mm)</span>
+                        <h3 className="text-xs font-black uppercase">Plano de Corte #{panel.panelNumber} ({targetThickness}mm)</h3>
+                        <span className="text-[10px] text-slate-400 font-bold">{selectedPanel.width}x{selectedPanel.height}mm | Trim: {result.trim}mm</span>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right hidden sm:block">
-                          <p className="text-[9px] text-slate-400 uppercase font-bold">Uso del Panel</p>
-                          <p className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}%</p>
-                        </div>
-                      </div>
+                      <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
                     </div>
                     
-                    {/* Contenedor del Tablero */}
                     <div className="relative bg-slate-200 shadow-2xl rounded-sm mx-auto overflow-hidden" 
-                         style={{ 
-                           width: '100%', 
-                           aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}`,
-                         }}>
+                         style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                       
-                      {/* Área Utilizable (Dentro del Trim) */}
-                      <div className="absolute bg-white shadow-inner" style={{ 
+                      {/* Margen de Trim Visual */}
+                      <div className="absolute inset-0 border-[10px] border-slate-300/50 pointer-events-none z-10">
+                        <div className="absolute top-1 left-1 text-[8px] font-bold text-slate-400">ZONA DE DESCARTE</div>
+                      </div>
+
+                      {/* Área Utilizable */}
+                      <div className="absolute bg-white" style={{ 
                         left: `${trimPctX}%`, 
                         top: `${trimPctY}%`, 
                         width: `${usableWidthPct}%`, 
@@ -291,40 +295,28 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                         backgroundImage: 'linear-gradient(rgba(0,0,0,.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.02) 1px, transparent 1px)',
                         backgroundSize: '20px 20px'
                       }}>
-                        
-                        {/* Piezas Optimizadas */}
-                        {panel.parts.map((p, pIdx) => {
-                          // Las coordenadas p.x y p.y ya vienen relativas al área utilizable (0,0 es el inicio tras el trim)
-                          return (
-                            <div 
-                              key={pIdx} 
-                              title={`${p.name}: ${p.width}x${p.height}mm`}
-                              className="absolute border border-slate-900/60 flex items-center justify-center overflow-hidden hover:brightness-90 transition-all cursor-help group" 
-                              style={{ 
-                                left: `${p.x * scaleX}%`, 
-                                top: `${p.y * scaleY}%`, 
-                                width: `${p.width * scaleX}%`, 
-                                height: `${p.height * scaleY}%`,
-                                backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
-                              }}
-                            >
-                              <div className="flex flex-col items-center justify-center p-0.5 text-center leading-none">
-                                <span className="text-[min(1.8vw,11px)] font-black text-slate-900 truncate w-full">{p.width}x{p.height}</span>
-                                <span className="text-[min(1.4vw,8px)] text-slate-700 uppercase truncate w-full font-bold px-1">{p.name}</span>
-                              </div>
+                        {panel.parts.map((p, pIdx) => (
+                          <div key={pIdx} title={`${p.name}: ${p.width}x${p.height}mm`}
+                               className="absolute border border-slate-900/60 flex items-center justify-center hover:brightness-90 transition-all cursor-help" 
+                               style={{ 
+                                 left: `${(p.x) * (usableWidthPct / (selectedPanel.width - 2 * result.trim))}%`, 
+                                 top: `${(p.y) * (usableHeightPct / (selectedPanel.height - 2 * result.trim))}%`, 
+                                 width: `${(p.width) * (usableWidthPct / (selectedPanel.width - 2 * result.trim))}%`, 
+                                 height: `${(p.height) * (usableHeightPct / (selectedPanel.height - 2 * result.trim))}%`,
+                                 backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
+                               }}>
+                            <div className="flex flex-col items-center justify-center text-center leading-none p-1">
+                              <span className="text-[min(1.8vw,10px)] font-black text-slate-900">{p.width}x{p.height}</span>
+                              <span className="text-[min(1.4vw,7px)] text-slate-700 uppercase font-bold truncate w-full">{p.name}</span>
                             </div>
-                          );
-                        })}
+                          </div>
+                        ))}
                       </div>
-
-                      {/* Etiquetas de Trim para Referencia Visual */}
-                      <div className="absolute top-0 left-0 w-full text-center text-[8px] font-bold text-slate-400 py-1 bg-slate-200/50 uppercase">Zona de Descarte (Trim {result.trim}mm)</div>
-                      <div className="absolute bottom-0 left-0 w-full text-center text-[8px] font-bold text-slate-400 py-1 bg-slate-200/50 uppercase">Zona de Descarte (Trim {result.trim}mm)</div>
                     </div>
                     
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
-                      <p className="text-[9px] text-slate-400 italic">Los espacios en blanco entre piezas representan el desperdicio del Kerf ({result.kerf}mm).</p>
+                      <p className="text-[9px] text-slate-400 italic">Descuento de Kerf ({result.kerf}mm) aplicado automáticamente en cada corte de guillotina.</p>
                     </div>
                   </div>
                 );
