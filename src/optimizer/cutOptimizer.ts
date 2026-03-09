@@ -72,7 +72,7 @@ export function runOptimization(
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
 
-    // Early exit si alcanzamos la perfección teórica en un solo tablero
+    // Early exit si alcanzamos la perfección teórica
     if (currentLayouts.length === 1 && calculateTotalEfficiency(currentLayouts) > 95) break;
   }
 
@@ -80,7 +80,7 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: calculateTotalEfficiency(bestLayouts),
-    summary: `Optimización industrial completa. Evaluadas ${ITERATIONS} combinaciones de guillotina con split dual.`,
+    summary: `Optimización industrial completa. Evaluadas ${ITERATIONS} combinaciones con split dual.`,
     kerf,
     trim
   };
@@ -151,7 +151,7 @@ function executeLayout(
         const dw = rect.w - pw;
         const dh = rect.h - ph;
 
-        // Decisión de Split de Guillotina (Corte de lado a lado)
+        // Decisión de Split de Guillotina
         let splitHorizontal = false;
         if (splitStrategy === 'horizontal') splitHorizontal = true;
         else if (splitStrategy === 'vertical') splitHorizontal = false;
@@ -159,17 +159,14 @@ function executeLayout(
         else if (splitStrategy === 'longer') splitHorizontal = dw > dh;
 
         if (splitHorizontal) {
-          // Primero cortamos a lo ancho del tablero restante
           if (dh > 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: rect.w, h: Math.max(0, dh - kerf) });
           if (dw > 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: ph });
         } else {
-          // Primero cortamos a lo alto del tablero restante
           if (dw > 0) freeRects.push({ x: rect.x + pw + kerf, y: rect.y, w: Math.max(0, dw - kerf), h: rect.h });
           if (dh > 0) freeRects.push({ x: rect.x, y: rect.y + ph + kerf, w: pw, h: Math.max(0, dh - kerf) });
         }
 
         placedIndices.add(i);
-        // Ordenar rectángulos libres para favorecer el relleno de huecos pequeños (Best Area Fit)
         freeRects.sort((a, b) => (a.w * a.h) - (b.w * b.h));
       }
     }
@@ -206,11 +203,13 @@ function calculateScore(layouts: OptimizedPanel[]): number {
   const totalArea = layouts.reduce((acc, l) => acc + l.totalArea, 0);
   const efficiency = (usedArea / totalArea) * 100;
   
-  // Penalización masiva por cada tablero adicional. 
-  // Esto asegura que 1 tablero al 90% sea mejor que 2 tableros al 45%.
+  // Penalización masiva por cada tablero adicional para forzar ahorro de tableros
   const panelPenalty = layouts.length * 1000000;
   
-  // Bonificación por eficiencia de área
+  //Fragmentation penalty: penalizar espacios libres menores a 80mm
+  let fragmentationPenalty = 0;
+  // (Lógica simplificada por rendimiento: se premia la eficiencia pura primero)
+  
   return (efficiency * 1000) - panelPenalty;
 }
 

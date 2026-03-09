@@ -65,7 +65,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setLoading(true);
     setError(null);
     
-    // Motor Industrial de 3000 iteraciones
+    // Simulación de proceso industrial asíncrono
     setTimeout(() => {
       try {
         const res = runOptimization(
@@ -122,7 +122,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           <Card className="md:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> Motor Industrial v2.0
+                <Settings2 className="w-4 h-4" /> Motor Industrial v2.6
               </CardTitle>
               <div className="flex gap-2">
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => setZoom(z => Math.max(0.5, z - 0.1))}>
