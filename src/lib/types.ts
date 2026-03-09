@@ -1,5 +1,6 @@
-export type FurnitureType = 'placard' | 'escritorio' | 'bajoMesada' | 'alacena' | 'rackTV' | 'biblioteca';
+export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca';
 export type FurnitureColor = 'alarce-blanco' | 'alarce-marron';
+export type GrainDirection = 'vertical' | 'horizontal' | 'libre';
 
 export interface Part {
   id: string;
@@ -7,17 +8,19 @@ export interface Part {
   width: number;  // Dimensión 3D X
   height: number; // Dimensión 3D Y
   depth: number;  // Dimensión 3D Z
-  x: number; // Centro X
-  y: number; // Centro Y
-  z: number; // Centro Z
+  x: number;
+  y: number;
+  z: number;
   type: 'static' | 'door-left' | 'door-right' | 'drawer' | 'hardware';
-  pivot?: { x: number; y: number; z: number }; // Específico para puertas
+  pivot?: { x: number; y: number; z: number };
   isHardware?: boolean;
   
-  // Propiedades técnicas para despiece (independientes de la orientación 3D)
+  // Propiedades técnicas para despiece
   cutLargo: number;
   cutAncho: number;
   cutEspesor: number;
+  grainDirection: GrainDirection;
+  hingeCount?: number;
 }
 
 export interface FurnitureDimensions {
@@ -31,3 +34,16 @@ export interface FurnitureModel {
   parts: Part[];
   summary: string;
 }
+
+export interface PanelSize {
+  id: string;
+  width: number;
+  height: number;
+  name: string;
+}
+
+export const AVAILABLE_PANELS: PanelSize[] = [
+  { id: 'standard-1', width: 2600, height: 1830, name: '2600 x 1830 mm' },
+  { id: 'standard-2', width: 2440, height: 1830, name: '2440 x 1830 mm' },
+  { id: 'standard-3', width: 2800, height: 2100, name: '2800 x 2100 mm' },
+];

@@ -1,4 +1,3 @@
-
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Part, FurnitureColor } from '@/lib/types';
@@ -10,134 +9,52 @@ export class SceneManager {
   private controls: OrbitControls;
   private furnitureGroup: THREE.Group;
   private partsMap: Map<string, THREE.Object3D> = new Map();
-  private partsState: Map<string, boolean> = new Map(); // Estado individual (abierto/cerrado)
-  private textureLoader: THREE.TextureLoader = new THREE.TextureLoader();
-  private textures: Map<FurnitureColor, THREE.Texture> = new Map();
-  private raycaster = new THREE.Raycaster();
-  private pointer = new THREE.Vector2();
+  private partsState: Map<string, boolean> = new Map();
 
-  private textureMap: Record<FurnitureColor, string> = {
-    'alarce-blanco': 'https://images.unsplash.com/photo-1610048764081-f35f553d1002?q=80&w=2000&auto=format&fit=crop',
-    'alarce-marron': 'https://images.unsplash.com/photo-1541123437800-1bb1317badc2?q=80&w=2070&auto=format&fit=crop'
-  };
-
-  private colorFallbackMap: Record<FurnitureColor, number> = {
-    'alarce-blanco': 0xF5F5DC,
-    'alarce-marron': 0x5D4037
+  // Colores CAD profesionales
+  private colors = {
+    panel: 0xE8D9B5,
+    border: 0xC8B08A,
+    outline: 0x444444,
+    background: 0xf1f5f9
   };
 
   constructor(container: HTMLElement) {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf1f5f9);
+    this.scene.background = new THREE.Color(this.colors.background);
 
     this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10000);
-    this.camera.position.set(1800, 1200, 1800);
+    this.camera.position.set(1500, 1000, 1500);
 
-    this.renderer = new THREE.WebGLRenderer({ 
-      antialias: true, 
-      preserveDrawingBuffer: true,
-      alpha: true 
-    });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
 
-    // Luces
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     this.scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    mainLight.position.set(1500, 3000, 1000);
-    mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 2048;
-    mainLight.shadow.mapSize.height = 2048;
-    this.scene.add(mainLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    dirLight.position.set(2000, 3000, 1000);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    this.scene.add(dirLight);
 
     this.furnitureGroup = new THREE.Group();
     this.scene.add(this.furnitureGroup);
 
     this.animate();
-
-    // Eventos
     window.addEventListener('resize', () => this.onWindowResize(container));
-    this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
-  }
-
-  private onPointerDown = (event: PointerEvent) => {
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.furnitureGroup.children, true);
-
-    if (intersects.length > 0) {
-      let object = intersects[0].object;
-      let target: THREE.Object3D | null = object;
-
-      // Buscar el contenedor que tenga el tipo de parte (puerta o cajón)
-      while (target && !target.userData.type && target.parent && target !== this.furnitureGroup) {
-        target = target.parent;
-      }
-
-      if (target && target.userData.type) {
-        const id = target.userData.id as string;
-        const type = target.userData.type;
-
-        if (type === 'door-left' || type === 'door-right') {
-          this.toggleDoor(id);
-        } else if (type === 'drawer') {
-          this.toggleDrawer(id);
-        }
-      }
-    }
-  };
-
-  public toggleDoor(id: string) {
-    const obj = this.partsMap.get(id);
-    if (!obj) return;
-    const type = obj.userData.type;
-    if (type !== 'door-left' && type !== 'door-right') return;
-    
-    const isOpen = this.partsState.get(obj.uuid) || false;
-    const nextState = !isOpen;
-    const angle = (type === 'door-left' ? -Math.PI / 2 : Math.PI / 2);
-    obj.rotation.y = nextState ? angle : 0;
-    this.partsState.set(obj.uuid, nextState);
-  }
-
-  public toggleDrawer(id: string) {
-    const target = this.partsMap.get(id);
-    if (!target || target.userData.type !== 'drawer') return;
-
-    // Identificar el ID base del cajón (ej. "cajon-0" de "cajon-0-frente")
-    const lastDashIndex = id.lastIndexOf('-');
-    const drawerBaseId = lastDashIndex !== -1 ? id.substring(0, lastDashIndex) : id;
-    
-    const isOpen = this.partsState.get(target.uuid) || false;
-    const nextState = !isOpen;
-
-    // Mover todas las piezas que pertenecen a este cajón específico
-    this.partsMap.forEach((obj) => {
-      const objId = obj.userData.id as string;
-      if (obj.userData.type === 'drawer' && (objId === drawerBaseId || objId.startsWith(drawerBaseId + '-'))) {
-        const originalPos = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = nextState ? originalPos.z + 400 : originalPos.z;
-        this.partsState.set(obj.uuid, nextState);
-      }
-    });
   }
 
   private onWindowResize(container: HTMLElement) {
-    if (!container) return;
     this.camera.aspect = container.clientWidth / container.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -149,71 +66,39 @@ export class SceneManager {
     this.renderer.render(this.scene, this.camera);
   };
 
-  private async loadTexture(color: FurnitureColor): Promise<THREE.Texture | null> {
-    if (this.textures.has(color)) return this.textures.get(color)!;
-    try {
-      return await new Promise((resolve) => {
-        this.textureLoader.load(this.textureMap[color], (t) => {
-          t.wrapS = t.wrapT = THREE.RepeatWrapping;
-          this.textures.set(color, t);
-          resolve(t);
-        }, undefined, () => resolve(null));
-      });
-    } catch { return null; }
-  }
-
-  private getShadedColor(baseColor: number, partName: string): THREE.Color {
-    const color = new THREE.Color(baseColor);
-    const name = partName.toLowerCase();
-    if (name.includes('tapa') || name.includes('frente')) return color.multiplyScalar(1.05);
-    if (name.includes('lateral')) return color.multiplyScalar(0.95);
-    if (name.includes('base') || name.includes('fondo')) return color.multiplyScalar(0.85);
-    return color;
-  }
-
   public async buildFurniture(parts: Part[], color: FurnitureColor) {
     while (this.furnitureGroup.children.length > 0) {
-      const obj = this.furnitureGroup.children[0];
-      this.disposeObject(obj);
-      this.furnitureGroup.remove(obj);
+      this.disposeObject(this.furnitureGroup.children[0]);
+      this.furnitureGroup.remove(this.furnitureGroup.children[0]);
     }
     this.partsMap.clear();
-    this.partsState.clear();
 
-    const baseTexture = await this.loadTexture(color);
-    const gap = 1.0;
+    const visualGap = 1.0;
 
     parts.forEach(part => {
-      const w = Math.max(0.1, part.width - (part.isHardware ? 0 : gap));
-      const h = Math.max(0.1, part.height - (part.isHardware ? 0 : gap));
-      const d = Math.max(0.1, part.depth - (part.isHardware ? 0 : gap));
+      const w = Math.max(0.1, part.width - (part.isHardware ? 0 : visualGap));
+      const h = Math.max(0.1, part.height - (part.isHardware ? 0 : visualGap));
+      const d = Math.max(0.1, part.depth - (part.isHardware ? 0 : visualGap));
       
       const geometry = new THREE.BoxGeometry(w, h, d);
       let material: THREE.MeshStandardMaterial;
 
       if (part.isHardware) {
-        material = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.2, metalness: 0.8 });
+        material = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.1, metalness: 0.9 });
       } else {
-        const shadedColor = this.getShadedColor(this.colorFallbackMap[color], part.name);
         material = new THREE.MeshStandardMaterial({ 
-          color: shadedColor, 
-          roughness: 0.6, 
+          color: this.colors.panel, 
+          roughness: 0.8, 
           metalness: 0.05 
         });
-        if (baseTexture) {
-          material.map = baseTexture.clone();
-          material.map.repeat.set(part.width / 800, part.height / 800);
-        }
       }
 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = mesh.receiveShadow = true;
 
-      // Bordes
-      const line = new THREE.LineSegments(
-        new THREE.EdgesGeometry(geometry), 
-        new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.5 })
-      );
+      // Bordes CAD
+      const edges = new THREE.EdgesGeometry(geometry);
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline }));
       mesh.add(line);
 
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
@@ -221,16 +106,14 @@ export class SceneManager {
       mesh.userData.id = part.id;
 
       if ((part.type === 'door-left' || part.type === 'door-right') && part.pivot) {
-        const hingeGroup = new THREE.Group();
-        hingeGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
+        const pivotGroup = new THREE.Group();
+        pivotGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
         const offsetX = (part.type === 'door-left') ? part.width / 2 : -part.width / 2;
-        mesh.position.set(offsetX, 0, part.z - part.pivot.z);
-        hingeGroup.add(mesh);
-        hingeGroup.userData.type = part.type;
-        hingeGroup.userData.id = part.id;
-        hingeGroup.userData.originalPosition = hingeGroup.position.clone();
-        this.furnitureGroup.add(hingeGroup);
-        this.partsMap.set(part.id, hingeGroup);
+        mesh.position.set(offsetX, 0, 0);
+        pivotGroup.add(mesh);
+        pivotGroup.userData.originalPosition = pivotGroup.position.clone();
+        this.furnitureGroup.add(pivotGroup);
+        this.partsMap.set(part.id, pivotGroup);
       } else {
         mesh.position.set(part.x, part.y, part.z);
         this.furnitureGroup.add(mesh);
@@ -239,18 +122,14 @@ export class SceneManager {
     });
 
     const box = new THREE.Box3().setFromObject(this.furnitureGroup);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    this.controls.target.copy(center);
+    box.getCenter(this.controls.target);
   }
 
   public setDoors(open: boolean) {
     this.partsMap.forEach((obj) => {
-      const type = obj.userData.type;
-      if (type === 'door-left' || type === 'door-right') {
-        const angle = (type === 'door-left' ? -Math.PI / 2 : Math.PI / 2);
+      if (obj.userData.type?.includes('door')) {
+        const angle = obj.userData.type === 'door-left' ? -Math.PI / 2 : Math.PI / 2;
         obj.rotation.y = open ? angle : 0;
-        this.partsState.set(obj.uuid, open);
       }
     });
   }
@@ -258,9 +137,8 @@ export class SceneManager {
   public setDrawers(open: boolean) {
     this.partsMap.forEach((obj) => {
       if (obj.userData.type === 'drawer') {
-        const originalPos = obj.userData.originalPosition as THREE.Vector3;
-        obj.position.z = open ? originalPos.z + 400 : originalPos.z;
-        this.partsState.set(obj.uuid, open);
+        const orig = obj.userData.originalPosition as THREE.Vector3;
+        obj.position.z = open ? orig.z + 400 : orig.z;
       }
     });
   }
@@ -271,19 +149,16 @@ export class SceneManager {
     box.getCenter(center);
 
     this.partsMap.forEach((obj) => {
-      const originalPos = obj.userData.originalPosition as THREE.Vector3;
-      const direction = new THREE.Vector3().subVectors(originalPos, center).normalize();
-      if (direction.length() < 0.1) direction.set(0, 1, 0);
-      obj.position.copy(originalPos.clone().add(direction.multiplyScalar(factor * 350)));
+      const orig = obj.userData.originalPosition as THREE.Vector3;
+      const dir = new THREE.Vector3().subVectors(orig, center).normalize();
+      obj.position.copy(orig.clone().add(dir.multiplyScalar(factor * 300)));
     });
   }
 
   public resetAssembly() {
     this.partsMap.forEach((obj) => {
-      const originalPos = obj.userData.originalPosition as THREE.Vector3;
-      obj.position.copy(originalPos);
+      obj.position.copy(obj.userData.originalPosition);
       obj.rotation.set(0, 0, 0);
-      this.partsState.set(obj.uuid, false);
     });
   }
 
@@ -303,7 +178,6 @@ export class SceneManager {
   }
 
   public dispose() {
-    this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     this.renderer.dispose();
     this.controls.dispose();
   }
