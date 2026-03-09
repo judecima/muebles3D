@@ -4,18 +4,20 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FurnitureType, FurnitureDimensions } from '@/lib/types';
-import { Box, DoorOpen, DoorClosed, MoveHorizontal, Maximize, RefreshCw, Layers } from 'lucide-react';
+import { FurnitureType, FurnitureDimensions, FurnitureColor } from '@/lib/types';
+import { Box, DoorOpen, DoorClosed, MoveHorizontal, Maximize, RefreshCw, Layers, Palette } from 'lucide-react';
 
 interface ControlPanelProps {
   type: FurnitureType;
   dimensions: FurnitureDimensions;
+  color: FurnitureColor;
   onTypeChange: (val: FurnitureType) => void;
   onDimensionsChange: (dim: FurnitureDimensions) => void;
+  onColorChange: (color: FurnitureColor) => void;
   onAction: (action: string) => void;
 }
 
-export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChange, onAction }: ControlPanelProps) {
+export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensionsChange, onColorChange, onAction }: ControlPanelProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     onDimensionsChange({ ...dimensions, [name]: parseFloat(value) || 0 });
@@ -29,7 +31,7 @@ export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChang
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="space-y-6 pt-6 px-4">
+      <CardContent className="space-y-6 pt-6 px-4 pb-10">
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase text-slate-500">Tipo de Mueble</Label>
           <Select value={type} onValueChange={(v) => onTypeChange(v as FurnitureType)}>
@@ -43,6 +45,22 @@ export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChang
               <SelectItem value="alacena">Alacena Superior</SelectItem>
               <SelectItem value="rackTV">Rack TV</SelectItem>
               <SelectItem value="biblioteca">Biblioteca</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1">
+            <Palette className="w-3.5 h-3.5" /> Color del Mueble
+          </Label>
+          <Select value={color} onValueChange={(v) => onColorChange(v as FurnitureColor)}>
+            <SelectTrigger className="w-full bg-white">
+              <SelectValue placeholder="Seleccionar color" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="blanco">Blanco Ártico</SelectItem>
+              <SelectItem value="marron">Marrón Nogal</SelectItem>
+              <SelectItem value="beige">Beige Arena</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -70,9 +88,9 @@ export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChang
           <RefreshCw className="w-4 h-4 mr-2" /> Generar Mueble
         </Button>
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-2 border-t border-slate-200 mt-4">
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase text-slate-500">Simulación de Puertas</Label>
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Puertas (Bisagras 90°)</Label>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" size="sm" className="bg-white text-xs" onClick={() => onAction('open-doors')}>
                 <DoorOpen className="w-3.5 h-3.5 mr-1" /> Abrir
@@ -84,7 +102,7 @@ export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChang
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase text-slate-500">Simulación de Cajones</Label>
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Cajones (Guías Telescópicas)</Label>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" size="sm" className="bg-white text-xs" onClick={() => onAction('open-drawers')}>
                 <MoveHorizontal className="w-3.5 h-3.5 mr-1" /> Extraer
@@ -96,7 +114,7 @@ export function ControlPanel({ type, dimensions, onTypeChange, onDimensionsChang
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase text-slate-500">Visualización Avanzada</Label>
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Herramientas Pro</Label>
             <div className="space-y-2">
               <Button variant="secondary" className="w-full text-xs font-bold" onClick={() => onAction('explode')}>
                 <Maximize className="w-4 h-4 mr-2" /> Vista Explotada

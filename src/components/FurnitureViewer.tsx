@@ -1,13 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { SceneManager } from '@/three/SceneManager';
-import { Part } from '@/lib/types';
+import { Part, FurnitureColor } from '@/lib/types';
 
 interface FurnitureViewerProps {
   parts: Part[];
   action: string;
+  color: FurnitureColor;
 }
 
-export function FurnitureViewer({ parts, action }: FurnitureViewerProps) {
+export function FurnitureViewer({ parts, action, color }: FurnitureViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SceneManager | null>(null);
 
@@ -26,9 +27,9 @@ export function FurnitureViewer({ parts, action }: FurnitureViewerProps) {
 
   useEffect(() => {
     if (managerRef.current) {
-      managerRef.current.buildFurniture(parts);
+      managerRef.current.buildFurniture(parts, color);
     }
-  }, [parts]);
+  }, [parts, color]);
 
   useEffect(() => {
     if (!managerRef.current) return;

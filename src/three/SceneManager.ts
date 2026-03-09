@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Part } from '@/lib/types';
+import { Part, FurnitureColor } from '@/lib/types';
 
 export class SceneManager {
   private scene: THREE.Scene;
@@ -9,6 +9,12 @@ export class SceneManager {
   private controls: OrbitControls;
   private furnitureGroup: THREE.Group;
   private partsMap: Map<string, THREE.Object3D> = new Map();
+
+  private colorMap: Record<FurnitureColor, number> = {
+    'blanco': 0xffffff,
+    'marron': 0x5d4037,
+    'beige': 0xf5f5dc
+  };
 
   constructor(container: HTMLElement) {
     this.scene = new THREE.Scene();
@@ -76,32 +82,31 @@ export class SceneManager {
     });
   }
 
-  public buildFurniture(parts: Part[]) {
+  public buildFurniture(parts: Part[], color: FurnitureColor) {
     this.clearFurniture();
     
+    const colorHex = this.colorMap[color];
+
     parts.forEach(part => {
       if (part.type === 'hardware') return;
 
       const geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
       const material = new THREE.MeshStandardMaterial({ 
-        color: 0x4a90e2, 
-        roughness: 0.7,
-        metalness: 0.2,
+        color: colorHex, 
+        roughness: 0.8,
+        metalness: 0.1,
       });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
 
-      // Guardar metadatos para simulación
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
 
       if ((part.type === 'door-left' || part.type === 'door-right') && part.pivot) {
-        // Crear sistema de pivote para puertas
         const hingeGroup = new THREE.Group();
         hingeGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
         
-        // La malla se posiciona relativa al grupo de la bisagra
         const offsetX = part.type === 'door-left' ? part.width / 2 : -part.width / 2;
         mesh.position.set(offsetX, 0, part.z - part.pivot.z);
         
@@ -124,13 +129,13 @@ export class SceneManager {
 
   public setDoors(open: boolean) {
     this.partsMap.forEach((obj) => {
-      // Detectar si el objeto es un grupo de bisagra
-      const partType = obj.children[0]?.userData.type || obj.userData.type;
+      const firstChild = obj.children[0];
+      const partType = firstChild?.userData?.type || obj.userData?.type;
+      
       if (partType === 'door-left' || partType === 'door-right') {
-        // Apertura estricta de 90 grados
-        const maxAngle = Math.PI / 2;
-        const angle = open ? (partType === 'door-left' ? maxAngle : -maxAngle) : 0;
-        obj.rotation.y = angle;
+        const angle90 = Math.PI / 2;
+        const targetAngle = open ? (partType === 'door-left' ? angle90 : -angle90) : 0;
+        obj.rotation.y = targetAngle;
       }
     });
   }
