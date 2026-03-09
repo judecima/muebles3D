@@ -1,3 +1,5 @@
+'use client';
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Part, FurnitureColor } from '@/lib/types';
@@ -104,12 +106,13 @@ export class SceneManager {
     this.itemStates.set(id, open);
     const type = obj.userData.type;
 
+    // Todas las puertas convencionales abren 90°, excepto la abatible que abre 100°
     if (type === 'door-left') {
       obj.rotation.y = open ? -Math.PI / 2 : 0;
     } else if (type === 'door-right') {
       obj.rotation.y = open ? Math.PI / 2 : 0;
     } else if (type === 'door-flip') {
-      // Apertura a 100 grados (1.745 rad)
+      // 100 grados = 1.745 rad
       obj.rotation.x = open ? -1.745 : 0; 
       this.updatePistons(open, obj);
     }
@@ -121,6 +124,7 @@ export class SceneManager {
         const config = obj.userData.config;
         const rod = obj.getObjectByName('rod');
         
+        // El anclaje de la puerta está en coordenadas del mueble, lo pasamos a mundo considerando la rotación de la puerta
         const actualAnchorLocal = new THREE.Vector3(
           config.anchorPuerta.x - doorObj.position.x,
           config.anchorPuerta.y - doorObj.position.y,
@@ -135,6 +139,7 @@ export class SceneManager {
         if (rod) {
           const cylinderLen = config.lengthClosed * 0.6;
           const currentExtension = distance - cylinderLen;
+          // El vástago se escala y se desplaza proporcionalmente
           rod.scale.z = currentExtension / (config.lengthClosed * 0.4); 
           rod.position.z = (cylinderLen / 2) + (currentExtension / 2);
         }
@@ -251,7 +256,7 @@ export class SceneManager {
     const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
     group.add(cylinder);
 
-    // Vástago (Metal)
+    // Vástago (Metal cromado)
     const rodGeom = new THREE.CylinderGeometry(2.5, 2.5, rodLen, 16);
     rodGeom.rotateX(Math.PI / 2);
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1, roughness: 0.1 });
@@ -260,7 +265,7 @@ export class SceneManager {
     rod.position.z = cylLen / 2; 
     group.add(rod);
 
-    // Soportes de acero
+    // Anclajes integrados (Esferas de acero)
     const supportGeom = new THREE.SphereGeometry(6, 16, 16);
     const supportMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 });
     
@@ -272,6 +277,7 @@ export class SceneManager {
     supportPuerta.position.z = rodLen / 2;
     rod.add(supportPuerta);
 
+    // Orientar hacia el anclaje de la puerta inicialmente
     const p2 = new THREE.Vector3(config.anchorPuerta.x, config.anchorPuerta.y, config.anchorPuerta.z);
     group.lookAt(p2);
     
@@ -374,6 +380,7 @@ export class SceneManager {
     box.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
     
+    // Posicionar cámara a 45 grados (isométrico técnico) para captura profesional
     const dist = maxDim * 2.5;
     this.camera.position.set(center.x + dist, center.y + dist, center.z + dist);
     this.controls.target.copy(center);
@@ -382,6 +389,7 @@ export class SceneManager {
     this.renderer.render(this.scene, this.camera);
     const data = this.renderer.domElement.toDataURL('image/png');
     
+    // Restaurar vista previa
     this.camera.position.copy(originalPos);
     this.controls.target.copy(originalTarget);
     this.controls.update();
