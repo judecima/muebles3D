@@ -1,5 +1,9 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
+/**
+ * Motor para Escritorio Red Arquimax
+ * Sistema constructivo: Caja de 5 piezas + Frente estético independiente.
+ */
 export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, depth: D, thickness: T } = dim;
   const H = 750;
@@ -31,12 +35,22 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
     const posY = startY - (frontH / 2) - (i * (frontH + 10));
     const prefix = `desk-drawer-${i}`;
     
-    parts.push({ id: `${prefix}-front`, name: `Frente Cajón ${i + 1}`, width: cabinetW - 4, height: frontH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 + T / 2, type: 'drawer', cutLargo: frontH, cutAncho: cabinetW - 4, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-side-L`, name: `Lateral Izq. Cajón ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX - drawerW / 2 + T / 2, y: posY, z: D / 2 - drawerD / 2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-side-R`, name: `Lateral Der. Cajón ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX + drawerW / 2 - T / 2, y: posY, z: D / 2 - drawerD / 2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-back`, name: `Trasera Cajón ${i + 1}`, width: drawerW - 2 * T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 - drawerD + T / 2, type: 'drawer', cutLargo: drawerW - 2 * T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-bottom`, name: `Base Cajón ${i + 1}`, width: drawerW - 2 * T, height: 3, depth: drawerD - T, x: cabinetCenterX, y: posY - drawerBoxH / 2 + 1.5, z: D / 2 - drawerD / 2 + T / 2, type: 'drawer', cutLargo: drawerD - T, cutAncho: drawerW - 2 * T, cutEspesor: 3, grainDirection: 'libre' });
+    // 1. Frente Estético
+    parts.push({ id: `${prefix}-front-aesthetic`, name: `Frente Estético Cajón ${i + 1}`, width: cabinetW - 4, height: frontH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 + T / 2, type: 'drawer', cutLargo: frontH, cutAncho: cabinetW - 4, cutEspesor: T, grainDirection: 'libre' });
+    
+    // 2. Frente Estructura de Caja
+    parts.push({ id: `${prefix}-box-front`, name: `Frente Estruct. Caja ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D/2 - T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+
+    // 3. Laterales de Caja
+    parts.push({ id: `${prefix}-box-side-L`, name: `Lateral Izq. Caja ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX - drawerW / 2 + T / 2, y: posY, z: D / 2 - drawerD / 2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-R`, name: `Lateral Der. Caja ${i + 1}`, width: T, height: drawerBoxH, depth: drawerD, x: cabinetCenterX + drawerW / 2 - T / 2, y: posY, z: D / 2 - drawerD / 2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    
+    // 4. Trasera de Caja
+    parts.push({ id: `${prefix}-box-back`, name: `Trasera Caja ${i + 1}`, width: drawerW - 2 * T, height: drawerBoxH, depth: T, x: cabinetCenterX, y: posY, z: D / 2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2 * T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    
+    // 5. Piso de Caja
+    parts.push({ id: `${prefix}-box-bottom`, name: `Base Caja ${i + 1}`, width: drawerW - 2 * T, height: 3, depth: drawerD, x: cabinetCenterX, y: posY - drawerBoxH / 2 + 1.5, z: D / 2 - drawerD / 2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2 * T, cutEspesor: 3, grainDirection: 'libre' });
   }
 
-  return { parts, summary: 'Escritorio profesional Red Arquimax.', hasDoors: false, hasDrawers: true };
+  return { parts, summary: 'Escritorio profesional con sistema de cajones constructivo independiente.', hasDoors: false, hasDrawers: true };
 }

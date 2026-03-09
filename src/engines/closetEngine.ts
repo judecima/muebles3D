@@ -1,5 +1,9 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
+/**
+ * Motor para Placard Red Arquimax
+ * Sistema constructivo: Caja de 5 piezas + Frente estético independiente.
+ */
 export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T } = dim;
   
@@ -33,10 +37,9 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const doorW = W / 2 - 2;
   const doorH = doorSectionH - 5;
   const doorY = drawerSectionH + (doorSectionH / 2);
-  const hingesPerDoor = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
 
   const doorTypes: ('door-left' | 'door-right')[] = ['door-left', 'door-right'];
-  doorTypes.forEach((type, idx) => {
+  doorTypes.forEach((type) => {
     const isLeft = type === 'door-left';
     parts.push({ 
       id: `closet-door-${isLeft ? 'L' : 'R'}`, 
@@ -46,29 +49,13 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
       y: doorY, z: D / 2 + T / 2, 
       type: type,
       pivot: { x: isLeft ? 0 : W, y: doorY, z: D / 2 },
-      cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical',
-      hingeCount: hingesPerDoor
+      cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical'
     });
-
-    for (let i = 0; i < hingesPerDoor; i++) {
-      let posY = drawerSectionH + 70;
-      if (hingesPerDoor > 2) {
-        posY = drawerSectionH + 70 + (i * (doorH - 140) / (hingesPerDoor - 1));
-      } else {
-        posY = i === 0 ? drawerSectionH + 70 : drawerSectionH + doorH - 70;
-      }
-
-      parts.push({
-        id: `hinge-closet-${isLeft ? 'L' : 'R'}-${i}`, name: 'Bisagra Interna 90°', width: 30, height: 15, depth: 45,
-        x: isLeft ? 10 : W - 10, y: posY, z: D/2 - 20, type: 'hardware', isHardware: true,
-        cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
-      });
-    }
   });
 
   const drawerFrontH = (drawerSectionH - T - 20) / 2;
   const drawerGap = 10;
-  const railSpace = 25; 
+  const railSpace = 26; 
   const drawerW = innerW - railSpace;
   const drawerD = D - 50;
   const drawerBoxH = drawerFrontH * 0.7;
@@ -77,12 +64,22 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     const prefix = `closet-drawer-${i}`;
     const posY = T + 10 + (i * (drawerFrontH + drawerGap)) + (drawerFrontH / 2);
     
-    parts.push({ id: `${prefix}-front`, name: `Frente Cajón ${i+1}`, width: W - 4, height: drawerFrontH, depth: T, x: W/2, y: posY, z: D/2 + T/2, type: 'drawer', cutLargo: drawerFrontH, cutAncho: W - 4, cutEspesor: T, grainDirection: 'horizontal' });
-    parts.push({ id: `${prefix}-side-L`, name: `Lat. Izq. Cajón ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-side-R`, name: `Lat. Der. Cajón ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-back`, name: `Trasera Cajón ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: W/2, y: posY, z: D/2 - drawerD + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-bottom`, name: `Piso Cajón ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, x: W/2, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer', cutLargo: drawerD - T, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
+    // 1. Frente Estético
+    parts.push({ id: `${prefix}-front-aesthetic`, name: `Frente Estético Cajón ${i+1}`, width: W - 4, height: drawerFrontH, depth: T, x: W/2, y: posY, z: D/2 + T/2, type: 'drawer', cutLargo: drawerFrontH, cutAncho: W - 4, cutEspesor: T, grainDirection: 'horizontal' });
+    
+    // 2. Frente Estructura Caja
+    parts.push({ id: `${prefix}-box-front`, name: `Frente Estruct. Caja ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: W/2, y: posY, z: D/2 - T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+
+    // 3. Laterales Caja
+    parts.push({ id: `${prefix}-box-side-L`, name: `Lat. Izq. Caja ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-box-side-R`, name: `Lat. Der. Caja ${i+1}`, width: T, height: drawerBoxH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    
+    // 4. Trasera Caja
+    parts.push({ id: `${prefix}-box-back`, name: `Trasera Caja ${i+1}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: W/2, y: posY, z: D/2 - drawerD - T + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'libre' });
+    
+    // 5. Piso Caja
+    parts.push({ id: `${prefix}-box-bottom`, name: `Piso Caja ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD, x: W/2, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2 - T, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
   }
 
-  return { parts, summary: 'Placard Red Arquimax con bisagras automáticas y cajonera.', hasDoors: true, hasDrawers: true };
+  return { parts, summary: 'Placard con sistema de cajonera industrial independiente.', hasDoors: true, hasDrawers: true };
 }
