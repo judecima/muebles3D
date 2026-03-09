@@ -1,7 +1,7 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
-  const { width: W, height: H, depth: D, thickness: T, hasBack } = dim;
+  const { width: W, height: H, depth: D, thickness: T, hasBack, hasShelf } = dim;
 
   const parts: Part[] = [
     { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
@@ -20,9 +20,28 @@ export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   }
 
+  if (hasShelf) {
+    parts.push({
+      id: 'estante-interno',
+      name: 'Estante Interno',
+      width: W - 2*T - 2,
+      height: T,
+      depth: D * 0.9,
+      x: W/2,
+      y: H/2,
+      z: 0,
+      type: 'static',
+      cutLargo: W - 2*T - 2,
+      cutAncho: D * 0.9,
+      cutEspesor: T,
+      grainDirection: 'horizontal'
+    });
+  }
+
   const doorH = H - 4;
   const doorW = W / 2 - 2;
   const doorY = H / 2;
+  
   const hingesPerDoor = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
 
   const doorTypes: ('door-left' | 'door-right')[] = ['door-left', 'door-right'];

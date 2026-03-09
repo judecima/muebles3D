@@ -65,7 +65,7 @@ export function ControlPanel({
   const isWidthSlider = type === 'escritorio';
   const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip';
   const forceBack = type === 'placard' || type === 'rackTV';
-  const canHaveShelf = type === 'bajoMesada' || type === 'alacenaFlip';
+  const canHaveShelf = type === 'bajoMesada' || type === 'alacena';
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
