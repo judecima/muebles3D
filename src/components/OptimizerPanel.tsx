@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,9 +22,16 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Reset results when parts change significantly or panel changes
+  useEffect(() => {
+    setResult(null);
+    setError(null);
+  }, [parts.length, selectedPanel.id]);
+
   const handleOptimize = () => {
     setLoading(true);
     setError(null);
+    setResult(null);
     
     // Pequeño delay para asegurar que el estado de carga se refleje en la UI
     setTimeout(() => {
@@ -37,14 +44,14 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           return;
         }
 
-        const usableWidth = selectedPanel.width - 20;
-        const usableHeight = selectedPanel.height - 20;
+        const usableWidth = selectedPanel.width - 20; // Trim 10mm por lado
+        const usableHeight = selectedPanel.height - 20; // Trim 10mm por lado
 
         const res = runOptimization(
           cutlist,
           usableWidth,
           usableHeight,
-          4.5
+          4.5 // Kerf estándar
         );
 
         if (res.optimizedLayout.length === 0) {
@@ -58,7 +65,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
       } finally {
         setLoading(false);
       }
-    }, 500);
+    }, 800);
   };
 
   const exportCSV = () => {

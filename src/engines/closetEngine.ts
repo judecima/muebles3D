@@ -23,6 +23,16 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'free' 
   });
 
+  // Barral de Colgar (Hardware) - Ubicado en la sección de puertas
+  const barHeight = 1700;
+  if (H > barHeight + 100) {
+    parts.push({ 
+      id: 'hanger-bar', name: 'Barral de Colgar', width: innerW, height: 25, depth: 25, 
+      x: W/2, y: barHeight, z: 0, type: 'hardware', isHardware: true, 
+      cutLargo: 0, cutAncho: 0, cutEspesor: 0 
+    });
+  }
+
   // Puertas (Sección Superior)
   const doorW = W / 2 - 2;
   const doorH = doorSectionH - 5;
@@ -101,7 +111,7 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
 
   return { 
     parts, 
-    summary: 'Placard Red Arquimax con secciones independientes: Puertas superiores y cajonera inferior.', 
+    summary: 'Placard Red Arquimax con barral de colgar y secciones independientes de puertas y cajones.', 
     hasDoors: true, 
     hasDrawers: true 
   };
