@@ -31,6 +31,7 @@ interface Rect {
 
 /**
  * Motor de optimización tipo Guillotina (Best Area Fit)
+ * Permite rotación si la veta es 'libre' para mejorar la eficiencia.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection }[],
@@ -63,7 +64,7 @@ export function runOptimization(
       for (let j = 0; j < freeRects.length; j++) {
         const rect = freeRects[j];
         
-        // Intentar sin rotar
+        // 1. Intentar sin rotar
         if (part.width <= rect.w && part.height <= rect.h) {
           const areaFit = rect.w * rect.h;
           if (areaFit < minAreaFit) {
@@ -73,8 +74,8 @@ export function runOptimization(
           }
         }
         
-        // Intentar rotado (solo si grainDirection es 'free')
-        if (part.grainDirection === 'free' && part.height <= rect.w && part.width <= rect.h) {
+        // 2. Intentar rotado (solo si grainDirection es 'libre' o similar)
+        if (part.grainDirection === 'libre' && part.height <= rect.w && part.width <= rect.h) {
           const areaFit = rect.w * rect.h;
           if (areaFit < minAreaFit) {
             minAreaFit = areaFit;
@@ -98,6 +99,7 @@ export function runOptimization(
           rotated
         });
 
+        // Split de Guillotina
         const dw = rect.w - w;
         const dh = rect.h - h;
 
@@ -123,7 +125,11 @@ export function runOptimization(
     });
 
     remainingParts = remainingParts.filter((_, idx) => !placedIndices.includes(idx));
-    if (placedIndices.length === 0 && remainingParts.length > 0) break;
+    
+    // Si no se pudo colocar ninguna pieza en un tablero vacío, la pieza es demasiado grande
+    if (placedIndices.length === 0 && remainingParts.length > 0) {
+      break;
+    }
   }
 
   const totalUsedArea = panels.reduce((sum, p) => sum + p.parts.reduce((s, part) => s + (part.width * part.height), 0), 0);
@@ -133,6 +139,6 @@ export function runOptimization(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsedArea / totalAvailableArea) * 100,
-    summary: `Optimización industrial completa. Eficiencia: ${(totalUsedArea / totalAvailableArea * 100).toFixed(1)}%.`
+    summary: `Optimización industrial completa. Eficiencia: ${(totalUsedArea / (totalAvailableArea || 1) * 100).toFixed(1)}%.`
   };
 }

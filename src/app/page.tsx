@@ -121,7 +121,7 @@ export default function Home() {
   return (
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-50">
       {/* Sidebar Desktop */}
-      <aside className="hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto">
+      <aside className="hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0">
         <ControlPanel 
           type={type} 
           dimensions={dimensions} 
@@ -164,33 +164,33 @@ export default function Home() {
                   />
                 </SheetContent>
               </Sheet>
-              <div className="md:hidden flex items-center gap-1">
+              <div className="flex items-center gap-1">
                 <Settings2 className="w-4 h-4 text-primary" />
-                <span className="text-xs font-bold uppercase text-slate-700">RED ARQUIMAX</span>
+                <span className="text-xs font-bold uppercase text-slate-700 hidden xs:inline">RED ARQUIMAX</span>
               </div>
             </div>
 
             <TabsList className="bg-slate-100 h-9">
               <TabsTrigger value="3d" className="gap-2 text-xs md:text-sm h-7">
                 <BoxIcon className="w-3.5 h-3.5" /> 
-                <span className="hidden xs:inline">Diseño</span>
+                <span>Diseño</span>
               </TabsTrigger>
               <TabsTrigger value="optimize" className="gap-2 text-xs md:text-sm h-7">
                 <LayoutGrid className="w-3.5 h-3.5" /> 
-                <span className="hidden xs:inline">Optimización</span>
+                <span>Corte</span>
               </TabsTrigger>
             </TabsList>
 
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="h-8 px-2 md:px-3" onClick={() => handleAction('export-pdf')}>
                 <FileDown className="w-4 h-4 md:mr-2" /> 
-                <span className="hidden sm:inline text-xs">Exportar PDF</span>
+                <span className="hidden sm:inline text-xs">PDF</span>
               </Button>
             </div>
           </div>
 
           {/* Content Areas */}
-          <TabsContent value="3d" className="flex-1 m-0 relative bg-slate-100 overflow-hidden flex flex-col data-[state=inactive]:hidden">
+          <TabsContent value="3d" className="flex-1 m-0 relative bg-slate-100 overflow-hidden flex flex-col data-[state=inactive]:hidden min-h-0">
             <div className="flex-1 relative">
               <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
               <div className="absolute bottom-4 left-4 pointer-events-none opacity-10">
@@ -202,7 +202,7 @@ export default function Home() {
             </div>
           </TabsContent>
 
-          <TabsContent value="optimize" className="flex-1 m-0 overflow-hidden flex flex-col data-[state=inactive]:hidden">
+          <TabsContent value="optimize" className="flex-1 m-0 overflow-hidden flex flex-col data-[state=inactive]:hidden min-h-0">
             <OptimizerPanel parts={parts} selectedPanel={selectedPanel} onPanelChange={setSelectedPanel} />
           </TabsContent>
         </Tabs>
