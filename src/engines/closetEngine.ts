@@ -12,11 +12,11 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const gap = 2;
 
   const parts: Part[] = [
-    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T },
-    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T },
-    { id: 'tapa-sup', name: 'Tapa Superior', width: innerW, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T },
-    { id: 'base-inf', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T },
-    { id: 'fondo', name: 'Fondo Mueble', width: W - T, height: H - T, depth: 3, x: W/2, y: H/2, z: -D/2 + 1.5, type: 'static', cutLargo: H - T, cutAncho: W - T, cutEspesor: 3 },
+    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'tapa-sup', name: 'Tapa Superior', width: innerW, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'base-inf', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'fondo', name: 'Fondo Mueble', width: W - T, height: H - T, depth: 3, x: W/2, y: H/2, z: -D/2 + 1.5, type: 'static', cutLargo: H - T, cutAncho: W - T, cutEspesor: 3, grainDirection: 'libre' },
   ];
 
   const numDrawers = 2;
@@ -31,25 +31,25 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
       name: `Frente Cajón ${i+1}`, 
       width: innerW - 4, height: frontH, depth: T, 
       x: W/2, y: posY, z: D/2 + T/2, 
-      type: 'drawer', cutLargo: frontH, cutAncho: innerW - 4, cutEspesor: T
+      type: 'drawer', cutLargo: frontH, cutAncho: innerW - 4, cutEspesor: T, grainDirection: 'horizontal'
     });
     
-    parts.push({ id: `${prefix}-lat-izq`, name: `Lateral Izq. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerH, cutEspesor: T });
-    parts.push({ id: `${prefix}-lat-der`, name: `Lateral Der. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerH, cutEspesor: T });
-    parts.push({ id: `${prefix}-trasera`, name: `Trasera Cajón ${i+1}`, width: drawerW - 2*T, height: drawerH, depth: T, x: W/2, y: posY, z: D/2 - drawerD + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerH, cutEspesor: T });
-    parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, x: W/2, y: posY - drawerH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer', cutLargo: drawerD - T, cutAncho: drawerW - 2*T, cutEspesor: 3 });
+    parts.push({ id: `${prefix}-lat-izq`, name: `Lateral Izq. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-lat-der`, name: `Lateral Der. Cajón ${i+1}`, width: T, height: drawerH, depth: drawerD, x: W/2 + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-trasera`, name: `Trasera Cajón ${i+1}`, width: drawerW - 2*T, height: drawerH, depth: T, x: W/2, y: posY, z: D/2 - drawerD + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerH, cutEspesor: T, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-piso`, name: `Piso Cajón ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD - T, x: W/2, y: posY - drawerH/2 + 1.5, z: D/2 - drawerD/2 + T/2, type: 'drawer', cutLargo: drawerD - T, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
 
     parts.push({ 
       id: `${prefix}-riel-izq`, name: `Riel Telescópico ${drawerD}mm`, 
       width: 13, height: 35, depth: drawerD, 
       x: T + 6.5, y: posY, z: D/2 - drawerD/2, 
-      type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0
+      type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
     });
     parts.push({ 
       id: `${prefix}-riel-der`, name: `Riel Telescópico ${drawerD}mm`, 
       width: 13, height: 35, depth: drawerD, 
       x: W - T - 6.5, y: posY, z: D/2 - drawerD/2, 
-      type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0
+      type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre'
     });
   }
 
@@ -66,7 +66,7 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     y: baseCajoneraY,
     z: 0,
     type: 'static',
-    cutLargo: innerW, cutAncho: D, cutEspesor: T
+    cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal'
   });
 
   const doorH = H - baseCajoneraY - T/2 - gap;
@@ -77,15 +77,15 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     id: 'door-L', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, 
     x: doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-left',
     pivot: { x: 0, y: doorY, z: D / 2 },
-    cutLargo: doorH, cutAncho: doorW, cutEspesor: T
+    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical'
   });
 
   parts.push({ 
     id: 'door-R', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, 
     x: W - doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-right',
     pivot: { x: W, y: doorY, z: D / 2 },
-    cutLargo: doorH, cutAncho: doorW, cutEspesor: T
+    cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical'
   });
 
-  return { parts, summary: 'Placard Red Arquimax con módulo de cajones y base estructural.' };
+  return { parts, summary: 'Placard Red Arquimax con módulo de cajones y base estructural.', hasDoors: true, hasDrawers: true };
 }

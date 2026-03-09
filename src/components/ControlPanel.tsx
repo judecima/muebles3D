@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -6,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { FurnitureType, FurnitureDimensions, FurnitureColor } from '@/lib/types';
 import { 
-  Box, 
   DoorOpen, 
   DoorClosed, 
   MoveHorizontal, 
@@ -17,20 +16,33 @@ import {
   Palette,
   Settings2,
   Undo2,
-  FileDown
+  FileDown,
+  Layout
 } from 'lucide-react';
 
 interface ControlPanelProps {
   type: FurnitureType;
   dimensions: FurnitureDimensions;
   color: FurnitureColor;
+  hasDoors: boolean;
+  hasDrawers: boolean;
   onTypeChange: (val: FurnitureType) => void;
   onDimensionsChange: (dim: FurnitureDimensions) => void;
   onColorChange: (color: FurnitureColor) => void;
   onAction: (action: string) => void;
 }
 
-export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensionsChange, onColorChange, onAction }: ControlPanelProps) {
+export function ControlPanel({ 
+  type, 
+  dimensions, 
+  color, 
+  hasDoors, 
+  hasDrawers,
+  onTypeChange, 
+  onDimensionsChange, 
+  onColorChange, 
+  onAction 
+}: ControlPanelProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     onDimensionsChange({ ...dimensions, [name]: parseFloat(value) || 0 });
@@ -40,8 +52,13 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
     onDimensionsChange({ ...dimensions, width: values[0] });
   };
 
-  const isHeightFixed = type === 'rackTV' || type === 'escritorio';
+  const handleTopToggle = (checked: boolean) => {
+    onDimensionsChange({ ...dimensions, hasTop: checked });
+  };
+
+  const isHeightFixed = type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada';
   const isWidthSlider = type === 'escritorio';
+  const canHaveTop = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca';
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -107,7 +124,7 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-[10px] font-bold uppercase text-slate-500">
-                Alto (mm) {isHeightFixed && <span className="text-primary-600">(Fijo)</span>}
+                Alto (mm) {isHeightFixed && <span className="text-primary/60">(Fijo)</span>}
               </Label>
               <Input 
                 name="height" 
@@ -122,11 +139,17 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
               <Label className="text-[10px] font-bold uppercase text-slate-500">Prof. (mm)</Label>
               <Input name="depth" type="number" value={dimensions.depth} onChange={handleChange} className="h-9 border-slate-200" />
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-bold uppercase text-slate-500">Espesor (mm)</Label>
-              <Input name="thickness" type="number" value={dimensions.thickness} onChange={handleChange} className="h-9 border-slate-200" />
-            </div>
           </div>
+
+          {canHaveTop && (
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <div className="flex items-center gap-2">
+                <Layout className="w-4 h-4 text-slate-500" />
+                <Label className="text-xs font-bold uppercase text-slate-600">Tapa Superior</Label>
+              </div>
+              <Switch checked={dimensions.hasTop} onCheckedChange={handleTopToggle} />
+            </div>
+          )}
         </div>
 
         {/* Color */}
@@ -156,31 +179,35 @@ export function ControlPanel({ type, dimensions, color, onTypeChange, onDimensio
         </div>
 
         <div className="pt-4 border-t border-slate-100 space-y-4">
-          {/* Puertas */}
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase text-slate-400">Sistema de Puertas</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('open-doors')}>
-                <DoorOpen className="w-3.5 h-3.5 mr-1" /> Abrir (90°)
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('close-doors')}>
-                <DoorClosed className="w-3.5 h-3.5 mr-1" /> Cerrar
-              </Button>
+          {/* Puertas - Condicional */}
+          {hasDoors && (
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase text-slate-400">Sistema de Puertas</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('open-doors')}>
+                  <DoorOpen className="w-3.5 h-3.5 mr-1" /> Abrir (90°)
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('close-doors')}>
+                  <DoorClosed className="w-3.5 h-3.5 mr-1" /> Cerrar
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Cajones */}
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase text-slate-400">Sistema de Cajones</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('open-drawers')}>
-                <MoveHorizontal className="w-3.5 h-3.5 mr-1" /> Extraer
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('close-drawers')}>
-                <MoveHorizontal className="w-3.5 h-3.5 mr-1" /> Retraer
-              </Button>
+          {/* Cajones - Condicional */}
+          {hasDrawers && (
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase text-slate-400">Sistema de Cajones</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('open-drawers')}>
+                  <MoveHorizontal className="w-3.5 h-3.5 mr-1" /> Extraer
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => onAction('close-drawers')}>
+                  <MoveHorizontal className="w-3.5 h-3.5 mr-1" /> Retraer
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Explosión */}
           <div className="space-y-2 pt-2">

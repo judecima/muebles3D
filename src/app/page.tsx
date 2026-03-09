@@ -5,7 +5,7 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { FurnitureViewer } from '@/components/FurnitureViewer';
 import { CutlistTable } from '@/components/CutlistTable';
 import { OptimizerPanel } from '@/components/OptimizerPanel';
-import { FurnitureType, FurnitureDimensions, Part, FurnitureColor, AVAILABLE_PANELS, PanelSize } from '@/lib/types';
+import { FurnitureType, FurnitureDimensions, Part, FurnitureColor, AVAILABLE_PANELS, PanelSize, FurnitureModel } from '@/lib/types';
 import { 
   FileDown,
   LayoutGrid,
@@ -28,12 +28,12 @@ import { closetEngine } from '@/engines/closetEngine';
 import { bookshelfEngine } from '@/engines/bookshelfEngine';
 
 const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
-  bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18 },
+  bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18, hasTop: false },
   rackTV: { width: 1600, height: 500, depth: 400, thickness: 18 },
   escritorio: { width: 1200, height: 750, depth: 600, thickness: 18 },
-  alacena: { width: 800, height: 600, depth: 320, thickness: 18 },
+  alacena: { width: 800, height: 600, depth: 320, thickness: 18, hasTop: true },
   placard: { width: 1800, height: 2100, depth: 600, thickness: 18 },
-  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18 },
+  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasTop: true },
 };
 
 export default function Home() {
@@ -43,6 +43,8 @@ export default function Home() {
   const [dimensions, setDimensions] = useState<FurnitureDimensions>(DEFAULT_DIMENSIONS.bajoMesada);
   const [action, setAction] = useState<string>('');
   const [parts, setParts] = useState<Part[]>([]);
+  const [hasDoors, setHasDoors] = useState(false);
+  const [hasDrawers, setHasDrawers] = useState(false);
   const [selectedPanel, setSelectedPanel] = useState<PanelSize>(AVAILABLE_PANELS[0]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -51,11 +53,11 @@ export default function Home() {
   // Efecto para resetear dimensiones cuando cambia el tipo de mueble
   useEffect(() => {
     setDimensions(DEFAULT_DIMENSIONS[type]);
-    setAction('reset'); // Asegurar que el visor se limpie o resetee
+    setAction('reset');
   }, [type]);
 
   const generateFurniture = () => {
-    let result;
+    let result: FurnitureModel;
     switch (type) {
       case 'bajoMesada': result = kitchenBaseEngine(dimensions); break;
       case 'escritorio': result = deskEngine(dimensions); break;
@@ -63,9 +65,11 @@ export default function Home() {
       case 'alacena': result = kitchenWallEngine(dimensions); break;
       case 'placard': result = closetEngine(dimensions); break;
       case 'biblioteca': result = bookshelfEngine(dimensions); break;
-      default: result = { parts: [] };
+      default: result = { parts: [], summary: '', hasDoors: false, hasDrawers: false };
     }
     setParts(result.parts);
+    setHasDoors(result.hasDoors);
+    setHasDrawers(result.hasDrawers);
   };
 
   useEffect(() => {
@@ -122,6 +126,8 @@ export default function Home() {
           type={type} 
           dimensions={dimensions} 
           color={color}
+          hasDoors={hasDoors}
+          hasDrawers={hasDrawers}
           onTypeChange={setType} 
           onDimensionsChange={setDimensions} 
           onColorChange={setColor}
@@ -149,6 +155,8 @@ export default function Home() {
                     type={type} 
                     dimensions={dimensions} 
                     color={color}
+                    hasDoors={hasDoors}
+                    hasDrawers={hasDrawers}
                     onTypeChange={(v) => { setType(v); setIsMobileMenuOpen(false); }} 
                     onDimensionsChange={setDimensions} 
                     onColorChange={setColor}

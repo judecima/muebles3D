@@ -28,11 +28,14 @@ export interface FurnitureDimensions {
   height: number;
   depth: number;
   thickness: number;
+  hasTop?: boolean; // Opción para tapa superior
 }
 
 export interface FurnitureModel {
   parts: Part[];
   summary: string;
+  hasDoors: boolean;
+  hasDrawers: boolean;
 }
 
 export interface PanelSize {

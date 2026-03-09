@@ -41,5 +41,5 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ id: `${prefix}-rail-R`, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: W - T - 6.5, y: posY, z: D / 2 - drawerD / 2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0 });
   }
 
-  return { parts, summary: 'Escritorio profesional Red Arquimax con módulo de cajonera estructural.' };
+  return { parts, summary: 'Escritorio profesional Red Arquimax con módulo de cajonera estructural.', hasDoors: false, hasDrawers: true };
 }

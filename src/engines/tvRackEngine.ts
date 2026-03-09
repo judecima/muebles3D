@@ -47,5 +47,5 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   });
 
-  return { parts, summary: 'Rack TV Red Arquimax con altura fija de 500mm y cajones técnicos.' };
+  return { parts, summary: 'Rack TV Red Arquimax con altura fija de 500mm y cajones técnicos.', hasDoors: false, hasDrawers: true };
 }
