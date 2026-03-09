@@ -7,14 +7,15 @@ import { CutlistTable } from '@/components/CutlistTable';
 import { FurnitureType, FurnitureDimensions, Part, FurnitureColor } from '@/lib/types';
 import { 
   Menu, 
-  X, 
   Info,
   Maximize2
 } from 'lucide-react';
 import { 
   Sheet, 
   SheetContent, 
-  SheetTrigger 
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 
@@ -94,6 +95,9 @@ export default function Home() {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-80">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Panel de Configuración de Mueble</SheetTitle>
+            </SheetHeader>
             <ControlPanel 
               type={type} 
               dimensions={dimensions} 
