@@ -84,26 +84,57 @@ export class SceneManager {
       let target: THREE.Object3D | null = object;
 
       // Buscar el contenedor que tenga el tipo de parte (puerta o cajón)
-      while (target && !target.userData.type && target.parent) {
+      while (target && !target.userData.type && target.parent && target !== this.furnitureGroup) {
         target = target.parent;
       }
 
       if (target && target.userData.type) {
+        const id = target.userData.id as string;
         const type = target.userData.type;
-        const isOpen = this.partsState.get(target.uuid) || false;
 
         if (type === 'door-left' || type === 'door-right') {
-          const angle = (type === 'door-left' ? -Math.PI / 2 : Math.PI / 2);
-          target.rotation.y = isOpen ? 0 : angle;
-          this.partsState.set(target.uuid, !isOpen);
+          this.toggleDoor(id);
         } else if (type === 'drawer') {
-          const originalPos = target.userData.originalPosition as THREE.Vector3;
-          target.position.z = isOpen ? originalPos.z : originalPos.z + 400;
-          this.partsState.set(target.uuid, !isOpen);
+          this.toggleDrawer(id);
         }
       }
     }
   };
+
+  public toggleDoor(id: string) {
+    const obj = this.partsMap.get(id);
+    if (!obj) return;
+    const type = obj.userData.type;
+    if (type !== 'door-left' && type !== 'door-right') return;
+    
+    const isOpen = this.partsState.get(obj.uuid) || false;
+    const nextState = !isOpen;
+    const angle = (type === 'door-left' ? -Math.PI / 2 : Math.PI / 2);
+    obj.rotation.y = nextState ? angle : 0;
+    this.partsState.set(obj.uuid, nextState);
+  }
+
+  public toggleDrawer(id: string) {
+    const target = this.partsMap.get(id);
+    if (!target || target.userData.type !== 'drawer') return;
+
+    // Identificar el ID base del cajón (ej. "cajon-0" de "cajon-0-frente")
+    const lastDashIndex = id.lastIndexOf('-');
+    const drawerBaseId = lastDashIndex !== -1 ? id.substring(0, lastDashIndex) : id;
+    
+    const isOpen = this.partsState.get(target.uuid) || false;
+    const nextState = !isOpen;
+
+    // Mover todas las piezas que pertenecen a este cajón específico
+    this.partsMap.forEach((obj) => {
+      const objId = obj.userData.id as string;
+      if (obj.userData.type === 'drawer' && (objId === drawerBaseId || objId.startsWith(drawerBaseId + '-'))) {
+        const originalPos = obj.userData.originalPosition as THREE.Vector3;
+        obj.position.z = nextState ? originalPos.z + 400 : originalPos.z;
+        this.partsState.set(obj.uuid, nextState);
+      }
+    });
+  }
 
   private onWindowResize(container: HTMLElement) {
     if (!container) return;
@@ -196,6 +227,7 @@ export class SceneManager {
         mesh.position.set(offsetX, 0, part.z - part.pivot.z);
         hingeGroup.add(mesh);
         hingeGroup.userData.type = part.type;
+        hingeGroup.userData.id = part.id;
         hingeGroup.userData.originalPosition = hingeGroup.position.clone();
         this.furnitureGroup.add(hingeGroup);
         this.partsMap.set(part.id, hingeGroup);
