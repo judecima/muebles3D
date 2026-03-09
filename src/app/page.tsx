@@ -27,22 +27,32 @@ import { kitchenWallEngine } from '@/engines/kitchenWallEngine';
 import { closetEngine } from '@/engines/closetEngine';
 import { bookshelfEngine } from '@/engines/bookshelfEngine';
 
+const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
+  bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18 },
+  rackTV: { width: 1600, height: 500, depth: 400, thickness: 18 },
+  escritorio: { width: 1200, height: 750, depth: 600, thickness: 18 },
+  alacena: { width: 800, height: 600, depth: 320, thickness: 18 },
+  placard: { width: 1800, height: 2100, depth: 600, thickness: 18 },
+  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18 },
+};
+
 export default function Home() {
   const [view, setView] = useState<'3d' | 'optimize'>('3d');
   const [type, setType] = useState<FurnitureType>('bajoMesada');
   const [color, setColor] = useState<FurnitureColor>('alarce-blanco');
-  const [dimensions, setDimensions] = useState<FurnitureDimensions>({
-    width: 1200,
-    height: 870,
-    depth: 600,
-    thickness: 18,
-  });
+  const [dimensions, setDimensions] = useState<FurnitureDimensions>(DEFAULT_DIMENSIONS.bajoMesada);
   const [action, setAction] = useState<string>('');
   const [parts, setParts] = useState<Part[]>([]);
   const [selectedPanel, setSelectedPanel] = useState<PanelSize>(AVAILABLE_PANELS[0]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
+
+  // Efecto para resetear dimensiones cuando cambia el tipo de mueble
+  useEffect(() => {
+    setDimensions(DEFAULT_DIMENSIONS[type]);
+    setAction('reset'); // Asegurar que el visor se limpie o resetee
+  }, [type]);
 
   const generateFurniture = () => {
     let result;
@@ -101,7 +111,7 @@ export default function Home() {
       headStyles: { fillColor: BRAND_COLOR }
     });
 
-    doc.save('mueble-red-arquimax.pdf');
+    doc.save(`mueble-red-arquimax-${type}.pdf`);
   };
 
   return (

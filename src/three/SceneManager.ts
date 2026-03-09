@@ -13,7 +13,6 @@ export class SceneManager {
   private mouse = new THREE.Vector2();
   private container: HTMLElement;
 
-  // Estados de apertura individuales
   private itemStates: Map<string, boolean> = new Map();
 
   private colors = {
@@ -37,7 +36,11 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
-    container.appendChild(this.renderer.domElement);
+    // Limpiar contenedor antes de añadir el canvas para evitar duplicados
+    while (this.container.firstChild) {
+      this.container.removeChild(this.container.firstChild);
+    }
+    this.container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -57,7 +60,7 @@ export class SceneManager {
 
     this.animate();
     this.initInteraction();
-    window.addEventListener('resize', () => this.onWindowResize());
+    window.addEventListener('resize', this.onWindowResize);
   }
 
   private initInteraction() {
@@ -71,7 +74,6 @@ export class SceneManager {
 
       if (intersects.length > 0) {
         let object = intersects[0].object;
-        // Subir al grupo si es un pivote de puerta
         while (object.parent && object.parent !== this.furnitureGroup && !object.userData.id) {
           object = object.parent;
         }
@@ -82,7 +84,6 @@ export class SceneManager {
         if (type?.includes('door')) {
           this.toggleDoor(id);
         } else if (type === 'drawer') {
-          // Extraer el prefijo del grupo de cajón (ej. cajon-0)
           const groupId = id.split('-').slice(0, 2).join('-');
           this.toggleDrawer(groupId);
         }
@@ -112,22 +113,26 @@ export class SceneManager {
     });
   }
 
-  private onWindowResize() {
+  private onWindowResize = () => {
+    if (!this.container || !this.camera || !this.renderer) return;
     this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-  }
+  };
 
   private animate = () => {
+    if (!this.renderer || !this.scene || !this.camera) return;
     requestAnimationFrame(this.animate);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   };
 
   public async buildFurniture(parts: Part[], color: FurnitureColor) {
+    // Limpieza profunda de la escena
     while (this.furnitureGroup.children.length > 0) {
-      this.disposeObject(this.furnitureGroup.children[0]);
-      this.furnitureGroup.remove(this.furnitureGroup.children[0]);
+      const child = this.furnitureGroup.children[0];
+      this.disposeObject(child);
+      this.furnitureGroup.remove(child);
     }
     this.partsMap.clear();
     this.itemStates.clear();
@@ -196,7 +201,6 @@ export class SceneManager {
   }
 
   public setDrawers(open: boolean) {
-    // Identificar prefijos únicos de cajones
     const drawerGroups = new Set<string>();
     this.partsMap.forEach((obj, id) => {
       if (obj.userData.type === 'drawer') {
@@ -236,6 +240,7 @@ export class SceneManager {
   }
 
   public getScreenshot(): string {
+    if (!this.renderer || !this.scene || !this.camera) return '';
     this.renderer.render(this.scene, this.camera);
     return this.renderer.domElement.toDataURL('image/png');
   }
@@ -251,7 +256,15 @@ export class SceneManager {
   }
 
   public dispose() {
-    this.renderer.dispose();
-    this.controls.dispose();
+    window.removeEventListener('resize', this.onWindowResize);
+    if (this.renderer) {
+      this.renderer.dispose();
+      if (this.renderer.domElement && this.renderer.domElement.parentNode) {
+        this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+      }
+    }
+    if (this.controls) this.controls.dispose();
+    this.partsMap.clear();
+    this.itemStates.clear();
   }
 }
