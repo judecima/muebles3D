@@ -88,14 +88,13 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Home className="w-5 h-5 text-blue-400" /> 
-            <span>Steel Framing v2.5</span>
+            <span>Steel Framing v2.8</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal">DISEÑO PARAMÉTRICO GLOBAL</span>
+          <span className="text-[10px] opacity-70 font-normal">INGENIERÍA ESTRUCTURAL</span>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="space-y-6 pt-6 px-4 pb-20">
-        {/* Dimensiones Globales */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
             <Maximize2 className="w-4 h-4 text-blue-500" />
@@ -125,7 +124,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
 
         <Separator />
 
-        {/* Capas de Visualización */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
             <Layers className="w-4 h-4 text-primary" />
@@ -147,16 +145,16 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                 <Label htmlFor="ext-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Exteriores</Label>
               </div>
               <div className="flex items-center gap-2">
-                <Checkbox id="int-pan" checked={config.layers.interiorPanels} onCheckedChange={() => toggleLayer('interiorPanels')} />
-                <Label htmlFor="int-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Interiores</Label>
-              </div>
-              <div className="flex items-center gap-2">
                 <Checkbox id="profiles" checked={config.layers.steelProfiles} onCheckedChange={() => toggleLayer('steelProfiles')} />
                 <Label htmlFor="profiles" className="text-[10px] font-bold uppercase cursor-pointer">Perfilería (PGC/PGU)</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox id="bracing" checked={config.layers.crossBracing} onCheckedChange={() => toggleLayer('crossBracing')} />
                 <Label htmlFor="bracing" className="text-[10px] font-bold uppercase cursor-pointer text-red-500">Cruces San Andrés</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="blocking" checked={config.layers.horizontalBlocking} onCheckedChange={() => toggleLayer('horizontalBlocking')} />
+                <Label htmlFor="blocking" className="text-[10px] font-bold uppercase cursor-pointer text-amber-600">Rigidizadores / Blocking</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox id="lintels" checked={config.layers.lintels} onCheckedChange={() => toggleLayer('lintels')} />

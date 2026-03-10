@@ -25,7 +25,7 @@ export class SteelSceneManager {
   private moveDown = false;
   private isShiftPressed = false;
   
-  // Rotación (Mirar) - Ahora controlada por Teclas de Flecha o Joysticks
+  // Rotación (Mirar)
   private lookUp = false;
   private lookDown = false;
   private lookLeft = false;
@@ -52,6 +52,7 @@ export class SteelSceneManager {
     openingHover: 0x3b82f6,
     steel: 0x9ca3af, 
     bracing: 0xef4444, 
+    blocking: 0xd97706, // Rigidizadores
     lintel: 0x2563eb,  
     panel_ext: 0x94a3b8,
     panel_int: 0xe2e8f0
@@ -114,7 +115,25 @@ export class SteelSceneManager {
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
+    
+    // Listener de mirada manual si pointer lock no está disponible
+    this.renderer.domElement.addEventListener('mousemove', this.onMouseMove);
   }
+
+  private onMouseMove = (event: MouseEvent) => {
+    if (!this.isWalkModeActive) return;
+    
+    // Si no tenemos pointer lock activo, permitimos rotar si el botón está presionado o simplemente por movimiento
+    // En sandbox usualmente Pointer Lock falla, así que usamos el delta del mouse directamente
+    if (!document.pointerLockElement) {
+      const movementX = event.movementX || 0;
+      const movementY = event.movementY || 0;
+      
+      this.camera.rotation.y -= movementX * 0.002;
+      this.camera.rotation.x -= movementY * 0.002;
+      this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
+    }
+  };
 
   private onKeyDown = (event: KeyboardEvent) => {
     if (!this.isWalkModeActive) return;
@@ -176,7 +195,21 @@ export class SteelSceneManager {
     this.controls.enabled = false;
     if (this.onWalkModeLock) this.onWalkModeLock(true);
 
-    // Teletransporte al centro de la casa
+    // Intentar bloqueo de ratón con blindaje de seguridad
+    try {
+      if (this.renderer.domElement.requestPointerLock) {
+        // En Next.js 15 / Turbopack dentro de Sandbox, esto puede fallar.
+        // Lo envolvemos para evitar que el error rompa el flujo.
+        const promise = this.renderer.domElement.requestPointerLock();
+        if (promise && (promise as any).catch) {
+          (promise as any).catch(() => {});
+        }
+      }
+    } catch (e) {
+      // Ignorar error de sandbox
+    }
+
+    // Teletransporte al centro
     this.houseGroup.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
@@ -225,20 +258,17 @@ export class SteelSceneManager {
     const delta = Math.min((time - this.prevTime) / 1000, 0.1);
 
     if (this.isWalkModeActive) {
-      // Rotación por teclado (Flechas)
       const rotationSpeed = 1.8 * delta;
       if (this.lookLeft) this.camera.rotation.y += rotationSpeed;
       if (this.lookRight) this.camera.rotation.y -= rotationSpeed;
       if (this.lookUp) this.camera.rotation.x += rotationSpeed;
       if (this.lookDown) this.camera.rotation.x -= rotationSpeed;
       
-      // Rotación por Joystick
       if (this.joystickLook.lengthSq() > 0) {
         this.camera.rotation.y -= this.joystickLook.x * 3.5 * delta;
         this.camera.rotation.x += this.joystickLook.y * 3.5 * delta;
       }
       
-      // Limitar mirada vertical
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
 
       this.velocity.x -= this.velocity.x * 10.0 * delta;
@@ -353,10 +383,12 @@ export class SteelSceneManager {
     structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
 
     const studHeight = wall.height - (this.profileFlange * 2);
+    const studPositions: number[] = [];
     
     const addStud = (posX: number, color?: number) => {
       const validX = Math.min(Math.max(0, posX), wall.length - this.profileFlange);
       structuralGroup.add(this.createProfile(studHeight, validX, this.profileFlange, 90, 'PGC', color));
+      studPositions.push(validX);
     };
 
     // Montantes de encuentro (Extremos)
@@ -383,23 +415,18 @@ export class SteelSceneManager {
       const opTop = sill + op.height;
 
       if (layers.lintels) {
-        // King Studs
         addStud(op.position - this.profileFlange);
         addStud(op.position + op.width);
 
-        // Jack Studs
         structuralGroup.add(this.createProfile(opTop - this.profileFlange, op.position, this.profileFlange, 90, 'PGC', this.colors.steel));
         structuralGroup.add(this.createProfile(opTop - this.profileFlange, op.position + op.width - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.steel));
 
-        // Dintel
         structuralGroup.add(this.createProfile(op.width, op.position, opTop, 0, 'PGU', this.colors.lintel));
 
-        // Umbral (si es ventana)
         if (op.type === 'window') {
           structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
         }
 
-        // Cripples
         const crippleSpacing = wall.studSpacing;
         for (let x = op.position + crippleSpacing; x < op.position + op.width - this.profileFlange; x += crippleSpacing) {
           structuralGroup.add(this.createProfile(wall.height - opTop - this.profileFlange, x, opTop + this.profileFlange, 90, 'PGC'));
@@ -412,6 +439,10 @@ export class SteelSceneManager {
 
     if (layers.crossBracing) {
       this.addSmartCrossBracing(wall, structuralGroup);
+    }
+
+    if (layers.horizontalBlocking) {
+      this.addHorizontalBlocking(wall, structuralGroup, studPositions);
     }
   }
 
@@ -438,6 +469,41 @@ export class SteelSceneManager {
     mesh.receiveShadow = true;
     
     return mesh;
+  }
+
+  private addHorizontalBlocking(wall: SteelWall, group: THREE.Group, studX: number[]) {
+    // Rigidizadores a H/2
+    const blockingY = wall.height / 2;
+    const sortedStuds = [...new Set(studX)].sort((a, b) => a - b);
+    
+    const blockingMat = new THREE.MeshStandardMaterial({ 
+      color: this.colors.blocking,
+      metalness: 0.7,
+      roughness: 0.3
+    });
+
+    for (let i = 0; i < sortedStuds.length - 1; i++) {
+      const xStart = sortedStuds[i] + this.profileFlange;
+      const xEnd = sortedStuds[i+1];
+      const gap = xEnd - xStart;
+
+      if (gap > 10) {
+        // Verificar si este segmento atraviesa una abertura
+        const midX = (xStart + xEnd) / 2;
+        const inOpening = wall.openings.some(op => {
+          const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+          const top = sill + op.height;
+          return midX > op.position && midX < (op.position + op.width) && blockingY > sill && blockingY < top;
+        });
+
+        if (!inOpening) {
+          const geom = new THREE.BoxGeometry(gap, this.profileFlange, this.profileWidth - 10);
+          const mesh = new THREE.Mesh(geom, blockingMat);
+          mesh.position.set(xStart + gap / 2, blockingY, 0);
+          group.add(mesh);
+        }
+      }
+    }
   }
 
   private addSmartCrossBracing(wall: SteelWall, group: THREE.Group) {
