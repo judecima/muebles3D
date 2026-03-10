@@ -1,8 +1,8 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Rack TV Red Arquimax v14.0
- * Construcción sándwich: Tapa y Base de ancho completo.
+ * Motor para Rack TV Red Arquimax v14.1
+ * Construcción sándwich: Tapa y Base W. Incluye Rieles Telescópicos.
  */
 export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, depth: D, thickness: T } = dim;
@@ -70,5 +70,5 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: config.railRX, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   });
 
-  return { parts, summary: 'Rack TV estructural con sistema sándwich y frentes overlay.', hasDoors: false, hasDrawers: true };
+  return { parts, summary: 'Rack TV v14.1: Estructura sándwich reforzada y frentes overlay.', hasDoors: false, hasDrawers: true };
 }
