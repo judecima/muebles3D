@@ -36,10 +36,10 @@ const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(2) Lateral V1/V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
   { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
-  { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-  { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
   { name: "(15) Divisor", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
   { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
+  { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+  { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
   { name: "(22) Contrafrente", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
   { name: "(24) Taco", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
 ];
@@ -195,8 +195,8 @@ export default function TestOptimizerPage() {
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
                   {loading ? "Simulando 10,000 permutaciones industriales..." : 
-                   result?.totalPanels === 1 ? "¡ÉXITO INDUSTRIAL! El algoritmo v9.0 ha consolidado todas las piezas en un solo panel de 2750x1830." : 
-                   "Dataset procesado. Se requiere más de un panel para mantener la viabilidad de guillotina."}
+                   result?.totalPanels === 1 ? "¡ÉXITO INDUSTRIAL! El algoritmo v9.0 ha consolidado todas las piezas en un solo panel de 2750x1830 mm." : 
+                   "Dataset procesado. El motor optimiza el flujo de corte para maximizar la densidad global."}
                 </p>
               </Card>
             </div>
