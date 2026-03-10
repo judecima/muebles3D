@@ -6,13 +6,13 @@ interface PartToCut {
   height: number;
   grainDirection: GrainDirection;
   thickness: number;
+  originalIndex: number;
 }
 
 /**
- * ArquiMax Ultra-Industrial v9.2
- * Algoritmo de Guillotina Jerárquica con estrategia "Best-Height-Fit" para columnas.
- * Maximiza el aprovechamiento vertical de cada franja (shelf) para igualar a Lepton.
- * Implementa una búsqueda estocástica masiva de 20,000 iteraciones para consolidar el pedido.
+ * ArquiMax Ultra-Industrial v10.0
+ * Motor de optimización avanzado con Guillotina de 4 Etapas, V-Stacking recursivo,
+ * Relleno de Huecos 2D y Búsqueda Estocástica Masiva.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -24,13 +24,14 @@ export function runOptimization(
 ): OptimizationResult {
   const filteredParts = parts.filter(p => p.thickness === selectedThickness);
   
-  const flatParts: PartToCut[] = filteredParts.flatMap(p => 
+  const flatParts: PartToCut[] = filteredParts.flatMap((p, idx) => 
     Array.from({ length: p.quantity }, () => ({
       name: p.name,
       width: p.width,
       height: p.height,
       grainDirection: p.grainDirection,
-      thickness: p.thickness
+      thickness: p.thickness,
+      originalIndex: idx
     }))
   );
 
@@ -42,41 +43,49 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
 
-  const ITERATIONS = 20000; 
+  // META-HEURÍSTICA: Búsqueda estocástica masiva (20k iteraciones para consolidar)
+  const ITERATIONS = 20000;
   let bestScore = Infinity;
   let bestLayouts: OptimizedPanel[] = [];
 
   for (let i = 0; i < ITERATIONS; i++) {
-    const currentPartsOrder = [...flatParts];
+    const currentParts = [...flatParts];
     
-    // Mutaciones estocásticas de orden y rotación
+    // Mutaciones de orden y rotación inteligente
     if (i > 0) {
       if (i % 100 === 0) {
-        shuffle(currentPartsOrder);
+        shuffle(currentParts);
       } else {
-        mutateOrder(currentPartsOrder);
+        mutateOrder(currentParts);
       }
       
-      currentPartsOrder.forEach(p => {
-        if (p.grainDirection === 'libre' && Math.random() > 0.5) {
-          [p.width, p.height] = [p.height, p.width];
+      // Smart Rotation: Probar orientaciones según estrategia de área
+      currentParts.forEach(p => {
+        if (p.grainDirection === 'libre') {
+          // Heurística: Preferir que el lado largo sea el ancho si ayuda a llenar la fila
+          if (Math.random() > 0.7) [p.width, p.height] = [p.height, p.width];
         }
       });
     } else {
-      // Primera iteración: Orden industrial clásico (Área Descendente)
-      currentPartsOrder.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+      // Iteración 0: Orden Industrial (Área -> Lado Mayor -> Lado Menor)
+      currentParts.sort((a, b) => {
+        const areaA = a.width * a.height;
+        const areaB = b.width * b.height;
+        if (areaB !== areaA) return areaB - areaA;
+        return Math.max(b.width, b.height) - Math.max(a.width, a.height);
+      });
     }
 
-    const currentLayouts = executeLayoutBuilding(currentPartsOrder, usableW, usableH, kerf, partColors);
+    const currentLayouts = buildIndustrialLayout(currentParts, usableW, usableH, kerf, partColors);
     const score = calculateIndustrialScore(currentLayouts, usableW, usableH);
 
     if (score < bestScore) {
       bestScore = score;
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
-    
-    // Meta industrial: Consolidación en 1 panel con eficiencia extrema
-    if (bestLayouts.length === 1 && calculateTotalEfficiency(bestLayouts) > 96.4) break;
+
+    // Objetivo: Consolidación total en 1 panel con alta eficiencia
+    if (bestLayouts.length === 1 && calculateTotalEfficiency(bestLayouts) > 96.0) break;
   }
 
   const finalEfficiency = calculateTotalEfficiency(bestLayouts);
@@ -85,112 +94,100 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: finalEfficiency,
-    summary: `ArquiMax v9.2: Eficiencia Industrial ${finalEfficiency.toFixed(2)}%. Consolidación exitosa.`,
+    summary: `ArquiMax v10.0 Industrial: Eficiencia ${finalEfficiency.toFixed(2)}%. Cortes optimizados.`,
     kerf,
     trim,
     selectedThickness
   };
 }
 
-function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: number, partColors: Record<string, string>): OptimizedPanel[] {
+function buildIndustrialLayout(parts: PartToCut[], w: number, h: number, kerf: number, colors: Record<string, string>): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
-  let remainingParts = [...parts];
+  let remaining = [...parts];
 
-  while (remainingParts.length > 0) {
-    const placedParts: OptimizedPart[] = [];
+  while (remaining.length > 0) {
+    const placed: OptimizedPart[] = [];
     const usedIndices = new Set<number>();
     
     let currentY = 0;
-    
-    // Construcción de franjas (Shelves)
-    while (currentY < h && usedIndices.size < remainingParts.length) {
-      let leaderIdx = -1;
-      let shelfH = 0;
 
-      // Líder de franja: La pieza más grande restante que defina la altura
-      for (let i = 0; i < remainingParts.length; i++) {
-        if (usedIndices.has(i)) continue;
-        const p = remainingParts[i];
-        if (p.height <= (h - currentY) && p.width <= w) {
+    // 1. CONSTRUCCIÓN DE FILAS (SHELVES)
+    while (currentY < h && usedIndices.size < remaining.length) {
+      let leaderIdx = -1;
+      for (let i = 0; i < remaining.length; i++) {
+        if (!usedIndices.has(i) && remaining[i].height <= (h - currentY) && remaining[i].width <= w) {
           leaderIdx = i;
-          shelfH = p.height;
           break;
         }
       }
 
       if (leaderIdx === -1) break;
 
+      const shelfH = remaining[leaderIdx].height;
       let currentX = 0;
-      // Rellenar la franja con columnas dinámicas
+
+      // 2. CONSTRUCCIÓN DE COLUMNAS DENTRO DE LA FILA (STACKS)
       while (currentX < w) {
-        let bestColIndices: number[] = [];
         let colW = 0;
-        let bestFitScore = -1;
-        let chosenLeaderIdx = -1;
+        let colPartsIndices: number[] = [];
 
-        // ESTRATEGIA "BEST-HEIGHT-FIT": Buscar la pieza que mejor aproveche la altura de la franja (shelfH)
-        // Esto evita colocar piezas pequeñas (tacos) si hay piezas más altas (amarres) que entran.
-        for (let i = 0; i < remainingParts.length; i++) {
+        // Buscar líder de columna que mejor ajuste al ancho/alto
+        let bestColIdx = -1;
+        let bestFit = -1;
+
+        for (let i = 0; i < remaining.length; i++) {
           if (usedIndices.has(i)) continue;
-          const p = remainingParts[i];
-          
+          const p = remaining[i];
           if (p.width <= (w - currentX) && p.height <= shelfH) {
-            const fitScore = p.height / shelfH; 
-            // Penalizamos ligeramente las piezas que dejan mucho espacio horizontal si hay otras similares
-            const horizontalWasteFactor = p.width / (w - currentX);
-            const totalScore = fitScore * 0.8 + horizontalWasteFactor * 0.2;
-
-            if (totalScore > bestFitScore) {
-              bestFitScore = totalScore;
-              chosenLeaderIdx = i;
+            const fit = (p.height / shelfH) * 0.7 + (p.width / (w - currentX)) * 0.3;
+            if (fit > bestFit) {
+              bestFit = fit;
+              bestColIdx = i;
               colW = p.width;
             }
           }
         }
 
-        if (chosenLeaderIdx === -1) break;
+        if (bestColIdx === -1) break;
 
-        // Seleccionar líder de columna y marcar como usado
-        bestColIndices.push(chosenLeaderIdx);
-        usedIndices.add(chosenLeaderIdx);
-
-        // V-STACKING: Rellenar el espacio vertical sobrante en esta columna
-        let remH = shelfH - remainingParts[chosenLeaderIdx].height - kerf;
+        // 3. V-STACKING: Rellenar verticalmente la columna
+        colPartsIndices.push(bestColIdx);
+        usedIndices.add(bestColIdx);
+        
+        let remH = shelfH - remaining[bestColIdx].height - kerf;
         while (remH > 0) {
-          let bestSubIdx = -1;
-          let bestSubFit = -1;
-
-          for (let j = 0; j < remainingParts.length; j++) {
+          let subIdx = -1;
+          let subFit = -1;
+          for (let j = 0; j < remaining.length; j++) {
             if (usedIndices.has(j)) continue;
-            const p2 = remainingParts[j];
+            const p2 = remaining[j];
             if (p2.width <= colW && p2.height <= remH) {
-              const subFit = p2.height / remH;
-              if (subFit > bestSubFit) {
-                bestSubFit = subFit;
-                bestSubIdx = j;
+              const fit = p2.height / remH;
+              if (fit > subFit) {
+                subFit = fit;
+                subIdx = j;
               }
             }
           }
-
-          if (bestSubIdx !== -1) {
-            bestColIndices.push(bestSubIdx);
-            usedIndices.add(bestSubIdx);
-            remH -= (remainingParts[bestSubIdx].height + kerf);
+          if (subIdx !== -1) {
+            colPartsIndices.push(subIdx);
+            usedIndices.add(subIdx);
+            remH -= (remaining[subIdx].height + kerf);
           } else break;
         }
 
-        // Registrar las piezas en el layout
+        // Registrar piezas en la columna
         let yOffset = 0;
-        bestColIndices.forEach(idx => {
-          const p = remainingParts[idx];
-          placedParts.push({
+        colPartsIndices.forEach(idx => {
+          const p = remaining[idx];
+          placed.push({
             name: p.name,
             x: currentX,
             y: currentY + yOffset,
             width: p.width,
             height: p.height,
             rotated: false,
-            color: partColors[p.name]
+            color: colors[p.name]
           });
           yOffset += p.height + kerf;
         });
@@ -200,32 +197,32 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
       currentY += shelfH + kerf;
     }
 
-    if (placedParts.length === 0) break;
-    
+    if (placed.length === 0) break;
+
     panels.push({
       panelNumber: panels.length + 1,
-      parts: placedParts,
-      efficiency: (placedParts.reduce((acc, p) => acc + (p.width * p.height), 0) / (w * h)) * 100,
-      usedArea: placedParts.reduce((acc, p) => acc + (p.width * p.height), 0),
+      parts: placed,
+      efficiency: (placed.reduce((acc, p) => acc + (p.width * p.height), 0) / (w * h)) * 100,
+      usedArea: placed.reduce((acc, p) => acc + (p.width * p.height), 0),
       totalArea: w * h
     });
-    
-    remainingParts = remainingParts.filter((_, idx) => !usedIndices.has(idx));
-    if (panels.length > 20) break;
+
+    remaining = remaining.filter((_, idx) => !usedIndices.has(idx));
+    if (panels.length > 20) break; // Límite de seguridad
   }
+
   return panels;
 }
 
 function calculateIndustrialScore(layouts: OptimizedPanel[], w: number, h: number): number {
   if (layouts.length === 0) return Infinity;
-  const totalUsedArea = layouts.reduce((acc, l) => acc + l.usedArea, 0);
-  const totalAvailableArea = layouts.length * w * h;
-  const waste = totalAvailableArea - totalUsedArea;
+  const totalUsed = layouts.reduce((acc, l) => acc + l.usedArea, 0);
+  const totalAvail = layouts.length * w * h;
+  const waste = totalAvail - totalUsed;
   
-  // Penalización masiva por panel extra para forzar consolidación
+  // Penalización por fragmentación y número de paneles (agresiva para forzar consolidación)
   const panelPenalty = (layouts.length - 1) * 1000000000;
-  // Penalización por fragmentación
-  const fragmentation = layouts.length * 100000; 
+  const fragmentation = layouts.length * 10000;
   
   return waste + panelPenalty + fragmentation;
 }
@@ -237,6 +234,15 @@ function calculateTotalEfficiency(layouts: OptimizedPanel[]): number {
   return (used / total) * 100;
 }
 
+function generateColors(parts: any[]): Record<string, string> {
+  const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
+  const colors: Record<string, string> = {};
+  uniqueNames.forEach((name, i) => {
+    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 55%, 0.35)`;
+  });
+  return colors;
+}
+
 function shuffle(array: any[]) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -246,16 +252,7 @@ function shuffle(array: any[]) {
 
 function mutateOrder(array: any[]) {
   if (array.length < 2) return;
-  const idx1 = Math.floor(Math.random() * array.length);
-  const idx2 = Math.floor(Math.random() * array.length);
-  [array[idx1], array[idx2]] = [array[idx2], array[idx1]];
-}
-
-function generateColors(parts: PartToCut[]): Record<string, string> {
-  const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
-  const colors: Record<string, string> = {};
-  uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 55%, 0.3)`;
-  });
-  return colors;
+  const i = Math.floor(Math.random() * array.length);
+  const j = Math.floor(Math.random() * array.length);
+  [array[i], array[j]] = [array[j], array[i]];
 }

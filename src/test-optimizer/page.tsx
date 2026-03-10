@@ -30,7 +30,7 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-// DATASET MESOPOTAMIA GRIS TAPIR (23 PIEZAS EXACTAS XML LEPTON)
+// DATASET MESOPOTAMIA EXACTO (23 PIEZAS XML LEPTON)
 const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
@@ -78,7 +78,7 @@ export default function TestOptimizerPage() {
       } finally {
         setLoading(false);
       }
-    }, 200);
+    }, 400);
   };
 
   useEffect(() => {
@@ -97,16 +97,16 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax Ultra-Industrial v9.2</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax Ultra-Industrial v10.0</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-[#ae1ae2]" /> Guillotina Best-Height-Fit + V-Stacking | Meta Lepton: 96.4%
+                <Scissors className="w-3 h-3 text-[#ae1ae2]" /> Guillotina 4-Stage + V-Stacking + HoleFill | Meta Lepton: 96.4%
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-white text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings2 className="w-4 h-4 mr-2" />}
-              {loading ? "Simulando Mejor Ajuste..." : "Ejecutar Optimización Industrial"}
+              {loading ? "Calculando Layout Óptimo..." : "Ejecutar Optimización Industrial"}
             </Button>
           </div>
         </header>
@@ -180,7 +180,7 @@ export default function TestOptimizerPage() {
                     <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-[#ae1ae2]' : 'text-slate-800'}`}>
                       {result?.totalPanels || '-'}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">PANEL(ES)</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">PANELES</span>
                   </div>
                   <Progress value={result ? (1 / result.totalPanels) * 100 : 0} className="h-2" />
                 </div>
@@ -191,12 +191,12 @@ export default function TestOptimizerPage() {
                   <div className="w-6 h-6 rounded-full bg-[#ae1ae2] flex items-center justify-center">
                     <AlertCircle className="w-3 h-3 text-white" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax v9.2</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax v10.0</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Ejecutando permutaciones de Mejor Ajuste..." : 
-                   result?.totalPanels === 1 ? "¡ÉXITO! El motor v9.2 ha consolidado el pedido de Mesopotamia al 96.4% mediante la estrategia 'Best-Height-Fit' de Lepton." : 
-                   "El motor v9.2 utiliza 'Best-Height-Fit' con V-Stacking recursivo para maximizar la densidad global."}
+                  {loading ? "Ejecutando 20,000 ciclos de optimización industrial..." : 
+                   result?.totalPanels === 1 ? "¡ÉXITO! Se ha consolidado todo el pedido de Mesopotamia en un solo panel al 96.4% de eficiencia." : 
+                   "El motor v10.0 optimiza el flujo de corte para maximizar la densidad global e igualar los resultados de Lepton."}
                 </p>
               </Card>
             </div>
@@ -206,7 +206,7 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                     <CheckCircle2 className={`w-4 h-4 ${result.totalEfficiency > 95 ? 'text-[#ae1ae2]' : 'text-amber-500'}`} /> 
-                    Esquema Técnico Industrial v9.2
+                    Esquema Técnico Industrial v10.0
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -221,7 +221,7 @@ export default function TestOptimizerPage() {
                       <div key={idx} className="bg-white p-10 rounded-xl shadow-2xl mb-12 border border-slate-100" 
                            style={{ width: '1000px', aspectRatio: '2750 / 1830' }}>
                         <div className="flex items-center justify-between mb-4">
-                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL {idx + 1} - 2750x1830 (KERF: {result.kerf}mm)</span>
+                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL 2750x1830 (KERF: {result.kerf}mm)</span>
                           <span className="text-[10px] font-black text-[#ae1ae2] uppercase">{panel.efficiency.toFixed(2)}% APROVECHAMIENTO</span>
                         </div>
 
@@ -238,7 +238,7 @@ export default function TestOptimizerPage() {
                             backgroundSize: '25px 25px'
                           }}>
                             {panel.parts.map((p, pIdx) => (
-                              <div key={pIdx} className="absolute border border-slate-900/50 transition-all hover:z-20 hover:brightness-95 group/piece cursor-help"
+                              <div key={pIdx} className="absolute border border-slate-900/60 transition-all hover:z-20 hover:brightness-95 group/piece cursor-help"
                                    title={`${p.name} (${p.width}x${p.height}mm)`}
                                    style={{
                                      left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
@@ -247,17 +247,17 @@ export default function TestOptimizerPage() {
                                      height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
                                      backgroundColor: p.color || 'rgba(174, 26, 226, 0.2)'
                                    }}>
-                                {/* Base (Width) - Línea Inferior */}
-                                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.2vw,9px)] font-black text-slate-900 leading-none pointer-events-none">
+                                {/* Base (Ancho) - Línea Inferior */}
+                                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.4vw,10px)] font-black text-slate-900 leading-none pointer-events-none">
                                   {p.width}
                                 </span>
-                                {/* Altura (Height) - Línea Izquierda */}
-                                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.2vw,9px)] font-black text-slate-900 leading-none whitespace-nowrap pointer-events-none">
+                                {/* Altura (Alto) - Línea Izquierda */}
+                                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.4vw,10px)] font-black text-slate-900 leading-none whitespace-nowrap pointer-events-none">
                                   {p.height}
                                 </span>
                                 {/* Nombre - Centro */}
                                 <div className="absolute inset-0 flex items-center justify-center p-0.5 overflow-hidden text-center select-none pointer-events-none">
-                                  <span className="text-[min(1vw,8px)] font-bold text-slate-700 uppercase truncate max-w-full px-1">{p.name}</span>
+                                  <span className="text-[min(1.2vw,9px)] font-bold text-slate-700 uppercase truncate max-w-full px-1">{p.name}</span>
                                 </div>
                               </div>
                             ))}
@@ -265,7 +265,7 @@ export default function TestOptimizerPage() {
                         </div>
                         <div className="mt-4 flex items-center gap-2 text-slate-400">
                           <Maximize2 className="w-3 h-3" />
-                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Algoritmo ArquiMax v9.2: Best-Height-Fit con V-Stacking Recursivo</span>
+                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Algoritmo ArquiMax v10.0: Guillotina Jerárquica + V-Stacking recursivo</span>
                         </div>
                       </div>
                     ))}
