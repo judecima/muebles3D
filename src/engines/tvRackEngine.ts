@@ -1,32 +1,44 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Rack TV Red Arquimax v15.0
- * Construcción sándwich y herrajes calculados.
+ * Motor para Rack TV Red Arquimax v15.2 Industrial
+ * Estructura Sándwich + Cajones de 6 piezas sincronizadas.
  */
 export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, depth: D, thickness: T } = dim;
   const H = 500; 
   const sideH = H - 2 * T;
+  const innerW = W - 2 * T;
 
   const parts: Part[] = [
-    { id: 'base', name: 'Base Principal', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'tapa', name: 'Tapa Superior', width: W, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'divisor', name: 'Divisor Central', width: T, height: sideH, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'lat-R', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'div', name: 'Divisor Central', width: T, height: sideH, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' },
   ];
 
-  const drW = (W - 3*T - 26*2) / 2;
+  const sectW = (W - 3 * T) / 2;
   const drD = D - 50;
+  const railCl = 13;
+  const drBoxW = sectW - (railCl * 2);
+  const boxH = (sideH - 10) * 0.7;
 
   for (let i = 0; i < 2; i++) {
-    const pX = i === 0 ? T + (W - 3*T)/4 : W - T - (W - 3*T)/4;
+    const pX = i === 0 ? T + sectW / 2 : W - T - sectW / 2;
     const prefix = `rack-dr-${i}`;
-    parts.push({ id: `${prefix}-front`, name: `Frente Cajón`, width: (W - 3*T)/2 - 4, height: sideH - 4, depth: T, x: pX, y: H/2, z: D/2 + T/2, type: 'drawer', cutLargo: sideH - 4, cutAncho: (W - 3*T)/2 - 4, cutEspesor: T, grainDirection: 'horizontal' });
-    parts.push({ id: `${prefix}-rail-L`, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drD, x: pX - drW/2 - 13 - 6.5, y: H/2, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-rail-R`, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drD, x: pX + drW/2 + 13 + 6.5, y: H/2, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+    const boxInnerW = drBoxW - 2 * T;
+
+    parts.push({ id: `${prefix}-f`, groupId: prefix, name: `Frente Cajón`, width: sectW - 4, height: sideH - 4, depth: T, x: pX, y: H/2, z: D/2 + T/2, type: 'drawer', cutLargo: sideH - 4, cutAncho: sectW - 4, cutEspesor: T, grainDirection: 'horizontal' });
+    parts.push({ id: `${prefix}-box-F`, groupId: prefix, name: `Frente Estruct. Caja`, width: boxInnerW, height: boxH, depth: T, x: pX, y: H/2, z: D/2 - T/2, type: 'drawer', cutLargo: boxInnerW, cutAncho: boxH, cutEspesor: T, grainDirection: 'horizontal' });
+    parts.push({ id: `${prefix}-box-B`, groupId: prefix, name: `Trasera Estruct. Caja`, width: boxInnerW, height: boxH, depth: T, x: pX, y: H/2, z: D/2 - drD + T/2, type: 'drawer', cutLargo: boxInnerW, cutAncho: boxH, cutEspesor: T, grainDirection: 'horizontal' });
+    parts.push({ id: `${prefix}-box-SL`, groupId: prefix, name: `Lateral Izq. Caja`, width: T, height: boxH, depth: drD, x: pX - drBoxW/2 + T/2, y: H/2, z: D/2 - drD/2, type: 'drawer', cutLargo: drD, cutAncho: boxH, cutEspesor: T, grainDirection: 'vertical' });
+    parts.push({ id: `${prefix}-box-SR`, groupId: prefix, name: `Lateral Der. Caja`, width: T, height: boxH, depth: drD, x: pX + drBoxW/2 - T/2, y: H/2, z: D/2 - drD/2, type: 'drawer', cutLargo: drD, cutAncho: boxH, cutEspesor: T, grainDirection: 'vertical' });
+    parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Piso Cajón 3mm`, width: drBoxW, height: 3, depth: drD, x: pX, y: H/2 - boxH/2 + 1.5, z: D/2 - drD/2, type: 'drawer', cutLargo: drD, cutAncho: drBoxW, cutEspesor: 3, grainDirection: 'libre' });
+
+    parts.push({ id: `${prefix}-rail-L`, groupId: prefix, name: `Riel Telescópico (Juego)`, width: 13, height: 35, depth: drD, x: pX - drBoxW/2 - 6.5, y: H/2, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico (Juego)`, width: 13, height: 35, depth: drD, x: pX + drBoxW/2 + 6.5, y: H/2, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   }
 
-  return { parts, summary: 'Rack TV v15.0: Estructura sándwich reforzada y rieles contabilizados por par.', hasDoors: false, hasDrawers: true };
+  return { parts, summary: 'Rack TV v15.2 Industrial: Estructura sándwich y cajones sincronizados.', hasDoors: false, hasDrawers: true };
 }
