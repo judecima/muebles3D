@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { runOptimization } from '@/optimizer/cutOptimizer';
 import { OptimizationResult, GrainDirection } from '@/lib/types';
@@ -31,17 +30,22 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-const DEFAULT_PARTS: PartInput[] = [
+// Dataset exacto del XML de Mesopotamia proporcionado (23 piezas)
+const LEPTON_DATASET: PartInput[] = [
   { name: "V1 ESTANTES (1)", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "V2 ESTANTES (2)", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "V1 CAJ BASE (4)", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
   { name: "V1 LATS (6)", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
   { name: "V1 FRENTES (5)", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
   { name: "V1 PUERTA (8)", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 COMP (3)", width: 178, height: 500, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 DIVISOR (15)", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
+  { name: "V1 ACC (22)", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 TAPA (24)", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
-  const [parts, setParts] = useState<PartInput[]>(DEFAULT_PARTS);
+  const [parts, setParts] = useState<PartInput[]>(LEPTON_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -81,25 +85,25 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Laboratorio ArquiMax v6.0</h1>
-              <p className="text-slate-500 text-sm font-medium">Validador de Eficiencia Industrial</p>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador Mesopotamia v6.0</h1>
+              <p className="text-slate-500 text-sm font-medium">Análisis de Eficiencia Industrial vs Lepton</p>
             </div>
           </div>
           <Button size="lg" onClick={handleOptimize} disabled={loading} className="font-black uppercase px-10 h-14 bg-slate-900 hover:bg-black">
-            {loading ? "OPTIMIZANDO..." : "OPTIMIZAR AHORA"}
+            {loading ? "PROCESANDO..." : "VALIDAR EFICIENCIA"}
           </Button>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 shadow-sm border-slate-200">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Listado de Piezas</CardTitle>
+              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Dataset de Mesopotamia (23 Piezas)</CardTitle>
               <Button variant="outline" size="sm" onClick={addPart} className="h-8 text-[10px] font-bold">
                 <Plus className="w-3.5 h-3.5 mr-1" /> AGREGAR PIEZA
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[500px] overflow-y-auto">
+              <div className="max-h-[600px] overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-white sticky top-0 border-b z-10">
                     <tr>
@@ -167,10 +171,10 @@ export default function TestOptimizerPage() {
             <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-4">
               <div className="flex items-center gap-3">
                 <Info className="w-5 h-5 text-primary" />
-                <p className="text-xs font-bold uppercase tracking-widest">Análisis de Corte</p>
+                <p className="text-xs font-bold uppercase tracking-widest">Lógica de Guillotina v6.0</p>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                El motor prioriza el empaquetado por franjas horizontales. Este algoritmo garantiza que cada pieza pueda ser liberada mediante cortes de guillotina de lado a lado.
+                El motor prioriza el empaquetado por franjas horizontales con apilamiento vertical dinámico. Este algoritmo garantiza que cada pieza pueda ser liberada mediante cortes de lado a lado.
               </p>
             </div>
           </div>
