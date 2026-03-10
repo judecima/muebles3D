@@ -68,8 +68,9 @@ export function ControlPanel({
   const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip' || type === 'bajomesada-cajonera' || type === 'porta-anafe' || isCatalog;
   const forceBack = type === 'placard' || type === 'rackTV' || type.includes('pantry') || type.includes('wall');
   
-  // Regla: El botón de estantes solo aplica a Bajo Mesada y Alacenas
-  const canHaveShelf = (type.includes('base') || type.includes('wall') || type === 'bajoMesada' || type === 'alacena' || type === 'porta-anafe') && !type.includes('pantry') && !type.includes('microwave');
+  // Regla: El botón de estantes solo aplica a Bajo Mesada y Alacenas. Se ignora en Pantry y Microwave.
+  const isPantryOrMicrowave = type.includes('pantry') || type.includes('microwave');
+  const canHaveShelf = (type.includes('base') || type.includes('wall') || type === 'bajoMesada' || type === 'alacena' || type === 'porta-anafe') && !isPantryOrMicrowave;
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
