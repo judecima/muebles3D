@@ -326,7 +326,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                       }}>
                         {panel.parts.map((p, pIdx) => (
                           <div key={pIdx} title={`${p.name}: ${p.width}x${p.height}mm`}
-                               className="absolute border border-slate-900/60 flex items-center justify-center hover:brightness-90 transition-all cursor-help" 
+                               className="absolute border border-slate-900/60 transition-all hover:brightness-90 cursor-help" 
                                style={{ 
                                  left: `${(p.x / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
                                  top: `${(p.y / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
@@ -334,9 +334,19 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                                  height: `${(p.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
                                  backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
                                }}>
-                            <div className="flex flex-col items-center justify-center text-center leading-none p-1">
-                              <span className="text-[min(1.8vw,10px)] font-black text-slate-900">{p.width}x{p.height}</span>
-                              <span className="text-[min(1.4vw,7px)] text-slate-700 uppercase font-bold truncate w-full">{p.name}</span>
+                            <div className="relative w-full h-full overflow-hidden pointer-events-none">
+                              {/* Base (Width) - Línea Inferior */}
+                              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[min(1.8vw,8px)] font-black text-slate-900 leading-none">
+                                {p.width}
+                              </span>
+                              {/* Altura (Height) - Línea Izquierda */}
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.8vw,8px)] font-black text-slate-900 leading-none whitespace-nowrap">
+                                {p.height}
+                              </span>
+                              {/* Nombre - Centro */}
+                              <div className="absolute inset-0 flex items-center justify-center p-1 text-center">
+                                <span className="text-[min(1.4vw,7px)] text-slate-700 uppercase font-bold truncate w-full">{p.name}</span>
+                              </div>
                             </div>
                           </div>
                         ))}

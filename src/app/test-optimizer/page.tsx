@@ -238,7 +238,7 @@ export default function TestOptimizerPage() {
                             backgroundSize: '25px 25px'
                           }}>
                             {panel.parts.map((p, pIdx) => (
-                              <div key={pIdx} className="absolute border border-slate-900/40 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece cursor-help"
+                              <div key={pIdx} className="absolute border border-slate-900/40 transition-all hover:z-20 hover:brightness-95 group/piece cursor-help"
                                    title={`${p.name} (${p.width}x${p.height}mm)`}
                                    style={{
                                      left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
@@ -247,10 +247,17 @@ export default function TestOptimizerPage() {
                                      height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
                                      backgroundColor: p.color || 'rgba(58, 114, 150, 0.2)'
                                    }}>
-                                <div className="flex flex-col items-center leading-tight p-0.5 overflow-hidden text-center select-none">
-                                  <span className="text-[min(1.2vw,9px)] font-black text-slate-800">{p.width}</span>
+                                {/* Base (Width) - Línea Inferior */}
+                                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.2vw,8px)] font-black text-slate-900 leading-none pointer-events-none">
+                                  {p.width}
+                                </span>
+                                {/* Altura (Height) - Línea Izquierda */}
+                                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.2vw,8px)] font-black text-slate-900 leading-none whitespace-nowrap pointer-events-none">
+                                  {p.height}
+                                </span>
+                                {/* Nombre - Centro */}
+                                <div className="absolute inset-0 flex items-center justify-center p-0.5 overflow-hidden text-center select-none pointer-events-none">
                                   <span className="text-[min(1vw,7px)] font-bold text-slate-600 uppercase truncate max-w-full px-1">{p.name}</span>
-                                  <span className="text-[min(1.2vw,9px)] font-black text-slate-800">{p.height}</span>
                                 </div>
                               </div>
                             ))}
