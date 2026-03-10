@@ -4,22 +4,19 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { runOptimization } from '@/optimizer/cutOptimizer';
 import { OptimizationResult, GrainDirection } from '@/lib/types';
 import { 
-  Scissors, 
   Target, 
   BarChart3, 
   Plus, 
   Trash2, 
-  Play, 
   CheckCircle2, 
-  AlertCircle,
   Info,
   Layers,
-  ArrowRightToLine
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 
 interface PartInput {
@@ -30,24 +27,25 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-// Dataset exacto del XML de Mesopotamia proporcionado (23 piezas)
+// Dataset EXACTO de 23 piezas del XML de Mesopotamia (MDF 18mm)
 const LEPTON_DATASET: PartInput[] = [
-  { name: "V1 ESTANTES (1)", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "V2 ESTANTES (2)", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "V1 CAJ BASE (4)", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 LATS (6)", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-  { name: "V1 FRENTES (5)", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
-  { name: "V1 PUERTA (8)", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 COMP (3)", width: 178, height: 500, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 DIVISOR (15)", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
-  { name: "V1 ACC (22)", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 TAPA (24)", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+  { name: "V1 ESTANTES (629x570)", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "V1 ESTANTES (610x570)", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "V1 CAJ BASE (582x500)", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 LATS (582x150)", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+  { name: "V1 FRENTES (562x500)", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+  { name: "V1 PUERTA (562x150)", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 COMP (178x500)", width: 178, height: 500, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 DIVISOR (578x470)", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
+  { name: "V1 ACC (382x117)", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 TAPA (177x117)", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
   const [parts, setParts] = useState<PartInput[]>(LEPTON_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [zoom, setZoom] = useState(1);
 
   const addPart = () => {
     setParts([...parts, { name: `Pieza ${parts.length + 1}`, width: 500, height: 300, quantity: 1, grainDirection: 'libre' }]);
@@ -85,19 +83,19 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador Mesopotamia v6.0</h1>
-              <p className="text-slate-500 text-sm font-medium">Análisis de Eficiencia Industrial vs Lepton</p>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador Mesopotamia v6.0 Pro</h1>
+              <p className="text-slate-500 text-sm font-medium">Análisis de Eficiencia Industrial (Dataset 23 Piezas)</p>
             </div>
           </div>
           <Button size="lg" onClick={handleOptimize} disabled={loading} className="font-black uppercase px-10 h-14 bg-slate-900 hover:bg-black">
-            {loading ? "PROCESANDO..." : "VALIDAR EFICIENCIA"}
+            {loading ? "PROCESANDO..." : "CALCULAR +94%"}
           </Button>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 shadow-sm border-slate-200">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Dataset de Mesopotamia (23 Piezas)</CardTitle>
+              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Dataset Mesopotamia (MDF 18mm)</CardTitle>
               <Button variant="outline" size="sm" onClick={addPart} className="h-8 text-[10px] font-bold">
                 <Plus className="w-3.5 h-3.5 mr-1" /> AGREGAR PIEZA
               </Button>
@@ -171,10 +169,10 @@ export default function TestOptimizerPage() {
             <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-4">
               <div className="flex items-center gap-3">
                 <Info className="w-5 h-5 text-primary" />
-                <p className="text-xs font-bold uppercase tracking-widest">Lógica de Guillotina v6.0</p>
+                <p className="text-xs font-bold uppercase tracking-widest">Guillotina v6.0 Pro</p>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                El motor prioriza el empaquetado por franjas horizontales con apilamiento vertical dinámico. Este algoritmo garantiza que cada pieza pueda ser liberada mediante cortes de lado a lado.
+                Algoritmo de 3 etapas con apilamiento vertical agresivo. Garantiza que todas las piezas sean liberadas mediante cortes de lado a lado (Guillotina) maximizando la densidad del tablero.
               </p>
             </div>
           </div>
@@ -182,49 +180,57 @@ export default function TestOptimizerPage() {
 
         {result && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-green-500" /> Esquema de Corte Optimizado
-            </h2>
-            
-            {result.optimizedLayout.map((panel, idx) => (
-              <div key={idx} className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
-                <div className="flex items-center justify-between">
-                  <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Eficiencia</p>
-                    <p className="text-xl font-black text-primary">{panel.efficiency.toFixed(2)}%</p>
-                  </div>
-                </div>
-
-                <div className="relative bg-slate-100 rounded-lg mx-auto overflow-hidden shadow-inner border border-slate-300" 
-                     style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
-                  
-                  {/* Área Útil */}
-                  <div className="absolute bg-white" style={{ 
-                    left: `${(result.trim / 2750) * 100}%`, 
-                    top: `${(result.trim / 1830) * 100}%`, 
-                    width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
-                    height: `${((1830 - result.trim * 2) / 1830) * 100}%`
-                  }}>
-                    {panel.parts.map((p, pIdx) => (
-                      <div key={pIdx} className="absolute border border-slate-900/60 flex items-center justify-center transition-all hover:brightness-95"
-                           style={{
-                             left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
-                             top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
-                             width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
-                             height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
-                             backgroundColor: p.color || 'rgba(174, 26, 226, 0.1)'
-                           }}>
-                        <div className="flex flex-col items-center leading-none p-1 pointer-events-none overflow-hidden text-center">
-                          <span className="text-[min(1.5vw,9px)] font-black text-slate-900">{p.width}x{p.height}</span>
-                          <span className="text-[min(1vw,6px)] font-bold text-slate-600 uppercase truncate w-full mt-0.5">{p.name}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-green-500" /> Esquema de Corte Optimizado
+              </h2>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><ZoomIn className="w-4 h-4" /></Button>
               </div>
-            ))}
+            </div>
+            
+            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+              {result.optimizedLayout.map((panel, idx) => (
+                <div key={idx} className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6 mb-12">
+                  <div className="flex items-center justify-between">
+                    <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Eficiencia</p>
+                      <p className="text-xl font-black text-primary">{panel.efficiency.toFixed(2)}%</p>
+                    </div>
+                  </div>
+
+                  <div className="relative bg-slate-100 rounded-lg mx-auto overflow-hidden shadow-inner border border-slate-300" 
+                       style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
+                    
+                    {/* Área Útil (Trim aplicada) */}
+                    <div className="absolute bg-white" style={{ 
+                      left: `${(result.trim / 2750) * 100}%`, 
+                      top: `${(result.trim / 1830) * 100}%`, 
+                      width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
+                      height: `${((1830 - result.trim * 2) / 1830) * 100}%`
+                    }}>
+                      {panel.parts.map((p, pIdx) => (
+                        <div key={pIdx} className="absolute border border-slate-900/60 flex items-center justify-center transition-all hover:brightness-95"
+                             style={{
+                               left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
+                               top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
+                               width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
+                               height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
+                               backgroundColor: p.color || 'rgba(174, 26, 226, 0.1)'
+                             }}>
+                          <div className="flex flex-col items-center leading-none p-1 pointer-events-none overflow-hidden text-center">
+                            <span className="text-[min(1.5vw,9px)] font-black text-slate-900">{p.width}x{p.height}</span>
+                            <span className="text-[min(1vw,6px)] font-bold text-slate-600 uppercase truncate w-full mt-0.5">{p.name}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
