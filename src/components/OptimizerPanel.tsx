@@ -87,8 +87,8 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           selectedPanel.width,
           selectedPanel.height,
           targetThickness,
-          4.5, // Kerf industrial
-          10   // Trim estándar
+          4.5, 
+          10   
         );
 
         if (res.optimizedLayout.length === 0) {
@@ -145,7 +145,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     doc.text(summaryText, 20, 42);
 
     (doc as any).autoTable({
-      head: [['Pieza', 'Ancho (mm)', 'Alto (mm)', 'Cant.', 'Veta']],
+      head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
       body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection]),
       startY: 48,
       headStyles: { fillColor: BRAND_COLOR, font: 'helvetica', fontStyle: 'bold' },
@@ -267,8 +267,8 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   <p className="text-lg font-black text-slate-700">{result ? result.totalPanels : '-'}</p>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-lg border">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">Aprovechamiento</p>
-                  <p className="text-lg font-black text-slate-700">{result ? `${result.totalEfficiency.toFixed(1)}%` : '-'}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">Eficiencia Panel #1</p>
+                  <p className="text-lg font-black text-slate-700">{result?.optimizedLayout[0] ? `${result.optimizedLayout[0].efficiency.toFixed(1)}%` : '-'}</p>
                 </div>
               </div>
 

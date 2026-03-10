@@ -11,12 +11,9 @@ interface InternalPart {
 }
 
 /**
- * ArquiMax Industrial Engine v12.1 - STRICT 3-STAGE GUILLOTINE
- * Implementa una jerarquía determinística de 4 capas:
- * 1. Panel (Área Útil)
- * 2. Fajas (Strips) - Cortes de lado a lado.
- * 3. Columnas (Containers) - Ancho fijo definido por la pieza líder de la columna.
- * 4. Piezas (Nesting) - Apilado vertical con ANCHO IDÉNTICO para respetar guillotina.
+ * ArquiMax Industrial Engine v12.1 - DETERMINISTIC 4-LAYER GUILLOTINE
+ * Maximiza el sobrante reutilizable agrupando piezas desde el origen (0,0).
+ * Jerarquía: Panel -> Fajas (Strips) -> Columnas (Containers) -> Stacks (Nesting).
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -35,18 +32,17 @@ export function runOptimization(
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
 
-  // Estrategias Industriales Determinísticas
+  // Estrategias Determinísticas para evaluación global
   const strategies = [
-    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área Mayor primero
-    (a: any, b: any) => b.height - a.height,                         // Altura Mayor primero
-    (a: any, b: any) => b.width - a.width,                           // Ancho Mayor primero
-    (a: any, b: any) => Math.max(b.width, b.height) - Math.max(a.width, a.height), // Lado Mayor
+    (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height), // Área Mayor
+    (a: InternalPart, b: InternalPart) => b.height - a.height,                         // Altura Mayor
+    (a: InternalPart, b: InternalPart) => b.width - a.width,                           // Ancho Mayor
   ];
 
   let bestResult: OptimizationResult | null = null;
   const partColors = generateColors(filteredParts);
 
-  // EVALUACIÓN GLOBAL: Probar estrategias y orientaciones de panel (Horizontal vs Vertical)
+  // EVALUACIÓN DE ORIENTACIÓN DE PANEL (Horizontal vs Vertical)
   for (const strategy of strategies) {
     for (const isVerticalPanel of [false, true]) {
       const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
@@ -63,7 +59,7 @@ export function runOptimization(
 
       pool.sort(strategy);
 
-      // Dimensiones según orientación del panel para fajas
+      // Dimensiones según orientación del panel para optimizar fajas
       const currentW = isVerticalPanel ? usableH : usableW;
       const currentH = isVerticalPanel ? usableW : usableH;
 
@@ -81,9 +77,7 @@ export function runOptimization(
       );
       
       const totalPlaced = currentResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0);
-      const expectedTotal = pool.length;
 
-      // Prioridad 1: Colocar TODAS las piezas. Prioridad 2: Menor número de paneles. Prioridad 3: Eficiencia.
       if (!bestResult || totalPlaced > bestResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0)) {
         bestResult = currentResult;
       } else if (totalPlaced === bestResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0)) {
@@ -130,7 +124,7 @@ function buildStrictLayout(
       const leader = workingPool[leaderIdx];
       let shelfH = leader.height;
       
-      // Decidir altura de faja óptima si es libre
+      // Decidir altura de faja óptima (Pieza Líder)
       if (leader.grainDirection === 'libre') {
         const canN = leader.width <= usableW && leader.height <= (usableH - currentY);
         const canR = leader.height <= usableW && leader.width <= (usableH - currentY);
@@ -141,7 +135,7 @@ function buildStrictLayout(
 
       let currentX = 0;
 
-      // CAPA 3: COLUMNAS (CONTAINERS) - Ancho fijo por pieza líder
+      // CAPA 3: COLUMNAS (CONTAINERS) - Ancho fijo por pieza líder de columna
       while (currentX < usableW) {
         let colLeaderIdx = -1;
         for (let i = 0; i < workingPool.length; i++) {
@@ -168,7 +162,7 @@ function buildStrictLayout(
         let colUsedH = 0;
 
         // CAPA 4: PIEZAS (NESTING) - Apilado vertical ESTRICTO
-        // Regla de Oro: Solo piezas con EL MISMO ANCHO entran en esta columna para guillotina.
+        // Para respetar guillotina, solo entran piezas que compartan el ancho de la columna
         while (colUsedH < shelfH) {
           let bestPartIdx = -1;
           let bestPartRot = false;
@@ -178,7 +172,7 @@ function buildStrictLayout(
             if (p.placed) continue;
             
             const remH = shelfH - colUsedH;
-            // Solo entra si el ancho es EXACTAMENTE el mismo que el líder de columna
+            // Solo entra si el ancho es EXACTAMENTE el mismo que el de la columna para corte recto
             const matchesN = p.width === colW && p.height <= remH;
             const matchesR = p.grainDirection === 'libre' && p.height === colW && p.width <= remH;
 
@@ -199,7 +193,7 @@ function buildStrictLayout(
           const finalW = bestPartRot ? p.height : p.width;
           const finalH = bestPartRot ? p.width : p.height;
 
-          // Convertir a coordenadas globales respetando la orientación del panel
+          // Coordenadas absolutas desde el origen del área útil
           const globalX = isVertical ? currentY : currentX;
           const globalY = isVertical ? currentX : currentY + colUsedH;
           const globalW = isVertical ? finalH : finalW;
@@ -247,7 +241,7 @@ function buildStrictLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `ArquiMax Industrial Engine v12.1: Jerarquía de 4 Capas (3-Stage Guillotine).`,
+    summary: `ArquiMax Industrial v12.1: Guillotina de 4 capas optimizada para sobrante máximo.`,
     kerf,
     trim,
     selectedThickness
