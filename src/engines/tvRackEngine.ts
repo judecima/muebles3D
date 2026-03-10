@@ -1,8 +1,8 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Rack TV Red Arquimax v14.1
- * Construcción sándwich: Tapa y Base W. Incluye Rieles Telescópicos.
+ * Motor para Rack TV Red Arquimax v15.0
+ * Construcción sándwich y herrajes calculados.
  */
 export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, depth: D, thickness: T } = dim;
@@ -17,58 +17,16 @@ export function tvRackEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'divisor', name: 'Divisor Central', width: T, height: sideH, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' },
   ];
 
-  parts.push({ 
-    id: 'fondo', 
-    name: 'Fondo Mueble', 
-    width: W - 2, height: H - 2, depth: 3, 
-    x: W/2, y: H/2, z: -D/2 - 1.5, 
-    type: 'static', cutLargo: H - 2, cutAncho: W - 2, cutEspesor: 3, grainDirection: 'libre' 
-  });
+  const drW = (W - 3*T - 26*2) / 2;
+  const drD = D - 50;
 
-  const railSpace = 26;
-  const innerW = W - 3*T;
-  const compW = innerW / 2;
-  const drawerW = compW - railSpace;
-  const drawerD = D - 40;
-  const drawerH = sideH - 40;
-  const drawerBoxH = Math.round(drawerH * 0.8);
+  for (let i = 0; i < 2; i++) {
+    const pX = i === 0 ? T + (W - 3*T)/4 : W - T - (W - 3*T)/4;
+    const prefix = `rack-dr-${i}`;
+    parts.push({ id: `${prefix}-front`, name: `Frente Cajón`, width: (W - 3*T)/2 - 4, height: sideH - 4, depth: T, x: pX, y: H/2, z: D/2 + T/2, type: 'drawer', cutLargo: sideH - 4, cutAncho: (W - 3*T)/2 - 4, cutEspesor: T, grainDirection: 'horizontal' });
+    parts.push({ id: `${prefix}-rail-L`, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drD, x: pX - drW/2 - 13 - 6.5, y: H/2, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+    parts.push({ id: `${prefix}-rail-R`, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drD, x: pX + drW/2 + 13 + 6.5, y: H/2, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
+  }
 
-  const drawerConfigs = [
-    { x: T + compW/2, id: '1', railLX: T + 6.5, railRX: W/2 - T/2 - 6.5 },
-    { x: W - T - compW/2, id: '2', railLX: W/2 + T/2 + 6.5, railRX: W - T - 6.5 }
-  ];
-
-  drawerConfigs.forEach((config) => {
-    const prefix = `cajon-${config.id}`;
-    const posY = H/2;
-    const frontW = compW - 3;
-
-    parts.push({ 
-      id: `${prefix}-front-aesthetic`, 
-      groupId: prefix,
-      name: `Frente Estético Cajón ${config.id}`, 
-      width: frontW, height: sideH - 3, depth: T, 
-      x: config.x, y: posY, z: D/2 + T/2, 
-      type: 'drawer', cutLargo: sideH - 3, cutAncho: frontW, cutEspesor: T, grainDirection: 'vertical' 
-    });
-    
-    parts.push({ 
-      id: `${prefix}-box-front`, 
-      groupId: prefix,
-      name: `Frente Estruct. Caja ${config.id}`, 
-      width: drawerW - 2*T, height: drawerBoxH, depth: T, 
-      x: config.x, y: posY, z: D/2 - T/2, 
-      type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'horizontal' 
-    });
-
-    parts.push({ id: `${prefix}-box-side-L`, groupId: prefix, name: `Lateral Izq. Caja ${config.id}`, width: T, height: drawerBoxH, depth: drawerD, x: config.x - drawerW/2 + T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'vertical' });
-    parts.push({ id: `${prefix}-box-side-R`, groupId: prefix, name: `Lateral Der. Caja ${config.id}`, width: T, height: drawerBoxH, depth: drawerD, x: config.x + drawerW/2 - T/2, y: posY, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'vertical' });
-    parts.push({ id: `${prefix}-box-back`, groupId: prefix, name: `Trasera Caja ${config.id}`, width: drawerW - 2*T, height: drawerBoxH, depth: T, x: config.x, y: posY, z: D/2 - drawerD + T/2, type: 'drawer', cutLargo: drawerW - 2*T, cutAncho: drawerBoxH, cutEspesor: T, grainDirection: 'horizontal' });
-    parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Piso Caja ${config.id}`, width: drawerW - 2*T, height: 3, depth: drawerD, x: config.x, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
-    
-    parts.push({ id: `${prefix}-rail-L`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: config.railLX, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
-    parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico ${drawerD}mm`, width: 13, height: 35, depth: drawerD, x: config.railRX, y: posY, z: D/2 - drawerD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
-  });
-
-  return { parts, summary: 'Rack TV v14.1: Estructura sándwich reforzada y frentes overlay.', hasDoors: false, hasDrawers: true };
+  return { parts, summary: 'Rack TV v15.0: Estructura sándwich reforzada y rieles contabilizados por par.', hasDoors: false, hasDrawers: true };
 }

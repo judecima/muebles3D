@@ -27,7 +27,9 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     if (!acc[key]) {
       acc[key] = { ...part, quantity: 0 };
     }
-    acc[key].quantity += 1;
+    // Lógica Red Arquimax v15.0: Rieles se venden por juego (2 piezas = 1 juego)
+    const increment = part.name.toLowerCase().includes('riel') ? 0.5 : 1;
+    acc[key].quantity += increment;
     return acc;
   }, {} as Record<string, Part & { quantity: number }>);
 
@@ -38,12 +40,11 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
       <CardHeader className="py-2 px-4 md:px-6 bg-slate-50 shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-xs md:text-sm font-bold flex items-center gap-2 text-primary">
-          <ListChecks className="w-4 h-4" /> Despiece Técnico (Red Arquimax)
+          <ListChecks className="w-4 h-4" /> Despiece Técnico (Red Arquimax v15.0)
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex-1 overflow-hidden">
         <div className="flex flex-col md:flex-row h-full">
-          {/* Tabla de Paneles MDF */}
           <div className="flex-1 md:border-r border-slate-100 overflow-hidden flex flex-col">
             <ScrollArea className="flex-1 h-full">
               <Table>
@@ -73,7 +74,6 @@ export function CutlistTable({ parts }: CutlistTableProps) {
             </ScrollArea>
           </div>
 
-          {/* Tabla de Herrajes */}
           <div className="w-full md:w-1/3 bg-slate-50/30 overflow-hidden flex flex-col border-t md:border-t-0">
             <ScrollArea className="flex-1 h-full">
               <Table>
@@ -92,7 +92,7 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                     hardwareList.map((item, idx) => (
                       <TableRow key={idx} className="hover:bg-slate-50 transition-colors h-8">
                         <TableCell className="font-medium text-[10px] py-1 px-2">{item.name}</TableCell>
-                        <TableCell className="text-right text-[10px] py-1 px-2 font-bold text-accent">{item.quantity}</TableCell>
+                        <TableCell className="text-right text-[10px] py-1 px-2 font-bold text-accent">{Math.ceil(item.quantity)}</TableCell>
                       </TableRow>
                     ))
                   )}
