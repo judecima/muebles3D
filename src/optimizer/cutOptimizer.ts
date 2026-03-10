@@ -12,7 +12,7 @@ interface PartToCut {
 /**
  * ArquiMax Ultra-Industrial v10.0
  * Motor de optimización avanzado con Guillotina de 4 Etapas, V-Stacking recursivo,
- * Relleno de Huecos 2D y Búsqueda Estocástica Masiva.
+ * Relleno de Huecos 2D y Búsqueda Estocástica Masiva (20k iteraciones).
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],

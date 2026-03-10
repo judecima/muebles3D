@@ -99,7 +99,7 @@ export default function TestOptimizerPage() {
             <div>
               <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax Ultra-Industrial v10.0</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-[#ae1ae2]" /> Guillotina 4-Stage + V-Stacking + HoleFill | Meta Lepton: 96.4%
+                <Scissors className="w-3 h-3 text-[#ae1ae2]" /> Guillotina 4-Stage + V-Stacking | Meta Lepton: 96.4%
               </p>
             </div>
           </div>
