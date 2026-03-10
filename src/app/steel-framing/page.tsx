@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
 import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
@@ -8,13 +8,10 @@ import { Button } from '@/components/ui/button';
 import { 
   Menu, 
   Home, 
-  Eye, 
   Download,
-  Share2,
   Layout,
   Move,
   Settings2,
-  X,
   Compass,
   MousePointer2,
   Keyboard,
@@ -52,9 +49,13 @@ export default function SteelFramingPage() {
   
   const viewerRef = useRef<{ enterWalkMode: () => void, setMovement: (dir: any, active: boolean) => void }>(null);
 
-  const handleOpeningDoubleClick = (wallId: string, opening: SteelOpening) => {
+  const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening) => {
     setSelectedOpening({ wallId, opening });
-  };
+  }, []);
+
+  const handleWalkModeLock = useCallback((locked: boolean) => {
+    setIsWalkModeActive(locked);
+  }, []);
 
   const updateOpeningPosition = (val: number) => {
     if (!selectedOpening) return;
@@ -145,7 +146,7 @@ export default function SteelFramingPage() {
             ref={viewerRef}
             config={config} 
             onOpeningDoubleClick={handleOpeningDoubleClick}
-            onWalkModeLock={setIsWalkModeActive}
+            onWalkModeLock={handleWalkModeLock}
           />
           
           <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
@@ -183,7 +184,6 @@ export default function SteelFramingPage() {
             )}
           </div>
 
-          {/* D-Pad para Móvil en Modo Caminata */}
           {isWalkModeActive && isMobile && (
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-50 pointer-events-auto">
               <div className="flex gap-2">
@@ -242,7 +242,6 @@ export default function SteelFramingPage() {
           )}
         </div>
 
-        {/* Dialogo de Edición de Abertura */}
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>

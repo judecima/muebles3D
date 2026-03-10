@@ -166,7 +166,6 @@ export class SteelSceneManager {
     const movementX = touch.clientX - this.touchStart.x;
     const movementY = touch.clientY - this.touchStart.y;
 
-    // Rotar cámara manualmente en móvil (PointerLock no bloquea en táctiles)
     const rotationSpeed = 0.005;
     this.camera.rotation.y -= movementX * rotationSpeed;
     this.camera.rotation.x -= movementY * rotationSpeed;
@@ -187,12 +186,11 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    this.camera.position.y = 1700; // Altura de ojos (mm)
+    this.camera.position.y = 1700;
     this.isWalkModeActive = true;
     try {
       this.fpControls.lock();
     } catch (e) {
-      // En móvil PointerLock puede fallar, pero activamos el modo igual
       if (this.onWalkModeLock) this.onWalkModeLock(true);
     }
   }
@@ -240,13 +238,12 @@ export class SteelSceneManager {
       this.direction.y = Number(this.moveUp) - Number(this.moveDown);
       this.direction.normalize();
 
-      const speed = 40000.0; // Velocidad en mm/s
+      const speed = 5000.0; // Velocidad ajustada a 5m/s para mm
 
       if (this.moveForward || this.moveBackward) this.velocity.z -= this.direction.z * speed * delta;
       if (this.moveLeft || this.moveRight) this.velocity.x -= this.direction.x * speed * delta;
       if (this.moveUp || this.moveDown) this.velocity.y += this.direction.y * speed * delta;
 
-      // Movimiento relativo a la cámara
       const worldDir = new THREE.Vector3();
       this.camera.getWorldDirection(worldDir);
       worldDir.y = 0;
@@ -287,7 +284,8 @@ export class SteelSceneManager {
     config.walls.forEach(wall => {
       const wallMesh = this.createWallMesh(wall);
       this.houseGroup.add(wallMesh);
-      wallsBox.expandByObject(wallMesh);
+      wallsBox.expandByPoint(new THREE.Vector3(wall.x, 0, wall.z));
+      wallsBox.expandByPoint(new THREE.Vector3(wall.x + wall.length, wall.height, wall.z + wall.length));
       
       this.createOpeningTriggers(wall);
     });
@@ -298,7 +296,7 @@ export class SteelSceneManager {
       const center = new THREE.Vector3();
       wallsBox.getCenter(center);
 
-      const floorGeom = new THREE.PlaneGeometry(size.x + 15000, size.z + 15000);
+      const floorGeom = new THREE.PlaneGeometry(Math.max(size.x, 15000) + 10000, Math.max(size.z, 15000) + 10000);
       const floorMat = new THREE.MeshStandardMaterial({ color: this.colors.floor });
       const floor = new THREE.Mesh(floorGeom, floorMat);
       floor.rotation.x = -Math.PI / 2;
