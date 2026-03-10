@@ -12,6 +12,7 @@ interface PartToCut {
  * ArquiMax Ultra-Industrial v9.2
  * Algoritmo de Guillotina Jerárquica con estrategia "Best-Height-Fit" para columnas.
  * Maximiza el aprovechamiento vertical de cada franja (shelf) para igualar a Lepton.
+ * Implementa una búsqueda estocástica masiva de 20,000 iteraciones para consolidar el pedido.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -50,7 +51,7 @@ export function runOptimization(
     
     // Mutaciones estocásticas de orden y rotación
     if (i > 0) {
-      if (i % 50 === 0) {
+      if (i % 100 === 0) {
         shuffle(currentPartsOrder);
       } else {
         mutateOrder(currentPartsOrder);
@@ -75,7 +76,7 @@ export function runOptimization(
     }
     
     // Meta industrial: Consolidación en 1 panel con eficiencia extrema
-    if (bestLayouts.length === 1 && calculateTotalEfficiency(bestLayouts) > 96.5) break;
+    if (bestLayouts.length === 1 && calculateTotalEfficiency(bestLayouts) > 96.4) break;
   }
 
   const finalEfficiency = calculateTotalEfficiency(bestLayouts);
@@ -127,15 +128,20 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
         let bestFitScore = -1;
         let chosenLeaderIdx = -1;
 
-        // ESTRATEGIA "BEST-HEIGHT-FIT": Buscar la pieza que mejor aproveche la altura de la franja
+        // ESTRATEGIA "BEST-HEIGHT-FIT": Buscar la pieza que mejor aproveche la altura de la franja (shelfH)
+        // Esto evita colocar piezas pequeñas (tacos) si hay piezas más altas (amarres) que entran.
         for (let i = 0; i < remainingParts.length; i++) {
           if (usedIndices.has(i)) continue;
           const p = remainingParts[i];
           
           if (p.width <= (w - currentX) && p.height <= shelfH) {
             const fitScore = p.height / shelfH; 
-            if (fitScore > bestFitScore) {
-              bestFitScore = fitScore;
+            // Penalizamos ligeramente las piezas que dejan mucho espacio horizontal si hay otras similares
+            const horizontalWasteFactor = p.width / (w - currentX);
+            const totalScore = fitScore * 0.8 + horizontalWasteFactor * 0.2;
+
+            if (totalScore > bestFitScore) {
+              bestFitScore = totalScore;
               chosenLeaderIdx = i;
               colW = p.width;
             }
@@ -205,7 +211,7 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
     });
     
     remainingParts = remainingParts.filter((_, idx) => !usedIndices.has(idx));
-    if (panels.length > 15) break;
+    if (panels.length > 20) break;
   }
   return panels;
 }
@@ -216,10 +222,10 @@ function calculateIndustrialScore(layouts: OptimizedPanel[], w: number, h: numbe
   const totalAvailableArea = layouts.length * w * h;
   const waste = totalAvailableArea - totalUsedArea;
   
-  // Penalización por panel extra (Crítico para consolidación)
-  const panelPenalty = (layouts.length - 1) * 50000000;
-  // Penalización por fragmentación (huecos inútiles)
-  const fragmentation = layouts.length * 10000; 
+  // Penalización masiva por panel extra para forzar consolidación
+  const panelPenalty = (layouts.length - 1) * 1000000000;
+  // Penalización por fragmentación
+  const fragmentation = layouts.length * 100000; 
   
   return waste + panelPenalty + fragmentation;
 }

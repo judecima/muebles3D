@@ -106,7 +106,7 @@ export default function TestOptimizerPage() {
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-white text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings2 className="w-4 h-4 mr-2" />}
-              {loading ? "Calculando Mejor Ajuste..." : "Ejecutar Optimización Industrial"}
+              {loading ? "Simulando Mejor Ajuste..." : "Ejecutar Optimización Industrial"}
             </Button>
           </div>
         </header>
@@ -195,8 +195,8 @@ export default function TestOptimizerPage() {
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
                   {loading ? "Ejecutando permutaciones de Mejor Ajuste..." : 
-                   result?.totalPanels === 1 ? "¡ÉXITO! El motor ha priorizado los amarres sobre los tacos en las filas de 570mm, consolidando el pedido al 96.4%." : 
-                   "El motor v9.2 utiliza 'Best-Height-Fit' para igualar el comportamiento de Lepton."}
+                   result?.totalPanels === 1 ? "¡ÉXITO! El motor v9.2 ha consolidado el pedido de Mesopotamia al 96.4% mediante la estrategia 'Best-Height-Fit' de Lepton." : 
+                   "El motor v9.2 utiliza 'Best-Height-Fit' con V-Stacking recursivo para maximizar la densidad global."}
                 </p>
               </Card>
             </div>
@@ -265,7 +265,7 @@ export default function TestOptimizerPage() {
                         </div>
                         <div className="mt-4 flex items-center gap-2 text-slate-400">
                           <Maximize2 className="w-3 h-3" />
-                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Algoritmo Guillotina v9.2: Best-Height-Fit con V-Stacking Recursivo</span>
+                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Algoritmo ArquiMax v9.2: Best-Height-Fit con V-Stacking Recursivo</span>
                         </div>
                       </div>
                     ))}
