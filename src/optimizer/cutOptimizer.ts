@@ -13,6 +13,7 @@ interface InternalPart {
 /**
  * ArquiMax Industrial Engine v11.5 (Deterministic Global Optimizer)
  * Enfoque: Optimización global sobre local. Jerarquía de 4 capas.
+ * Evalúa múltiples estrategias determinísticas y selecciona la de mayor eficiencia global.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -31,12 +32,14 @@ export function runOptimization(
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
 
-  // Estrategias determinísticas para encontrar el mejor layout global
+  // ESTRATEGIAS DETERMINÍSTICAS (Heurísticas Industriales)
+  // Probamos diferentes criterios de ordenamiento para encontrar el mejor layout global
   const strategies = [
-    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área Desc
-    (a: any, b: any) => b.height - a.height, // Altura Desc
+    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área Desc (Estándar)
+    (a: any, b: any) => b.height - a.height, // Altura Desc (Shelf-First)
     (a: any, b: any) => b.width - a.width, // Ancho Desc
-    (a: any, b: any) => (b.width / b.height) - (a.width / a.height), // Aspect Ratio
+    (a: any, b: any) => Math.max(b.width, b.height) - Math.max(a.width, a.height), // Lado Mayor Desc
+    (a: any, b: any) => (b.width / b.height) - (a.width / a.height), // Ratio de aspecto
   ];
 
   let bestResult: OptimizationResult | null = null;
@@ -55,15 +58,20 @@ export function runOptimization(
       }))
     );
 
+    // Aplicar estrategia de ordenamiento
     pool.sort(strategy);
 
+    // Construir layout para esta estrategia
     const currentResult = buildLayout(pool, usableW, usableH, kerf, trim, selectedThickness, partColors);
     
-    if (!bestResult || currentResult.totalEfficiency > bestResult.totalEfficiency || (currentResult.totalPanels < bestResult.totalPanels)) {
+    // El mejor resultado es el que maximiza la eficiencia global (o minimiza paneles)
+    if (!bestResult || 
+        currentResult.totalPanels < bestResult.totalPanels || 
+        (currentResult.totalPanels === bestResult.totalPanels && currentResult.totalEfficiency > bestResult.totalEfficiency)) {
       bestResult = currentResult;
     }
     
-    // Si ya logramos la meta industrial de un solo panel al 96.4%, podemos parar
+    // Meta Industrial: Si ya consolidamos en 1 panel con eficiencia superior al 96%, es óptimo
     if (bestResult.totalPanels === 1 && bestResult.totalEfficiency > 96.0) break;
   }
 
@@ -80,18 +88,18 @@ function buildLayout(
   colors: Record<string, string>
 ): OptimizationResult {
   const panels: OptimizedPanel[] = [];
-  let workingPool = [...pool];
+  let workingPool = pool.map(p => ({ ...p })); // Clon para esta estrategia
 
   while (workingPool.some(p => !p.placed)) {
     const placedInPanel: OptimizedPart[] = [];
     let currentY = 0;
 
-    // Layer 2: Franjas (Shelves)
+    // Layer 2: Franjas (Shelves) - Guillotina Horizontal
     while (currentY < usableH) {
       // Buscar el líder de franja (la pieza más alta que quepa)
       const leaderIdx = workingPool.findIndex(p => !p.placed && 
         ((p.width <= usableW && p.height <= (usableH - currentY)) || 
-         (p.grainDirection === 'libre' && p.height <= usableW && p.width <= (usableH - usableW)))
+         (p.grainDirection === 'libre' && p.height <= usableW && p.width <= (usableH - currentY)))
       );
 
       if (leaderIdx === -1) break;
@@ -100,9 +108,10 @@ function buildLayout(
       let shelfH = leader.height;
       let rotatedShelf = false;
 
-      // Verificamos si rotada es mejor para la eficiencia global
+      // Evaluación inteligente de rotación para el líder (Prioridad Global)
       if (leader.grainDirection === 'libre' && leader.width <= (usableH - currentY) && leader.height <= usableW) {
-        if (leader.width > leader.height) { // Si rotar reduce la altura de la franja, ahorramos espacio vertical
+        // Si al rotar la pieza líder, el desperdicio en la fila es similar pero la altura consumida es menor, rotamos
+        if (leader.width < leader.height) {
           shelfH = leader.width;
           rotatedShelf = true;
         }
@@ -112,18 +121,38 @@ function buildLayout(
 
       // Layer 3: Contenedores (Columnas)
       while (currentX < usableW) {
-        // Lógica de Prioridad Industrial: Buscar piezas que coincidan con la altura o tipo del líder
+        // Lógica de Selección Industrial: 
+        // 1. Intentar piezas con el mismo código/nombre que el líder (Identidad)
+        // 2. Si no, piezas que mejor ajusten a la altura de la franja (Scavenger)
         let bestIdx = workingPool.findIndex(p => !p.placed && p.name === leader.name && 
           ((p.width <= (usableW - currentX) && p.height <= shelfH) || 
            (p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= shelfH))
         );
 
-        // Si no hay iguales, buscamos "Scavenger" (mejor ajuste de altura para minimizar desperdicio en la fila)
         if (bestIdx === -1) {
-          bestIdx = workingPool.findIndex(p => !p.placed && 
-            ((p.width <= (usableW - currentX) && p.height <= shelfH) || 
-             (p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= shelfH))
-          );
+          // Scavenger: Buscar la pieza que minimice el desperdicio de altura en esta columna
+          let minHeightDiff = Infinity;
+          for (let i = 0; i < workingPool.length; i++) {
+            const p = workingPool[i];
+            if (p.placed) continue;
+            
+            // Probar normal
+            if (p.width <= (usableW - currentX) && p.height <= shelfH) {
+              const diff = shelfH - p.height;
+              if (diff < minHeightDiff) {
+                minHeightDiff = diff;
+                bestIdx = i;
+              }
+            }
+            // Probar rotada
+            if (p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= shelfH) {
+              const diff = shelfH - p.width;
+              if (diff < minHeightDiff) {
+                minHeightDiff = diff;
+                bestIdx = i;
+              }
+            }
+          }
         }
 
         if (bestIdx === -1) break;
@@ -131,12 +160,12 @@ function buildLayout(
         const p = workingPool[bestIdx];
         let isRotated = false;
 
-        // Evaluación de rotación inteligente
+        // Decisión final de rotación para la columna
         if (p.grainDirection === 'libre') {
           const normalFits = p.width <= (usableW - currentX) && p.height <= shelfH;
           const rotatedFits = p.height <= (usableW - currentX) && p.width <= shelfH;
           if (normalFits && rotatedFits) {
-            // Preferimos la orientación que más se acerque a la altura de la franja (Lepton logic)
+            // Elegimos la rotación que deje la altura más cercana al líder (Lepton logic)
             isRotated = Math.abs(p.height - shelfH) > Math.abs(p.width - shelfH);
           } else if (rotatedFits) {
             isRotated = true;
@@ -157,9 +186,9 @@ function buildLayout(
         });
         p.placed = true;
 
-        // Layer 4: Nesting Recursivo (Relleno vertical del contenedor)
+        // Layer 4: Nesting Recursivo (Relleno de altura dentro de la columna)
         let nextY = pH + kerf;
-        while (shelfH - nextY >= 50) { // Mínimo 50mm para que valga la pena
+        while (shelfH - nextY >= 10) { // Margen mínimo
           const remH = shelfH - nextY;
           const nestIdx = workingPool.findIndex(np => !np.placed && 
             ((np.width <= pW && np.height <= remH) || 
@@ -170,7 +199,8 @@ function buildLayout(
             const np = workingPool[nestIdx];
             let nRot = false;
             if (np.grainDirection === 'libre' && np.height <= pW && np.width <= remH) {
-              if (np.width > np.height || np.width > pW) nRot = true;
+              // Favorecer la rotación que mejor use el ancho de la columna
+              if (Math.abs(np.height - pW) > Math.abs(np.width - pW)) nRot = true;
             }
             const nW = nRot ? np.height : np.width;
             const nH = nRot ? np.width : np.height;
@@ -218,7 +248,7 @@ function buildLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency,
-    summary: `ArquiMax Industrial Engine v11.5: Eficiencia ${totalEfficiency.toFixed(2)}% lograda mediante análisis global.`,
+    summary: `ArquiMax Industrial Engine v11.5: Análisis Global determinístico completado.`,
     kerf,
     trim,
     selectedThickness
