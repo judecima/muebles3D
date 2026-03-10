@@ -3,6 +3,7 @@ import { Part, FurnitureDimensions, FurnitureModel, FurnitureType } from '@/lib/
 /**
  * Motor de Catálogo Red Arquimax v16.0 Industrial
  * Especialización: Despenseros y Torres de Horno con arquitectura de Sándwich Estricta.
+ * Actualización v16.1: Puertas únicas de ancho completo para torres.
  */
 export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensions): FurnitureModel {
   const T = dim.thickness || 18;
@@ -83,15 +84,13 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
   switch (type) {
     case 'cabinet_pantry_60_2p': {
       hasDoors = true;
-      const doorW = (W - sideGap*2 - midGap) / 2;
+      const doorW = W - sideGap * 2;
       const doorH = H - topGap;
       const doorY = H / 2;
       
-      // Puertas
-      parts.push({ id: 'door-L', name: 'Puerta Despensero Izq', width: doorW, height: doorH, depth: T, x: sideGap + doorW/2, y: doorY, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door-L', doorH, doorW, 0, doorY);
-      parts.push({ id: 'door-R', name: 'Puerta Despensero Der', width: doorW, height: doorH, depth: T, x: W - sideGap - doorW/2, y: doorY, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door-R', doorH, doorW, W, doorY);
+      // Puerta Única pivotante a la derecha
+      parts.push({ id: 'door-main', name: 'Puerta Despensero Única', width: doorW, height: doorH, depth: T, x: W/2, y: doorY, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
+      addHinges('door-main', doorH, doorW, W, doorY);
 
       // 4 Estantes internos
       for (let i = 1; i <= 4; i++) {
@@ -104,29 +103,26 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
       hasDoors = true;
       const bottomH = 750;
       const nicheH = 450;
-      const topH = H - bottomH - nicheH - T*2;
 
       // Divisores del nicho
       parts.push({ id: 'div-niche-B', name: 'Base Nicho Horno', width: innerW, height: T, depth: D, x: W/2, y: bottomH, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
       parts.push({ id: 'div-niche-T', name: 'Techo Nicho Horno', width: innerW, height: T, depth: D, x: W/2, y: bottomH + nicheH, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
 
-      // Puertas Inferiores (2)
-      const dW_inf = (W - sideGap*2 - midGap) / 2;
+      // Puerta Inferior Única (Pivot Derecha)
+      const dW_inf = W - sideGap * 2;
       const dH_inf = bottomH - T - topGap;
       const dY_inf = (bottomH + T) / 2;
-      parts.push({ id: 'd-inf-L', name: 'Puerta Inferior Izq', width: dW_inf, height: dH_inf, depth: T, x: sideGap + dW_inf/2, y: dY_inf, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: dY_inf, z: D/2 }, cutLargo: dH_inf, cutAncho: dW_inf, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('d-inf-L', dH_inf, dW_inf, 0, dY_inf);
-      parts.push({ id: 'd-inf-R', name: 'Puerta Inferior Der', width: dW_inf, height: dH_inf, depth: T, x: W - sideGap - dW_inf/2, y: dY_inf, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: dY_inf, z: D/2 }, cutLargo: dH_inf, cutAncho: dW_inf, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('d-inf-R', dH_inf, dW_inf, W, dY_inf);
+      parts.push({ id: 'd-inf', name: 'Puerta Inferior Única', width: dW_inf, height: dH_inf, depth: T, x: W/2, y: dY_inf, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: dY_inf, z: D/2 }, cutLargo: dH_inf, cutAncho: dW_inf, cutEspesor: T, grainDirection: 'vertical' });
+      addHinges('d-inf', dH_inf, dW_inf, W, dY_inf);
 
-      // Puerta Superior (1)
+      // Puerta Superior Única
       const dW_sup = W - sideGap*2;
       const dH_sup = H - (bottomH + nicheH + T) - topGap;
       const dY_sup = (H - T + (bottomH + nicheH + T)) / 2;
       parts.push({ id: 'd-sup', name: 'Puerta Superior Torre', width: dW_sup, height: dH_sup, depth: T, x: W/2, y: dY_sup, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: dY_sup, z: D/2 }, cutLargo: dH_sup, cutAncho: dW_sup, cutEspesor: T, grainDirection: 'vertical' });
       addHinges('d-sup', dH_sup, dW_sup, W, dY_sup);
 
-      // Estantes extra
+      // Estante extra en módulo inferior
       parts.push({ id: 'sh-inf', name: 'Estante Inferior', width: innerW, height: T, depth: D*0.9, x: W/2, y: bottomH/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D*0.9, cutEspesor: T, grainDirection: 'horizontal' });
       break;
     }
@@ -191,5 +187,5 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     }
   }
 
-  return { parts, summary: `Catálogo v16.0 Industrial: Especialización en torres y despenseros con apoyo real.`, hasDoors, hasDrawers };
+  return { parts, summary: `Catálogo v16.1 Industrial: Puertas únicas de ancho completo para torres y despenseros.`, hasDoors, hasDrawers };
 }
