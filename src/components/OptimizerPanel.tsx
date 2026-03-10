@@ -8,6 +8,8 @@ import { Part, AVAILABLE_PANELS, PanelSize, GrainDirection, OptimizationResult }
 import { runOptimization } from '@/optimizer/cutOptimizer';
 import { generateCutListFromModel, CutlistPart } from '@/utils/cutlistGenerator';
 import { Progress } from '@/components/ui/progress';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { 
   Scissors, 
   Loader2, 
@@ -22,7 +24,9 @@ import {
   ZoomOut,
   Info,
   Layers,
-  Maximize2
+  Maximize2,
+  List,
+  CheckCircle2
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -41,6 +45,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   const [error, setError] = useState<string | null>(null);
   const [localCutlist, setLocalCutlist] = useState<CutlistPart[]>([]);
   const [isPartsListOpen, setIsPartsListOpen] = useState(false);
+  const [isDetailedListOpen, setIsDetailedListOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [targetThickness, setTargetThickness] = useState<number>(18);
 
@@ -93,7 +98,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
         }
       } catch (e) {
         console.error(e);
-        setError("Error en el cálculo industrial v10.0.");
+        setError("Error en el cálculo industrial v11.7.");
       } finally {
         setLoading(false);
       }
@@ -160,7 +165,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v10.0
+                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v11.7
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}>
@@ -266,6 +271,52 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   <p className="text-lg font-black text-slate-700">{result ? `${result.totalEfficiency.toFixed(1)}%` : '-'}</p>
                 </div>
               </div>
+
+              {result && (
+                <Collapsible open={isDetailedListOpen} onOpenChange={setIsDetailedListOpen} className="mt-2 border rounded-xl bg-white overflow-hidden shadow-sm">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full flex justify-between items-center px-4 py-3 text-slate-600 hover:bg-slate-50 h-auto">
+                      <div className="flex items-center gap-2">
+                        <List className="w-4 h-4 text-primary" />
+                        <span className="text-[10px] font-bold uppercase tracking-tight">Ver Listado de Colocación</span>
+                      </div>
+                      {isDetailedListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="p-0 border-t">
+                    <div className="max-h-[300px] overflow-auto custom-scrollbar">
+                      <Table>
+                        <TableHeader className="bg-slate-50 sticky top-0 z-10">
+                          <TableRow className="h-8">
+                            <TableHead className="text-[9px] font-bold uppercase py-1 px-2 h-auto">Pieza</TableHead>
+                            <TableHead className="text-[9px] font-bold uppercase py-1 px-2 h-auto text-right">Base</TableHead>
+                            <TableHead className="text-[9px] font-bold uppercase py-1 px-2 h-auto text-right">Altura</TableHead>
+                            <TableHead className="text-[9px] font-bold uppercase py-1 px-2 h-auto text-center">Rot.</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {result.optimizedLayout.flatMap(panel => 
+                            panel.parts.map((part, pIdx) => (
+                              <TableRow key={`${panel.panelNumber}-${pIdx}`} className="h-7 hover:bg-slate-50">
+                                <TableCell className="text-[9px] py-1 px-2 font-medium truncate max-w-[100px]">{part.name}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-right">{part.width}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-right">{part.height}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-center">
+                                  {part.rotated ? (
+                                    <Badge variant="outline" className="text-[8px] h-3 px-1 border-amber-200 text-amber-700 bg-amber-50 leading-none">SI</Badge>
+                                  ) : (
+                                    <span className="text-slate-300">-</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -274,7 +325,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase text-lg">Ejecutando Simulador Industrial v10.0...</p>
+              <p className="font-black text-slate-700 uppercase text-lg">Ejecutando Simulador Industrial v11.7...</p>
             </div>
           ) : error ? (
             <div className="py-20 flex flex-col items-center gap-4 text-red-500 bg-red-50 p-10 rounded-2xl border border-red-100">
@@ -354,7 +405,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
-                      <p className="text-[9px] text-slate-400 italic">Optimización ArquiMax v10.0. Estándar industrial de alta densidad.</p>
+                      <p className="text-[9px] text-slate-400 italic">Optimización ArquiMax v11.7. Estándar industrial de alta densidad.</p>
                     </div>
                   </div>
                 );
