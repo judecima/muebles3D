@@ -183,34 +183,32 @@ export class SceneManager {
         obj.position.z = orig.z + offset;
       }
 
-      // Cinemática Industrial de Pistones v15.7
+      // Cinemática Industrial de Pistones v15.8 (Restaurada)
       if (type === 'piston-body') {
         const config = obj.userData.pistonConfig;
-        const door = this.partsMap.get(config.doorId);
+        const doorGroup = this.partsMap.get(config.doorId);
         
-        if (door) {
-          // El anclaje del mueble es la posición de origen fija
-          const cabinetAnchor = new THREE.Vector3(config.anchorMueble.x, config.anchorMueble.y, config.anchorMueble.z);
+        if (doorGroup) {
+          // Buscamos la malla de la puerta dentro del grupo de pivote
+          const doorMesh = doorGroup.getObjectByProperty('type', 'Mesh') || doorGroup.children[0];
           
-          // Calculamos la posición del anclaje de la puerta en el espacio del mundo
-          const doorAnchorLocal = new THREE.Vector3(config.anchorPuertaLocal.x, config.anchorPuertaLocal.y, config.anchorPuertaLocal.z);
-          const doorAnchorWorld = door.localToWorld(doorAnchorLocal.clone());
-          
-          // Sincronizamos la posición del cuerpo al anclaje del mueble
-          obj.position.copy(cabinetAnchor);
-          
-          // El pistón mira siempre hacia el punto de anclaje de la puerta
-          obj.lookAt(doorAnchorWorld);
+          if (doorMesh) {
+            const cabinetAnchor = new THREE.Vector3(config.anchorMueble.x, config.anchorMueble.y, config.anchorMueble.z);
+            const doorAnchorLocal = new THREE.Vector3(config.anchorPuertaLocal.x, config.anchorPuertaLocal.y, config.anchorPuertaLocal.z);
+            
+            // Calculamos la posición del anclaje de la puerta en coordenadas globales
+            const doorAnchorWorld = doorMesh.localToWorld(doorAnchorLocal.clone());
+            
+            // Sincronizamos la posición y orientación del cuerpo del pistón
+            obj.position.copy(cabinetAnchor);
+            obj.lookAt(doorAnchorWorld);
 
-          // Calculamos la distancia actual entre anclajes para escalar el vástago
-          const currentDist = cabinetAnchor.distanceTo(doorAnchorWorld);
-          
-          const rod = obj.getObjectByName('piston-rod');
-          if (rod) {
-            // El vástago se escala linealmente para cerrar el gap entre anclajes
-            // Consideramos la longitud cerrada como factor de escala 1
-            const scaleFactor = currentDist / config.lengthClosed;
-            rod.scale.z = scaleFactor;
+            // Calculamos la extensión telescópica del vástago
+            const currentDist = cabinetAnchor.distanceTo(doorAnchorWorld);
+            const rod = obj.getObjectByName('piston-rod');
+            if (rod) {
+              rod.scale.z = currentDist / config.lengthClosed;
+            }
           }
         }
       }
@@ -242,15 +240,13 @@ export class SceneManager {
       let mesh: THREE.Object3D;
 
       if (part.type === 'piston-body') {
-        // Estructura de Pistón Telescópico v15.7
         const bodyGeom = new THREE.CylinderGeometry(6, 6, part.depth, 16);
-        bodyGeom.rotateX(Math.PI / 2); // Alinear cilindro con eje Z
-        bodyGeom.translate(0, 0, part.depth / 2); // Pivotear en el extremo
+        bodyGeom.rotateX(Math.PI / 2); 
+        bodyGeom.translate(0, 0, part.depth / 2); 
         
         const bodyMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_body, metalness: 0.5, roughness: 0.3 });
         const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
         
-        // Vástago interno móvil
         const rodGeom = new THREE.CylinderGeometry(3.5, 3.5, part.depth, 16);
         rodGeom.rotateX(Math.PI / 2);
         rodGeom.translate(0, 0, part.depth / 2);
@@ -328,7 +324,7 @@ export class SceneManager {
     const size = new THREE.Vector3();
     box.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = this.camera.fov * (Math.PI / 180);
+    const fov = this.camera.fov * (Math.PI / 200);
     let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2.2;
     const direction = new THREE.Vector3(1, 0.7, 1).normalize();
     this.camera.position.copy(direction.multiplyScalar(cameraDistance).add(center));
