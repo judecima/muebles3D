@@ -17,7 +17,9 @@ import {
   ZoomOut,
   Scissors,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Settings2,
+  Maximize2
 } from 'lucide-react';
 
 interface PartInput {
@@ -46,7 +48,7 @@ export default function TestOptimizerPage() {
   const [parts, setParts] = useState<PartInput[]>(MESOPOTAMIA_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [zoom, setZoom] = useState(0.85);
+  const [zoom, setZoom] = useState(0.8);
 
   const addPart = () => {
     setParts([...parts, { name: `Nueva Pieza ${parts.length + 1}`, width: 500, height: 300, quantity: 1, grainDirection: 'libre' }]);
@@ -83,26 +85,28 @@ export default function TestOptimizerPage() {
     handleOptimize();
   }, []);
 
+  const totalPartsCount = parts.reduce((a, b) => a + b.quantity, 0);
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-body antialiased">
+    <div className="min-h-screen bg-[#F3F6F8] p-4 md:p-8 font-body antialiased">
       <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
         
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100 gap-4">
           <div className="flex items-center gap-4">
-            <div className="bg-primary p-3 rounded-2xl shadow-lg shadow-primary/20">
+            <div className="bg-[#3A7296] p-3 rounded-2xl shadow-lg shadow-[#3A7296]/20">
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax v8.5 Ultra</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax Ultra-Industrial v9.0</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-primary" /> Guillotina Industrial (Shelf + V-Stacking) | Meta Lepton: 96.4%
+                <Scissors className="w-3 h-3 text-[#3A7296]" /> Guillotina 3-Stage + V-Stacking | Meta Lepton: 96.4%
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {loading ? "Procesando 10,000 Ciclos..." : "Optimizar Nivel Industrial"}
+            <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-[#3A7296] hover:bg-[#2A5266] text-white text-xs rounded-xl shadow-xl transition-all">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings2 className="w-4 h-4 mr-2" />}
+              {loading ? "Procesando 10,000 Ciclos..." : "Ejecutar Optimización Industrial"}
             </Button>
           </div>
         </header>
@@ -111,7 +115,7 @@ export default function TestOptimizerPage() {
           <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[750px]">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-4">
               <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Dataset Mesopotamia ({parts.reduce((a, b) => a + b.quantity, 0)})
+                <Layers className="w-4 h-4" /> Piezas Dataset ({totalPartsCount})
               </CardTitle>
               <Button variant="outline" size="icon" onClick={addPart} className="h-7 w-7 rounded-full">
                 <Plus className="w-3 h-3" />
@@ -129,16 +133,16 @@ export default function TestOptimizerPage() {
                       />
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase">Ancho</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Largo</p>
                           <Input type="number" value={part.width} onChange={(e) => updatePart(i, 'width', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase">Alto</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Ancho</p>
                           <Input type="number" value={part.height} onChange={(e) => updatePart(i, 'height', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
                         </div>
                         <div className="space-y-1">
                           <p className="text-[8px] font-bold text-slate-400 uppercase">Cant.</p>
-                          <Input type="number" value={part.quantity} onChange={(e) => updatePart(i, 'quantity', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-black text-primary bg-primary/5 border-primary/20" />
+                          <Input type="number" value={part.quantity} onChange={(e) => updatePart(i, 'quantity', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-black text-[#3A7296] bg-[#3A7296]/5 border-[#3A7296]/20" />
                         </div>
                       </div>
                     </div>
@@ -154,11 +158,11 @@ export default function TestOptimizerPage() {
           <div className="lg:col-span-3 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center items-center text-center">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Aprovechamiento Panel</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Eficiencia Industrial</p>
                 <div className="relative h-24 w-24 flex items-center justify-center mb-4">
                   <svg className="w-full h-full transform -rotate-90">
                     <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-slate-100" />
-                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" strokeDasharray={`${(result?.totalEfficiency || 0) * 2.51} 251`} className="text-primary transition-all duration-1000 ease-out" />
+                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" strokeDasharray={`${(result?.totalEfficiency || 0) * 2.51} 251`} className="text-[#66DBDB] transition-all duration-1000 ease-out" />
                   </svg>
                   <span className="absolute text-xl font-black text-slate-800 tracking-tighter">
                     {result ? `${result.totalEfficiency.toFixed(1)}%` : '--%'}
@@ -168,15 +172,15 @@ export default function TestOptimizerPage() {
 
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center">
                 <div className="flex justify-between items-center mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado de Consolidación</p>
-                  <Layers className="w-4 h-4 text-primary" />
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consolidación de Paneles</p>
+                  <Layers className="w-4 h-4 text-[#3A7296]" />
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-baseline">
-                    <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-green-600' : 'text-slate-800'}`}>
+                    <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-[#66DBDB]' : 'text-slate-800'}`}>
                       {result?.totalPanels || '-'}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">PANEL TOTAL</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">PANELES</span>
                   </div>
                   <Progress value={result ? (1 / result.totalPanels) * 100 : 0} className="h-2" />
                 </div>
@@ -184,15 +188,15 @@ export default function TestOptimizerPage() {
 
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-slate-900 text-white flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                    <AlertCircle className="w-3 h-3 text-white" />
+                  <div className="w-6 h-6 rounded-full bg-[#66DBDB] flex items-center justify-center">
+                    <AlertCircle className="w-3 h-3 text-slate-900" />
                   </div>
                   <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
                   {loading ? "Simulando 10,000 permutaciones industriales..." : 
-                   result?.totalPanels === 1 ? "¡ÉXITO! Se ha igualado la eficiencia de Lepton. Todas las piezas caben en un panel de 2750x1830." : 
-                   "Buscando el mejor ajuste para consolidar en un solo panel..."}
+                   result?.totalPanels === 1 ? "¡ÉXITO INDUSTRIAL! El algoritmo v9.0 ha consolidado todas las piezas en un solo panel de 2750x1830." : 
+                   "Dataset procesado. Se requiere más de un panel para mantener la viabilidad de guillotina."}
                 </p>
               </Card>
             </div>
@@ -201,8 +205,8 @@ export default function TestOptimizerPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
-                    <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-green-500' : 'text-amber-500'}`} /> 
-                    Esquema de Corte ArquiMax v8.5
+                    <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-[#66DBDB]' : 'text-amber-500'}`} /> 
+                    Esquema Técnico de Corte v9.0
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -211,45 +215,50 @@ export default function TestOptimizerPage() {
                   </div>
                 </div>
 
-                <div className="overflow-auto bg-slate-200/50 p-8 rounded-3xl border-2 border-dashed border-slate-300 min-h-[700px] flex flex-col items-center custom-scrollbar">
+                <div className="overflow-auto bg-slate-200/30 p-8 rounded-3xl border-2 border-dashed border-slate-200 min-h-[700px] flex flex-col items-center custom-scrollbar">
                   <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }} className="transition-transform duration-300">
                     {result.optimizedLayout.map((panel, idx) => (
                       <div key={idx} className="bg-white p-10 rounded-xl shadow-2xl mb-12 border border-slate-100" 
                            style={{ width: '1000px', aspectRatio: '2750 / 1830' }}>
                         <div className="flex items-center justify-between mb-4">
-                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL 2750x1830 (TRIM: {result.trim}mm)</span>
-                          <span className="text-[10px] font-black text-primary uppercase">{panel.efficiency.toFixed(2)}% EFICIENCIA</span>
+                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL 2750x1830 (KERF: {result.kerf}mm)</span>
+                          <span className="text-[10px] font-black text-[#3A7296] uppercase">{panel.efficiency.toFixed(2)}% APROVECHAMIENTO</span>
                         </div>
 
-                        <div className="relative bg-slate-100 rounded-sm overflow-hidden border border-slate-300" 
+                        <div className="relative bg-slate-100 rounded-sm overflow-hidden border border-slate-300 shadow-inner" 
                              style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
                           
-                          {/* Zona Útil */}
+                          {/* Área Útil (Trim aplicada) */}
                           <div className="absolute bg-white" style={{ 
                             left: `${(result.trim / 2750) * 100}%`, 
                             top: `${(result.trim / 1830) * 100}%`, 
                             width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
                             height: `${((1830 - result.trim * 2) / 1830) * 100}%`,
-                            backgroundImage: 'linear-gradient(rgba(0,0,0,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.03) 1px, transparent 1px)',
+                            backgroundImage: 'linear-gradient(rgba(58, 114, 150, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(58, 114, 150, 0.05) 1px, transparent 1px)',
                             backgroundSize: '25px 25px'
                           }}>
                             {panel.parts.map((p, pIdx) => (
-                              <div key={pIdx} className="absolute border border-slate-900/70 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece"
+                              <div key={pIdx} className="absolute border border-slate-900/40 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece cursor-help"
+                                   title={`${p.name} (${p.width}x${p.height}mm)`}
                                    style={{
                                      left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
                                      top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
                                      width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
                                      height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
-                                     backgroundColor: p.color || 'rgba(174, 26, 226, 0.18)'
+                                     backgroundColor: p.color || 'rgba(58, 114, 150, 0.2)'
                                    }}>
                                 <div className="flex flex-col items-center leading-tight p-0.5 overflow-hidden text-center select-none">
                                   <span className="text-[min(1.2vw,9px)] font-black text-slate-800">{p.width}</span>
-                                  <span className="text-[min(1vw,7px)] font-bold text-slate-600 uppercase truncate max-w-full">{p.name}</span>
+                                  <span className="text-[min(1vw,7px)] font-bold text-slate-600 uppercase truncate max-w-full px-1">{p.name}</span>
                                   <span className="text-[min(1.2vw,9px)] font-black text-slate-800">{p.height}</span>
                                 </div>
                               </div>
                             ))}
                           </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 text-slate-400">
+                          <Maximize2 className="w-3 h-3" />
+                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Cortes de Guillotina Industriales Generados Automáticamente</span>
                         </div>
                       </div>
                     ))}
