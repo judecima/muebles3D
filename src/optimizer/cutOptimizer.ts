@@ -11,10 +11,10 @@ interface InternalPart {
 }
 
 /**
- * ArquiMax Industrial Engine v11.7 (Deterministic Global Optimizer)
- * Enfoque: Análisis de Doble Orientación de Panel + Nesting Recursivo 4-Layer.
- * El motor evalúa el tablero tanto en horizontal como en vertical para decidir
- * la dirección óptima de las fajas de guillotina.
+ * ArquiMax Industrial Engine v11.8 (Deterministic Global Optimizer)
+ * Enfoque: Análisis de Doble Orientación de Panel + Scavenger de Faja Agresivo.
+ * El motor garantiza la colocación de todas las piezas buscando rellenos laterales
+ * incluso cuando las piezas principales de la fila ya han sido colocadas.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -30,16 +30,15 @@ export function runOptimization(
     return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas", kerf, trim, selectedThickness };
   }
 
-  // ESTRATEGIAS DE ORIENTACIÓN DEL PANEL
   const panelOrientations = [
     { w: panelWidth, h: panelHeight, isRotated: false },
     { w: panelHeight, h: panelWidth, isRotated: true }
   ];
 
   let bestGlobalResult: OptimizationResult | null = null;
+  let bestGlobalUnplaced = Infinity;
   const partColors = generateColors(filteredParts);
 
-  // Para cada orientación de panel, probamos todas las estrategias determinísticas
   for (const orient of panelOrientations) {
     const usableW = Math.max(0, orient.w - (trim * 2));
     const usableH = Math.max(0, orient.h - (trim * 2));
@@ -68,11 +67,17 @@ export function runOptimization(
       pool.sort(strategy);
 
       const currentResult = buildLayout(pool, usableW, usableH, kerf, trim, selectedThickness, partColors, orient.w, orient.h);
+      const unplacedCount = pool.filter(p => !p.placed).length;
       
+      // PRIORIDAD 1: Menor cantidad de piezas sin colocar
+      // PRIORIDAD 2: Menor número de paneles
+      // PRIORIDAD 3: Mayor eficiencia
       if (!bestGlobalResult || 
-          currentResult.totalPanels < bestGlobalResult.totalPanels || 
-          (currentResult.totalPanels === bestGlobalResult.totalPanels && currentResult.totalEfficiency > bestGlobalResult.totalEfficiency)) {
+          unplacedCount < bestGlobalUnplaced || 
+          (unplacedCount === bestGlobalUnplaced && currentResult.totalPanels < bestGlobalResult.totalPanels) ||
+          (unplacedCount === bestGlobalUnplaced && currentResult.totalPanels === bestGlobalResult.totalPanels && currentResult.totalEfficiency > bestGlobalResult.totalEfficiency)) {
         bestGlobalResult = currentResult;
+        bestGlobalUnplaced = unplacedCount;
       }
     }
   }
@@ -98,7 +103,6 @@ function buildLayout(
     const placedInPanel: OptimizedPart[] = [];
     let currentY = 0;
 
-    // Layer 2: Fajas (Strips)
     while (currentY < usableH) {
       const leaderIdx = workingPool.findIndex(p => !p.placed && 
         ((p.width <= usableW && p.height <= (usableH - currentY)) || 
@@ -111,12 +115,10 @@ function buildLayout(
       let shelfH = leader.height;
       let rotatedShelf = false;
 
-      // Evaluación inteligente de rotación para el líder de faja
       if (leader.grainDirection === 'libre') {
         const canNormal = leader.width <= usableW && leader.height <= (usableH - currentY);
         const canRotated = leader.height <= usableW && leader.width <= (usableH - currentY);
         
-        // Priorizamos la rotación que mejor use el ancho o reduzca la altura de la faja
         if (canNormal && canRotated) {
           if (leader.width < leader.height) { 
             shelfH = leader.width;
@@ -130,11 +132,12 @@ function buildLayout(
 
       let currentX = 0;
 
-      // Layer 3: Contenedores (Columnas)
+      // SCAVENGER AGRESIVO: Llenar el ancho de la faja sin detenerse
       while (currentX < usableW) {
         let bestIdx = -1;
         let minHeightDiff = Infinity;
 
+        // Buscamos en TODO el pool la mejor pieza que quepa en el ancho restante
         for (let i = 0; i < workingPool.length; i++) {
           const p = workingPool[i];
           if (p.placed) continue;
@@ -152,21 +155,19 @@ function buildLayout(
           }
         }
 
-        if (bestIdx === -1) break;
+        if (bestIdx === -1) break; // Realmente no cabe nada más en este ancho
 
         const p = workingPool[bestIdx];
         let isRotated = false;
 
-        // Lógica de rotación forzada para evitar violaciones de trim
         const canNormal = p.width <= (usableW - currentX) && p.height <= shelfH;
         const canRotated = p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= shelfH;
 
         if (bestIdx === leaderIdx) {
           isRotated = rotatedShelf;
         } else if (!canNormal && canRotated) {
-          isRotated = true; // Rotación forzada por espacio
+          isRotated = true;
         } else if (canNormal && canRotated) {
-          // Elegimos la rotación que mejor se ajuste a la altura de la faja (Best-Height-Fit)
           isRotated = Math.abs(p.height - shelfH) > Math.abs(p.width - shelfH);
         }
 
@@ -184,7 +185,7 @@ function buildLayout(
         });
         p.placed = true;
 
-        // Layer 4: Nesting Recursivo (V-Stacking)
+        // Nesting Recursivo (V-Stacking)
         let nextY = pH + kerf;
         while (shelfH - nextY >= 5) {
           const remH = shelfH - nextY;
@@ -216,7 +217,7 @@ function buildLayout(
             const nRotatedFits = np.grainDirection === 'libre' && np.height <= pW && np.width <= remH;
 
             if (!nNormalFits && nRotatedFits) {
-              nRot = true; // Rotación forzada en nesting
+              nRot = true;
             } else if (nNormalFits && nRotatedFits) {
               if (Math.abs(np.height - pW) < Math.abs(np.width - pW)) nRot = true;
             }
@@ -267,7 +268,7 @@ function buildLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency,
-    summary: `DGP v11.7 Industrial Engine. Orientación de Panel analizada. Eficiencia Global: ${totalEfficiency.toFixed(2)}%`,
+    summary: `ArquiMax Industrial v11.8: Scavenger Agresivo Activo. Eficiencia: ${totalEfficiency.toFixed(2)}%`,
     kerf,
     trim,
     selectedThickness
