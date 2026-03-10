@@ -39,3 +39,16 @@ export interface SteelHouseConfig {
   layers: LayerVisibility;
   structuralMode: boolean;
 }
+
+export interface MaterialItem {
+  name: string;
+  category: 'perfileria' | 'paneles' | 'fijaciones' | 'aislacion' | 'otros';
+  unit: string;
+  quantity: number;
+  description: string;
+}
+
+export interface MaterialEstimate {
+  items: MaterialItem[];
+  totalSteelWeightKg: number;
+}

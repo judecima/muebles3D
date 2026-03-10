@@ -4,8 +4,10 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
 import { SteelJoystick } from '@/components/steel/SteelJoystick';
+import { SteelMaterialsTable } from '@/components/steel/SteelMaterialsTable';
 import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Menu, 
   Home, 
@@ -20,8 +22,9 @@ import {
   Zap,
   Gamepad2,
   MousePointer,
-  MoveHorizontal,
-  MoveVertical
+  Box,
+  ClipboardList,
+  ChevronRight
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -46,6 +49,7 @@ const INITIAL_CONFIG: SteelHouseConfig = {
     interiorPanels: false,
     steelProfiles: true,
     crossBracing: true,
+    horizontalBlocking: true,
     lintels: true,
     reinforcements: true
   },
@@ -57,6 +61,7 @@ export default function SteelFramingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
+  const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
   const isMobile = useIsMobile();
   
   const viewerRef = useRef<{ 
@@ -66,7 +71,6 @@ export default function SteelFramingPage() {
     updateJoystickLook: (x: number, y: number) => void
   }>(null);
 
-  // Ajuste automático de muros al cambiar dimensiones globales
   useEffect(() => {
     const newWalls = config.walls.map(w => {
       if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
@@ -149,133 +153,168 @@ export default function SteelFramingPage() {
                 </SheetHeader>
                 <SteelControlPanel 
                   config={config} 
-                  onConfigChange={(newConfig) => {
-                    setConfig(newConfig);
-                  }} 
+                  onConfigChange={setConfig} 
                 />
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-1.5">
               <Home className="w-4 h-4 text-blue-600" />
-              <span className="text-[10px] font-black uppercase text-slate-800 tracking-tighter">RED ARQUIMAX STEEL</span>
+              <span className="text-[10px] font-black uppercase text-slate-800 tracking-tighter">ARQUIMAX STEEL v2.9</span>
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button 
-              variant={isWalkModeActive ? "secondary" : "default"}
-              size="sm" 
-              className={`h-8 px-4 text-[10px] font-black uppercase tracking-tighter transition-all ${isWalkModeActive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-              onClick={() => {
-                if (isWalkModeActive) setIsWalkModeActive(false);
-                else viewerRef.current?.enterWalkMode();
-              }}
-            >
-              <Compass className="w-3.5 h-3.5 mr-2" /> 
-              {isWalkModeActive ? "Salir de Navegación" : "Entrar Modo Caminata"}
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 px-3 text-[10px] font-bold">
-              <Download className="w-3.5 h-3.5 mr-2" /> 
-              EXPORTAR
-            </Button>
+          <div className="flex items-center gap-4">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="h-8">
+              <TabsList className="bg-slate-100 h-8 p-1 rounded-lg">
+                <TabsTrigger value="3d" className="text-[10px] font-bold uppercase h-6 px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                  <Box className="w-3 h-3 mr-1.5" /> Diseño 3D
+                </TabsTrigger>
+                <TabsTrigger value="materials" className="text-[10px] font-bold uppercase h-6 px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                  <ClipboardList className="w-3 h-3 mr-1.5" /> Listado Materiales
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="h-4 w-px bg-slate-200 hidden md:block" />
+
+            <div className="flex gap-2">
+              <Button 
+                variant={isWalkModeActive ? "secondary" : "default"}
+                size="sm" 
+                className={`h-8 px-4 text-[10px] font-black uppercase tracking-tighter transition-all ${isWalkModeActive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                onClick={() => {
+                  if (isWalkModeActive) setIsWalkModeActive(false);
+                  else viewerRef.current?.enterWalkMode();
+                }}
+              >
+                <Compass className="w-3.5 h-3.5 mr-2" /> 
+                {isWalkModeActive ? "Salir" : "Caminar"}
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 px-3 text-[10px] font-bold">
+                <Download className="w-3.5 h-3.5 mr-2" /> 
+                EXPORTAR
+              </Button>
+            </div>
           </div>
         </header>
 
         <div className="flex-1 relative overflow-hidden">
-          <SteelViewer 
-            ref={viewerRef}
-            config={config} 
-            onOpeningDoubleClick={handleOpeningDoubleClick}
-            onWalkModeLock={handleWalkModeLock}
-          />
-          
-          <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
-            {!isWalkModeActive && (
-              <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">MODO DE EDICIÓN</span>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1">
-                    <Layout className="w-3 h-3 text-blue-500" />
-                    <span className="text-xs font-black text-slate-800">{config.walls.length} Muros</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Settings2 className="w-3 h-3 text-slate-400" />
-                    <span className="text-[9px] font-medium text-slate-600 uppercase">Doble Click para reacomodar</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isWalkModeActive && (
-              <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300 pointer-events-auto">
-                <div className="flex items-center gap-2 mb-2">
-                  <Gamepad2 className="w-4 h-4 text-blue-400" />
-                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NAVEGACIÓN ACTIVA</span>
-                </div>
-                <div className="grid grid-cols-1 gap-y-2">
-                  <div className="flex items-center gap-2">
-                    <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[9px] font-medium uppercase">WASD: Moverse | Flechas: Mirar</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MousePointer className="w-3 h-3 text-slate-400" />
-                    <span className="text-[9px] font-medium uppercase italic text-slate-500">Ratón desactivado (Evita errores de seguridad)</span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic text-center">Presiona el botón superior para salir</div>
-              </div>
-            )}
-          </div>
-
-          {isWalkModeActive && (
-            <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
-              <div className="absolute bottom-16 left-16 pointer-events-auto">
-                <SteelJoystick 
-                  label="Moverse" 
-                  onMove={(v) => viewerRef.current?.updateJoystickMove(v.x, v.y)} 
-                />
-              </div>
+          <Tabs value={activeTab} className="w-full h-full">
+            <TabsContent value="3d" className="w-full h-full m-0 p-0 relative">
+              <SteelViewer 
+                ref={viewerRef}
+                config={config} 
+                onOpeningDoubleClick={handleOpeningDoubleClick}
+                onWalkModeLock={handleWalkModeLock}
+              />
               
-              <div className="absolute bottom-16 right-16 pointer-events-auto">
-                <SteelJoystick 
-                  label="Cámara" 
-                  onMove={(v) => viewerRef.current?.updateJoystickLook(v.x, v.y)} 
-                />
+              <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
+                {!isWalkModeActive && (
+                  <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-left">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">PROYECTO ACTIVO</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Layout className="w-3 h-3 text-blue-500" />
+                        <span className="text-xs font-black text-slate-800">{config.walls.length} Muros</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-[9px] font-black text-slate-600 uppercase">Motor Estructural OK</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isWalkModeActive && (
+                  <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in zoom-in duration-300 pointer-events-auto">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Gamepad2 className="w-4 h-4 text-blue-400" />
+                      <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">MODO CAMINATA</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-y-2">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Keyboard className="w-3 h-3" />
+                        <span className="text-[9px] font-medium uppercase">W-A-S-D: Moverse</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Move className="w-3 h-3" />
+                        <span className="text-[9px] font-medium uppercase">Flechas: Cámara</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-auto scale-90">
-                <Button 
-                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
-                  onMouseDown={() => viewerRef.current?.setMovement('up', true)} onMouseUp={() => viewerRef.current?.setMovement('up', false)}
-                  onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
-                >
-                  <ArrowUp className="w-6 h-6 text-white" />
-                </Button>
-                <Button 
-                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600/60 backdrop-blur border border-white/20 shadow-lg" 
-                  onMouseDown={() => viewerRef.current?.setMovement('sprint', true)} onMouseUp={() => viewerRef.current?.setMovement('sprint', false)}
-                  onTouchStart={() => viewerRef.current?.setMovement('sprint', true)} onTouchEnd={() => viewerRef.current?.setMovement('sprint', false)}
-                >
-                  <Zap className="w-6 h-6 text-white" />
-                </Button>
-                <Button 
-                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
-                  onMouseDown={() => viewerRef.current?.setMovement('down', true)} onMouseUp={() => viewerRef.current?.setMovement('down', false)}
-                  onTouchStart={() => viewerRef.current?.setMovement('down', true)} onTouchEnd={() => viewerRef.current?.setMovement('down', false)}
-                >
-                  <ArrowDown className="w-6 h-6 text-white" />
-                </Button>
-              </div>
-            </div>
-          )}
+              {isWalkModeActive && (
+                <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
+                  <div className="absolute bottom-16 left-16 pointer-events-auto">
+                    <SteelJoystick 
+                      label="Moverse" 
+                      onMove={(v) => viewerRef.current?.updateJoystickMove(v.x, v.y)} 
+                    />
+                  </div>
+                  
+                  <div className="absolute bottom-16 right-16 pointer-events-auto">
+                    <SteelJoystick 
+                      label="Cámara" 
+                      onMove={(v) => viewerRef.current?.updateJoystickLook(v.x, v.y)} 
+                    />
+                  </div>
 
-          {!isWalkModeActive && (
-            <div className="absolute bottom-4 right-4 bg-slate-900/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 pointer-events-none">
-              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                <Move className="w-3 h-3" /> ROTAR: CLICK IZQ | PAN: CLICK DER | ZOOM: RUEDA
-              </p>
-            </div>
-          )}
+                  <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-auto scale-90">
+                    <Button 
+                      variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
+                      onMouseDown={() => viewerRef.current?.setMovement('up', true)} onMouseUp={() => viewerRef.current?.setMovement('up', false)}
+                      onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
+                    >
+                      <ArrowUp className="w-6 h-6 text-white" />
+                    </Button>
+                    <Button 
+                      variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600/60 backdrop-blur border border-white/20 shadow-lg" 
+                      onMouseDown={() => viewerRef.current?.setMovement('sprint', true)} onMouseUp={() => viewerRef.current?.setMovement('sprint', false)}
+                      onTouchStart={() => viewerRef.current?.setMovement('sprint', true)} onTouchEnd={() => viewerRef.current?.setMovement('sprint', false)}
+                    >
+                      <Zap className="w-6 h-6 text-white" />
+                    </Button>
+                    <Button 
+                      variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
+                      onMouseDown={() => viewerRef.current?.setMovement('down', true)} onMouseUp={() => viewerRef.current?.setMovement('down', false)}
+                      onTouchStart={() => viewerRef.current?.setMovement('down', true)} onTouchEnd={() => viewerRef.current?.setMovement('down', false)}
+                    >
+                      <ArrowDown className="w-6 h-6 text-white" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!isWalkModeActive && (
+                <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-200 shadow-sm pointer-events-none">
+                  <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
+                    <MousePointer className="w-3 h-3 text-blue-500" /> ROTAR: CLICK IZQ | PAN: CLICK DER | ZOOM: RUEDA
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="materials" className="w-full h-full m-0 bg-slate-50 overflow-y-auto p-4 md:p-8">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-200">
+                    <ClipboardList className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Cómputo Métrico</h2>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      <span>Estimación Industrial</span>
+                      <ChevronRight className="w-3 h-3" />
+                      <span>{config.width}x{config.length}mm</span>
+                    </div>
+                  </div>
+                </div>
+                <SteelMaterialsTable config={config} />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
 
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
