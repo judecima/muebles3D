@@ -1,11 +1,11 @@
 import { Part, FurnitureDimensions, FurnitureModel, FurnitureType } from '@/lib/types';
 
 /**
- * Motor de Catálogo Red Arquimax v15.8 Industrial
+ * Motor de Catálogo Red Arquimax v15.9 Industrial
  * - Estructura Sándwich (Base/Tapa ancho W).
  * - Cajones de 6 piezas sincronizadas con huelgo 3mm.
  * - Descuento simétrico de 13mm para rieles.
- * - Restauración de estantes para Torres (Despensero/Horno).
+ * - Soporte para Despenseros de 2 Puertas (2P) con 4 estantes internos.
  */
 export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensions): FurnitureModel {
   const T = dim.thickness || 18;
@@ -28,7 +28,6 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
   parts.push({ id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
   
   if (isBase) {
-    // Para bajos, los refuerzos van entre los laterales (W-2T) y al ras de la altura
     parts.push({ id: 'ref-F', name: 'Amarre Frontal', width: innerW, height: T, depth: 60, x: W/2, y: H - T/2, z: D/2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' });
     parts.push({ id: 'ref-B', name: 'Amarre Trasero', width: innerW, height: 60, depth: T, x: W/2, y: H - 30, z: -D/2 + T/2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' });
   } else {
@@ -74,7 +73,6 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     const aesH = fH - topGap;
     const boxInnerW = boxW - 2 * T;
 
-    // Cajón de 6 piezas sincronizadas
     parts.push({ id: `${prefix}-aes`, groupId: prefix, name: `Frente Cajón`, width: aesW, height: aesH, depth: T, x: x, y: y, z: D/2 + T/2, type: 'drawer', cutLargo: aesH, cutAncho: aesW, cutEspesor: T, grainDirection: 'horizontal' });
     parts.push({ id: `${prefix}-box-F`, groupId: prefix, name: `Frente Estruct. Caja`, width: boxInnerW, height: boxH, depth: T, x: x, y: y, z: D/2 - T/2, type: 'drawer', cutLargo: boxInnerW, cutAncho: boxH, cutEspesor: T, grainDirection: 'horizontal' });
     parts.push({ id: `${prefix}-box-B`, groupId: prefix, name: `Trasera Estruct. Caja`, width: boxInnerW, height: boxH, depth: T, x: x, y: y, z: D/2 - drD + T/2, type: 'drawer', cutLargo: boxInnerW, cutAncho: boxH, cutEspesor: T, grainDirection: 'horizontal' });
@@ -92,7 +90,6 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
       const drSectW = 400;
       const doorAreaW = W - drSectW;
       const divX = doorAreaW;
-      // Divisor interno canalizado para refuerzo (H-2T)
       parts.push({ id: 'div-dr', name: 'Divisor Cajonera', width: T, height: sideH - T, depth: D * 0.9, x: divX - T/2, y: T + (sideH-T)/2, z: 0, type: 'static', cutLargo: sideH - T, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' });
       const drH = (H - T - 10) / 3;
       for (let i = 0; i < 3; i++) createDrawer(`dr-${i}`, W - drSectW/2, T + 5 + (i * drH) + drH/2, drSectW, drH, D - 50);
@@ -125,12 +122,13 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
       break;
     }
     default: {
-      hasDoors = isWall || isTower || type.includes('60_1p') || type.includes('80_2p');
+      hasDoors = isWall || isTower || type.includes('60_1p') || type.includes('80_2p') || type.includes('2p');
       if (hasDoors) {
-        const dW = type.includes('80_2p') ? (W - sideGap*2 - midGap)/2 : (W - sideGap*2);
+        const is2P = type.includes('80_2p') || type.includes('2p');
+        const dW = is2P ? (W - sideGap*2 - midGap)/2 : (W - sideGap*2);
         const dH = H - topGap;
         const dY = H / 2;
-        if (type.includes('80_2p')) {
+        if (is2P) {
           parts.push({ id: 'door-L', name: 'Puerta Izquierda', width: dW, height: dH, depth: T, x: sideGap + dW/2, y: dY, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: dY, z: D/2 }, cutLargo: dH, cutAncho: dW, cutEspesor: T, grainDirection: 'vertical' });
           addHinges('door-L', dH, dW, 0, dY);
           parts.push({ id: 'door-R', name: 'Puerta Derecha', width: dW, height: dH, depth: T, x: W - sideGap - dW/2, y: dY, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: dY, z: D/2 }, cutLargo: dH, cutAncho: dW, cutEspesor: T, grainDirection: 'vertical' });
@@ -140,7 +138,6 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
           addHinges('door', dH, dW, 0, dY);
         }
       }
-      // Estantes para Torres (Despensero y Microondas)
       if (hasShelf) {
         if (isTower) {
           const numShelves = 4;
@@ -158,5 +155,5 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     }
   }
 
-  return { parts, summary: `Catálogo v15.8 Industrial: Estructura sándwich de apoyo real.`, hasDoors, hasDrawers };
+  return { parts, summary: `Catálogo v15.9 Industrial: Estructura sándwich y Torres de 4 estantes.`, hasDoors, hasDrawers };
 }
