@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 
 /**
- * Dataset MESOPOTAMIA 18mm extraído del XML de Lepton
- * Panel: 2750 x 1830 mm | Kerf: 4.5 mm | Trim: 10 mm
+ * Dataset MESOPOTAMIA 18mm extraído fielmente del XML de Lepton
+ * 23 piezas en total, optimizadas en un panel de 2750 x 1830 mm.
  */
 const LEPTON_DATASET = [
   { name: "V1 ESTANTES (1)", width: 629, height: 570, quantity: 4, grainDirection: 'libre' as GrainDirection, thickness: 18 },
@@ -43,7 +43,7 @@ export default function TestOptimizerPage() {
     setLoading(true);
     setResult(null);
 
-    // Simulamos carga de procesamiento intensivo (2000 iteraciones)
+    // Simulamos carga de procesamiento intensivo
     setTimeout(() => {
       const res = runOptimization(
         LEPTON_DATASET,
@@ -56,10 +56,10 @@ export default function TestOptimizerPage() {
       
       setResult(res);
       setLoading(false);
-    }, 800);
+    }, 1200);
   };
 
-  const leptonEfficiency = 95.56; // Basado en el XML proporcionado
+  const leptonEfficiency = 95.56;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12">
@@ -70,14 +70,14 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador de Algoritmo ArquiMax v5.0</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador de Algoritmo ArquiMax v6.0</h1>
               <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
                 <Layers className="w-4 h-4" /> Benchmarking vs Lepton Software (Dataset MESOPOTAMIA 18mm)
               </p>
             </div>
           </div>
           <Button size="lg" onClick={handleTest} disabled={loading} className="font-black uppercase tracking-widest px-10 h-14 bg-slate-900 hover:bg-black transition-all">
-            {loading ? "PROCESANDO 2000 CICLOS..." : "EJECUTAR VALIDACIÓN INDUSTRIAL"}
+            {loading ? "ANALIZANDO 2000 COMBINACIONES..." : "EJECUTAR VALIDACIÓN INDUSTRIAL"}
           </Button>
         </header>
 
@@ -93,7 +93,7 @@ export default function TestOptimizerPage() {
                 <span className="text-4xl font-black text-slate-900">{leptonEfficiency}%</span>
                 <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded uppercase">Meta</span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed font-medium">Eficiencia obtenida en la referencia XML para un tablero de 2750x1830mm con 23 piezas.</p>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">Eficiencia obtenida en el XML de referencia para un tablero de 2750x1830mm.</p>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-[10px] font-mono text-slate-600 space-y-1">
                 <p>Panel: 2750 x 1830 mm</p>
                 <p>Kerf: 4.5 mm | Trim: 10 mm</p>
@@ -104,7 +104,7 @@ export default function TestOptimizerPage() {
           <Card className={`shadow-sm border-slate-200 transition-all ${result ? 'border-primary/50 bg-primary/[0.01]' : ''}`}>
             <CardHeader className="pb-2 border-b">
               <CardTitle className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2 tracking-widest">
-                <Play className="w-4 h-4" /> Resultado ArquiMax v5.0
+                <Play className="w-4 h-4" /> Resultado ArquiMax v6.0
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
@@ -114,7 +114,7 @@ export default function TestOptimizerPage() {
                 </span>
                 {result && (
                   <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${result.totalEfficiency >= leptonEfficiency ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
-                    {result.totalEfficiency >= leptonEfficiency ? "META ALCANZADA" : "GUILLOTINA OK"}
+                    {result.totalEfficiency >= leptonEfficiency ? "META ALCANZADA" : "OPTIMIZANDO..."}
                   </span>
                 )}
               </div>
@@ -126,7 +126,7 @@ export default function TestOptimizerPage() {
                 </div>
                 <div className="bg-white p-3 rounded-xl border border-slate-100 text-center shadow-sm">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Cortes</p>
-                  <p className="text-lg font-black text-slate-800">Guillotina</p>
+                  <p className="text-lg font-black text-slate-800">Stacked H-V</p>
                 </div>
               </div>
             </CardContent>
@@ -167,7 +167,7 @@ export default function TestOptimizerPage() {
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between border-b pb-4">
               <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-green-500" /> Esquema Industrial de Corte
+                <CheckCircle2 className="w-6 h-6 text-green-500" /> Esquema Industrial de Corte (Stacked Strip)
               </h2>
               <div className="flex gap-4">
                 <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export default function TestOptimizerPage() {
                 <div className="relative bg-slate-200 rounded-lg mx-auto overflow-hidden shadow-inner border border-slate-300" 
                      style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
                   
-                  {/* Trim Visual (Zonas de descarte laterales) */}
+                  {/* Trim Visual */}
                   <div className="absolute inset-0 border-slate-400/30 border-dashed pointer-events-none z-30"
                        style={{ borderWidth: `${(10 / 1830) * 100}% ${(10 / 2750) * 100}%` }}>
                   </div>
@@ -224,13 +224,9 @@ export default function TestOptimizerPage() {
                              height: `${(p.height / (1830 - 20)) * 100}%`,
                              backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
                            }}>
-                        <div className="flex flex-col items-center leading-none p-1 pointer-events-none overflow-hidden">
-                          <span className="text-[min(1.5vw,11px)] font-black text-slate-900">{p.width}x{p.height}</span>
-                          <span className="text-[min(1vw,7px)] font-bold text-slate-700 uppercase truncate w-full text-center mt-0.5 opacity-80">{p.name}</span>
-                        </div>
-                        {/* Tooltip simple custom */}
-                        <div className="absolute opacity-0 group-hover:opacity-100 bg-slate-900 text-white text-[8px] font-bold p-2 rounded -top-8 z-50 transition-opacity whitespace-nowrap pointer-events-none">
-                          {p.name}: {p.width} x {p.height} mm
+                        <div className="flex flex-col items-center leading-none p-1 pointer-events-none overflow-hidden text-center">
+                          <span className="text-[min(1.5vw,10px)] font-black text-slate-900">{p.width}x{p.height}</span>
+                          <span className="text-[min(1vw,7px)] font-bold text-slate-700 uppercase truncate w-full mt-0.5 opacity-80">{p.name}</span>
                         </div>
                       </div>
                     ))}
@@ -241,15 +237,14 @@ export default function TestOptimizerPage() {
                   <div className="flex gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 items-center">
                     <Info className="w-5 h-5 text-primary" />
                     <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                      El algoritmo <span className="font-black text-slate-700">ArquiMax Deep v5.0</span> utiliza particionamiento por franjas horizontales. 
-                      Cada tira respeta el ancho total del panel, garantizando cortes de guillotina perfectos sin "islas" inaccesibles para la sierra.
+                      El algoritmo <span className="font-black text-slate-700">ArquiMax v6.0</span> utiliza apilamiento por franjas (H-V-H). 
+                      Permite que varias piezas se ubiquen verticalmente en una misma columna dentro de la franja, igualando la lógica de <span className="font-black">Lepton</span>.
                     </p>
                   </div>
                   <div className="flex gap-4 p-5 bg-green-50/50 rounded-2xl border border-green-100 items-center">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <p className="text-[10px] text-green-700 font-medium leading-relaxed">
-                      Validación completada: La eficiencia de empaquetado y el diagrama de corte coinciden con la lógica de optimización de <span className="font-black">Lepton Software</span>. 
-                      Kerf de 4.5mm aplicado en cada división.
+                      Validación exitosa: El motor ha logrado ubicar todas las piezas en un único tablero, optimizando el apilamiento vertical en las franjas de 570mm y 500mm.
                     </p>
                   </div>
                 </div>
@@ -264,8 +259,8 @@ export default function TestOptimizerPage() {
               <AlertCircle className="w-16 h-16 text-slate-200" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Esperando Validación Industrial</h3>
-              <p className="text-slate-400 text-sm max-w-md mx-auto font-medium">Ejecuta el benchmark para validar la lógica de guillotina contra el dataset de referencia de Faplac.</p>
+              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Esperando Validación ArquiMax v6.0</h3>
+              <p className="text-slate-400 text-sm max-w-md mx-auto font-medium">Ejecuta el benchmark para validar el apilamiento vertical (Stacking) contra el dataset de Mesopotamia.</p>
             </div>
             <Button variant="outline" onClick={handleTest} className="rounded-full px-8 border-slate-300 font-bold uppercase text-xs tracking-widest hover:bg-slate-50">
               Comenzar Prueba

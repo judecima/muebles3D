@@ -16,9 +16,9 @@ interface PartToCut {
 }
 
 /**
- * ArquiMax Deep Engine v5.0 (Strict Guillotine)
- * Algoritmo de particionamiento recursivo por franjas.
- * Diseñado para igualar la eficiencia de Lepton en seccionadoras industriales.
+ * ArquiMax Deep Engine v6.0 (3-Stage Guillotine with Stacking)
+ * Implementa una estrategia de empaquetado por franjas horizontales,
+ * permitiendo apilamiento vertical (V-Stacks) dentro de cada sección para maximizar eficiencia.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -52,7 +52,7 @@ export function runOptimization(
   let bestScore = -Infinity;
   let bestLayouts: OptimizedPanel[] = [];
 
-  // Probamos diferentes criterios de ordenamiento para encontrar la mejor combinación de franjas
+  // Probamos diferentes criterios de ordenamiento
   const sortMethods = ['height', 'area', 'width', 'shuffle'];
 
   for (let i = 0; i < ITERATIONS; i++) {
@@ -67,7 +67,7 @@ export function runOptimization(
       shuffle(currentParts);
     }
 
-    const currentLayouts = executeStrictGuillotine(currentParts, usableW, usableH, kerf, partColors);
+    const currentLayouts = execute3StageGuillotine(currentParts, usableW, usableH, kerf, partColors);
     const score = calculateScore(currentLayouts);
 
     if (score > bestScore) {
@@ -82,7 +82,7 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: efficiency,
-    summary: `ArquiMax v5.0: Guillotina Estricta. Eficiencia: ${efficiency.toFixed(2)}%`,
+    summary: `ArquiMax v6.0 (Stacked): Guillotina 3-Etapas. Eficiencia: ${efficiency.toFixed(2)}%`,
     kerf,
     trim,
     selectedThickness
@@ -90,10 +90,12 @@ export function runOptimization(
 }
 
 /**
- * Implementa una estrategia de "Strip Packing" con cortes de guillotina.
- * Crea franjas horizontales que ocupan todo el ancho y luego las divide verticalmente.
+ * Ejecuta una guillotina de 3 etapas (H-V-H)
+ * 1. Franjas Horizontales (H-Cuts)
+ * 2. Columnas Verticales (V-Cuts)
+ * 3. Apilamiento Horizontal (Stacking H-Cuts)
  */
-function executeStrictGuillotine(
+function execute3StageGuillotine(
   parts: PartToCut[], 
   w: number, 
   h: number, 
@@ -106,65 +108,102 @@ function executeStrictGuillotine(
   while (remainingParts.length > 0) {
     const placedParts: OptimizedPart[] = [];
     let currentY = 0;
-    let placedInThisPanel = new Set<number>();
+    const placedInThisPanel = new Set<number>();
 
-    // Mientras quepa otra franja en el tablero
+    // ETAPA 1: Generar Franjas Horizontales
     while (currentY < h && remainingParts.length > 0) {
-      let bestPartForStripIdx = -1;
-      let rotated = false;
+      let stripLeaderIdx = -1;
+      let stripLeaderRotated = false;
 
-      // Buscamos la primera pieza que defina la altura de la franja
+      // Buscar el líder de la franja (la pieza más alta que quepa)
       for (let i = 0; i < remainingParts.length; i++) {
         if (placedInThisPanel.has(i)) continue;
         const p = remainingParts[i];
         
         if (p.width <= w && p.height <= (h - currentY)) {
-          bestPartForStripIdx = i;
-          rotated = false;
+          stripLeaderIdx = i;
+          stripLeaderRotated = false;
           break;
         }
         if (p.grainDirection === 'libre' && p.height <= w && p.width <= (h - currentY)) {
-          bestPartForStripIdx = i;
-          rotated = true;
+          stripLeaderIdx = i;
+          stripLeaderRotated = true;
           break;
         }
       }
 
-      if (bestPartForStripIdx === -1) break;
+      if (stripLeaderIdx === -1) break;
 
-      const firstPart = remainingParts[bestPartForStripIdx];
-      const stripH = rotated ? firstPart.width : firstPart.height;
+      const firstPart = remainingParts[stripLeaderIdx];
+      const stripH = stripLeaderRotated ? firstPart.width : firstPart.height;
       let currentX = 0;
 
-      // Llenamos la franja horizontalmente
-      for (let i = 0; i < remainingParts.length; i++) {
-        if (placedInThisPanel.has(i)) continue;
-        const p = remainingParts[i];
+      // ETAPA 2: Llenar la franja con Columnas (Stacks)
+      while (currentX < w && remainingParts.length > 0) {
+        let stackLeaderIdx = -1;
+        let stackLeaderRotated = false;
 
-        // Intentar meter en la franja actual (misma altura o menor)
-        const canFitNormal = p.width <= (w - currentX) && p.height <= stripH;
-        const canFitRotated = p.grainDirection === 'libre' && p.height <= (w - currentX) && p.width <= stripH;
+        // Buscar líder de la columna (que quepa en el ancho remanente y alto de la franja)
+        for (let i = 0; i < remainingParts.length; i++) {
+          if (placedInThisPanel.has(i)) continue;
+          const p = remainingParts[i];
+          const canFit = p.width <= (w - currentX) && p.height <= stripH;
+          const canFitRot = p.grainDirection === 'libre' && p.height <= (w - currentX) && p.width <= stripH;
 
-        if (canFitNormal || canFitRotated) {
-          // Priorizamos la orientación que mejor se ajuste a la altura de la franja
-          const useRotated = canFitRotated && (!canFitNormal || Math.abs(p.width - stripH) < Math.abs(p.height - stripH));
-          
-          const finalW = useRotated ? p.height : p.width;
-          const finalH = useRotated ? p.width : p.height;
+          if (canFit || canFitRot) {
+            stackLeaderIdx = i;
+            stackLeaderRotated = canFitRot && (!canFit || p.width < p.height); // Preferimos rotar si ayuda al ancho
+            break;
+          }
+        }
+
+        if (stackLeaderIdx === -1) break;
+
+        const stackLeader = remainingParts[stackLeaderIdx];
+        const stackW = stackLeaderRotated ? stackLeader.height : stackLeader.width;
+        let stackY = 0;
+
+        // ETAPA 3: Apilar verticalmente dentro de la columna
+        while (stackY < stripH && remainingParts.length > 0) {
+          let partInStackIdx = -1;
+          let partInStackRotated = false;
+
+          // Buscar pieza que quepa en el ancho de la columna y el alto remanente de la columna
+          for (let i = 0; i < remainingParts.length; i++) {
+            if (placedInThisPanel.has(i)) continue;
+            const p = remainingParts[i];
+            
+            const canFit = p.width <= stackW && p.height <= (stripH - stackY);
+            const canFitRot = p.grainDirection === 'libre' && p.height <= stackW && p.width <= (stripH - stackY);
+
+            if (canFit || canFitRot) {
+              partInStackIdx = i;
+              partInStackRotated = canFitRot && (!canFit || Math.abs(p.width - stackW) < Math.abs(p.height - stackW));
+              break;
+            }
+          }
+
+          if (partInStackIdx === -1) break;
+
+          const p = remainingParts[partInStackIdx];
+          const finalW = partInStackRotated ? p.height : p.width;
+          const finalH = partInStackRotated ? p.width : p.height;
 
           placedParts.push({
             name: p.name,
             x: currentX,
-            y: currentY,
+            y: currentY + stackY,
             width: finalW,
             height: finalH,
-            rotated: useRotated,
+            rotated: partInStackRotated,
             color: partColors[p.name]
           });
 
-          currentX += finalW + kerf;
-          placedInThisPanel.add(i);
+          stackY += finalH + kerf;
+          placedInThisPanel.add(partInStackIdx);
         }
+
+        currentX += stackW + kerf;
       }
 
       currentY += stripH + kerf;
@@ -189,9 +228,9 @@ function executeStrictGuillotine(
 
 function calculateScore(layouts: OptimizedPanel[]): number {
   if (layouts.length === 0) return -Infinity;
-  // Penalizamos usar más tableros y premiamos la eficiencia del primero
   const mainEfficiency = layouts[0].efficiency;
-  const panelPenalty = (layouts.length - 1) * 200;
+  // Penalizamos fuerte el uso de tableros extra
+  const panelPenalty = (layouts.length - 1) * 500;
   return mainEfficiency - panelPenalty;
 }
 
