@@ -189,8 +189,21 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    this.camera.position.y = 1700;
+    // 1. Encontrar el centro de la casa para no aparecer en el vacío (teletransporte)
+    const box = new THREE.Box3().setFromObject(this.houseGroup);
+    const center = new THREE.Vector3();
+    if (!box.isEmpty()) {
+      box.getCenter(center);
+    } else {
+      center.set(0, 0, 0);
+    }
+    
+    // 2. Posicionar la cámara en el centro de la casa a altura humana (1.7m)
+    // Desplazamos un poco en Z para no estar exactamente en el medio si hay muros
+    this.camera.position.set(center.x, 1700, center.z + 1000);
     this.camera.rotation.set(0, 0, 0);
+    this.camera.lookAt(center.x, 1700, center.z);
+    
     this.isWalkModeActive = true;
     try {
       this.fpControls.lock();
