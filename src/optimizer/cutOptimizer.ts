@@ -11,9 +11,9 @@ interface InternalPart {
 }
 
 /**
- * ArquiMax Industrial Engine v11.0 (Deterministic)
- * Basado en principios de optimización de guillotina de 4 capas.
- * Panel -> Strips -> Containers -> Pieces (with Recursive Nesting)
+ * ArquiMax Industrial Engine v11.0 (DGP - Deterministic Guillotine Packer)
+ * Basado en principios de optimización industrial (Layer 1-4).
+ * Panel -> Strips -> Containers -> Pieces + Nesting.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -25,7 +25,7 @@ export function runOptimization(
 ): OptimizationResult {
   const filteredParts = parts.filter(p => p.thickness === selectedThickness);
   
-  // 1. Preprocesamiento: Expandir cantidades y ordenar determinísticamente
+  // 1. Preprocesamiento Determinístico
   let pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
     Array.from({ length: p.quantity }, () => ({
       name: p.name,
@@ -38,15 +38,12 @@ export function runOptimization(
     }))
   );
 
-  // Orden Industrial: Área desc -> Lado mayor desc -> Lado menor desc
+  // Orden Industrial: Área desc -> Lado mayor desc
   pool.sort((a, b) => {
     const areaA = a.width * a.height;
     const areaB = b.width * b.height;
     if (areaB !== areaA) return areaB - areaA;
-    const maxA = Math.max(a.width, a.height);
-    const maxB = Math.max(b.width, b.height);
-    if (maxB !== maxA) return maxB - maxA;
-    return Math.min(b.width, b.height) - Math.min(a.width, a.height);
+    return Math.max(b.width, b.height) - Math.max(a.width, a.height);
   });
 
   if (pool.length === 0) {
@@ -58,14 +55,14 @@ export function runOptimization(
   const partColors = generateColors(pool);
   const panels: OptimizedPanel[] = [];
 
-  // 2. Proceso de empaquetado por Panel
+  // 2. Empaquetado por Panel
   while (pool.some(p => !p.placed)) {
     const placedPartsInPanel: OptimizedPart[] = [];
     let currentY = 0;
 
-    // Llenar el panel con fajas horizontales (Strips)
+    // Layer 2: Fajas (Strips) horizontales
     while (currentY < usableH) {
-      // 3. Selección de Pieza Guía para la Faja
+      // Seleccionar Pieza Guía (la de mayor área disponible que quepa)
       const guideIdx = pool.findIndex(p => !p.placed && 
         ((p.width <= usableW && p.height <= (usableH - currentY)) || 
          (p.grainDirection === 'libre' && p.height <= usableW && p.width <= (usableH - currentY)))
@@ -74,53 +71,54 @@ export function runOptimization(
       if (guideIdx === -1) break;
 
       const guide = pool[guideIdx];
-      // Determinar orientación óptima para la guía (maximizar ancho si es posible)
-      let canRotate = guide.grainDirection === 'libre';
+      // Determinar orientación óptima para la altura de la faja (preferir el lado que deje más espacio arriba)
       let stripH = guide.height;
       let guideW = guide.width;
+      let rotatedGuide = false;
 
-      if (canRotate && guide.width > guide.height && guide.width <= (usableH - currentY) && guide.height <= usableW) {
-        // En este motor jerárquico, priorizamos que la altura de la faja sea la dimensión menor para ahorrar espacio vertical
-        [guideW, stripH] = [guide.height, guide.width];
-      } else if (canRotate && guide.height > (usableH - currentY)) {
-        [guideW, stripH] = [guide.height, guide.width];
+      if (guide.grainDirection === 'libre') {
+        // Si rotada cabe mejor o permite una faja más baja para ahorrar altura
+        if (guide.width < guide.height && guide.width <= (usableH - currentY)) {
+          stripH = guide.width;
+          guideW = guide.height;
+          rotatedGuide = true;
+        }
       }
 
       let currentX = 0;
 
-      // 4. Construcción de la Faja (Horizontal Strip)
+      // Layer 3: Contenedores dentro de la faja
       while (currentX < usableW) {
-        // Buscar mejor pieza para el contenedor actual
-        let bestPartIdx = -1;
+        // Buscar mejor pieza para el contenedor (Scavenger + Priority Identity)
+        let bestIdx = -1;
         let isRotated = false;
 
-        // Prioridad 1: Misma identidad (mismo nombre)
-        bestPartIdx = pool.findIndex(p => !p.placed && p.name === guide.name && 
+        // Prioridad 1: Pieza con el mismo nombre que la guía
+        bestIdx = pool.findIndex(p => !p.placed && p.name === guide.name && 
           ((p.width <= (usableW - currentX) && p.height <= stripH) ||
            (p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= stripH))
         );
 
-        // Prioridad 2: Scavenger (Cualquier pieza que quepa)
-        if (bestPartIdx === -1) {
-          bestPartIdx = pool.findIndex(p => !p.placed && 
+        // Prioridad 2: Cualquier pieza que quepa (Scavenger)
+        if (bestIdx === -1) {
+          bestIdx = pool.findIndex(p => !p.placed && 
             ((p.width <= (usableW - currentX) && p.height <= stripH) ||
              (p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= stripH))
           );
         }
 
-        if (bestPartIdx === -1) break;
+        if (bestIdx === -1) break;
 
-        const p = pool[bestPartIdx];
-        // Decidir rotación del contenedor
+        const p = pool[bestIdx];
         isRotated = false;
+        
+        // Evaluación de rotación inteligente
         if (p.grainDirection === 'libre') {
-          // Si rotada encaja mejor en altura o permite más ancho sobrante
           const fitsNormal = p.width <= (usableW - currentX) && p.height <= stripH;
           const fitsRotated = p.height <= (usableW - currentX) && p.width <= stripH;
-          
           if (fitsNormal && fitsRotated) {
-             // Priorizar la orientación que más se acerque a la altura de la faja
-             isRotated = Math.abs(p.width - stripH) < Math.abs(p.height - stripH);
+            // Elegir la orientación que más se acerque a la altura de la faja
+            isRotated = Math.abs(p.width - stripH) < Math.abs(p.height - stripH);
           } else if (fitsRotated) {
             isRotated = true;
           }
@@ -129,7 +127,7 @@ export function runOptimization(
         const actualW = isRotated ? p.height : p.width;
         const actualH = isRotated ? p.width : p.height;
 
-        // Colocar pieza principal
+        // Colocar Pieza (Layer 4)
         placedPartsInPanel.push({
           name: p.name,
           x: currentX,
@@ -141,59 +139,42 @@ export function runOptimization(
         });
         p.placed = true;
 
-        // 5. Nesting Recursivo Vertical dentro del Contenedor
+        // Nesting Vertical dentro del Contenedor (Recursivo)
         let nestedY = actualH + kerf;
-        while (stripH - nestedY >= 50) { // Mínimo 50mm para nesting industrial
+        while (stripH - nestedY >= 50) {
           const remH = stripH - nestedY;
-          let bestNestIdx = -1;
-          let nestRotated = false;
-
-          // Buscar la pieza que mejor llene el área del hueco vertical
-          let bestAreaFit = -1;
-
-          for (let i = 0; i < pool.length; i++) {
-            const candidate = pool[i];
-            if (candidate.placed) continue;
-
-            // Probar ambas orientaciones
-            const canRotateCand = candidate.grainDirection === 'libre';
-            const fitsNormal = candidate.width <= actualW && candidate.height <= remH;
-            const fitsRotated = canRotateCand && candidate.height <= actualW && candidate.width <= remH;
-
-            if (fitsNormal || fitsRotated) {
-              const area = candidate.width * candidate.height;
-              if (area > bestAreaFit) {
-                bestAreaFit = area;
-                bestNestIdx = i;
-                // Preferir orientación que llene más el ancho del contenedor
-                if (fitsNormal && fitsRotated) {
-                  nestRotated = Math.abs(candidate.height - actualW) < Math.abs(candidate.width - actualW);
-                } else {
-                  nestRotated = fitsRotated;
-                }
-              }
-            }
-          }
+          let bestNestIdx = pool.findIndex(np => !np.placed && 
+            ((np.width <= actualW && np.height <= remH) ||
+             (np.grainDirection === 'libre' && np.height <= actualW && np.width <= remH))
+          );
 
           if (bestNestIdx !== -1) {
-            const nestPart = pool[bestNestIdx];
-            const nW = nestRotated ? nestPart.height : nestPart.width;
-            const nH = nestRotated ? nestPart.width : nestPart.height;
+            const np = pool[bestNestIdx];
+            let nRot = false;
+            if (np.grainDirection === 'libre') {
+               const nNormal = np.width <= actualW && np.height <= remH;
+               const nRotated = np.height <= actualW && np.width <= remH;
+               if (nNormal && nRotated) {
+                 nRot = Math.abs(np.height - actualW) < Math.abs(np.width - actualW);
+               } else if (nRotated) {
+                 nRot = true;
+               }
+            }
+            const nW = nRot ? np.height : np.width;
+            const nH = nRot ? np.width : np.height;
 
             placedPartsInPanel.push({
-              name: nestPart.name,
+              name: np.name,
               x: currentX,
               y: currentY + nestedY,
               width: nW,
               height: nH,
-              rotated: nestRotated,
-              color: partColors[nestPart.name]
+              rotated: nRot,
+              color: partColors[np.name]
             });
-            nestPart.placed = true;
+            np.placed = true;
             nestedY += nH + kerf;
-          } else {
-            break;
-          }
+          } else break;
         }
 
         currentX += actualW + kerf;
@@ -214,24 +195,19 @@ export function runOptimization(
     if (panels.length > 50) break; // Límite de seguridad
   }
 
-  const totalEfficiency = calculateTotalEfficiency(panels);
+  const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
+  const totalArea = usableW * usableH * panels.length;
+  const totalEfficiency = (totalUsed / totalArea) * 100;
 
   return {
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: totalEfficiency,
-    summary: `ArquiMax Industrial v11.0: Eficiencia global ${totalEfficiency.toFixed(2)}%. Algoritmo DGP Determinístico.`,
+    summary: `ArquiMax Industrial Engine v11.0: Eficiencia global ${totalEfficiency.toFixed(2)}%. Algoritmo DGP Determinístico.`,
     kerf,
     trim,
     selectedThickness
   };
-}
-
-function calculateTotalEfficiency(layouts: OptimizedPanel[]): number {
-  if (layouts.length === 0) return 0;
-  const used = layouts.reduce((acc, l) => acc + l.usedArea, 0);
-  const total = layouts.reduce((acc, l) => acc + l.totalArea, 0);
-  return (used / total) * 100;
 }
 
 function generateColors(parts: any[]): Record<string, string> {

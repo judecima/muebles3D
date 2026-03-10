@@ -30,7 +30,7 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-// DATASET MESOPOTAMIA GRIS TAPIR (23 PIEZAS EXACTAS XML LEPTON)
+// DATASET MESOPOTAMIA GRIS TAPIR (23 PIEZAS EXACTAS XML)
 const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(1) Lat Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(2) Lateral V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
@@ -78,7 +78,7 @@ export default function TestOptimizerPage() {
       } finally {
         setLoading(false);
       }
-    }, 200);
+    }, 300);
   };
 
   useEffect(() => {
@@ -97,16 +97,16 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax Ultra-Industrial v9.0</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax Industrial Engine v11.0</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-[#ae1ae2]" /> Guillotina 4-Stage + V-Stacking | Meta Lepton: 96.4%
+                <Scissors className="w-3 h-3 text-[#ae1ae2]" /> Jerarquía de 4 Capas | Meta Lepton: 96.4%
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-white text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings2 className="w-4 h-4 mr-2" />}
-              {loading ? "Procesando Ciclos..." : "Ejecutar Optimización Industrial"}
+              {loading ? "Procesando DGP v11..." : "Ejecutar Optimización Industrial"}
             </Button>
           </div>
         </header>
@@ -172,7 +172,7 @@ export default function TestOptimizerPage() {
 
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center">
                 <div className="flex justify-between items-center mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consolidación de Paneles</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consolidación</p>
                   <Layers className="w-4 h-4 text-[#ae1ae2]" />
                 </div>
                 <div className="space-y-4">
@@ -191,10 +191,10 @@ export default function TestOptimizerPage() {
                   <div className="w-6 h-6 rounded-full bg-[#ae1ae2] flex items-center justify-center">
                     <AlertCircle className="w-3 h-3 text-white" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax v11.0</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Ejecutando permutaciones industriales v9.0..." : 
+                  {loading ? "Calculando mediante motor jerárquico determinístico..." : 
                    result?.totalPanels === 1 ? "¡ÉXITO! Se ha consolidado todo el pedido en un solo panel de 2750x1830 mm con una eficiencia superior al 95%." : 
                    "El motor optimiza el flujo de corte para maximizar la densidad global e igualar los resultados de Lepton."}
                 </p>
@@ -206,7 +206,7 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                     <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-[#ae1ae2]' : 'text-amber-500'}`} /> 
-                    Esquema Técnico Industrial v9.0
+                    Esquema Técnico Industrial v11.0
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -265,7 +265,7 @@ export default function TestOptimizerPage() {
                         </div>
                         <div className="mt-4 flex items-center gap-2 text-slate-400">
                           <Maximize2 className="w-3 h-3" />
-                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Algoritmo de Guillotina v9.0 con Apilamiento Vertical (V-Stacking)</span>
+                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Algoritmo DGP v11: Guillotina Jerárquica + Nesting Recursivo</span>
                         </div>
                       </div>
                     ))}
