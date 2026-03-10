@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
+import { SteelJoystick } from '@/components/steel/SteelJoystick';
 import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
 import { Button } from '@/components/ui/button';
 import { 
@@ -15,13 +16,10 @@ import {
   Compass,
   MousePointer2,
   Keyboard,
-  ChevronUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ArrowUp,
   ArrowDown,
-  Zap
+  Zap,
+  Gamepad2
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -48,7 +46,12 @@ export default function SteelFramingPage() {
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
   const isMobile = useIsMobile();
   
-  const viewerRef = useRef<{ enterWalkMode: () => void, setMovement: (dir: any, active: boolean) => void }>(null);
+  const viewerRef = useRef<{ 
+    enterWalkMode: () => void, 
+    setMovement: (dir: any, active: boolean) => void,
+    updateJoystickMove: (x: number, y: number) => void,
+    updateJoystickLook: (x: number, y: number) => void
+  }>(null);
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening) => {
     setSelectedOpening({ wallId, opening });
@@ -169,16 +172,21 @@ export default function SteelFramingPage() {
 
             {isWalkModeActive && (
               <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300 pointer-events-auto">
-                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-2">NAVEGACIÓN ACTIVA</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <Gamepad2 className="w-4 h-4 text-blue-400" />
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NAVEGACIÓN GAMER ACTIVA</span>
+                </div>
                 <div className="grid grid-cols-1 gap-y-2">
                   <div className="flex items-center gap-2">
                     <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">WASD: Mover | SHIFT: Correr | ESPACIO/C: Altura</span>
+                    <span className="text-[10px] font-medium uppercase">WASD: Mover | SHIFT: Correr | Flechas: Mirar</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <MousePointer2 className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">Mouse / Touch: Mirar</span>
-                  </div>
+                  {!isMobile && (
+                    <div className="flex items-center gap-2">
+                      <MousePointer2 className="w-3 h-3 text-slate-400" />
+                      <span className="text-[10px] font-medium uppercase">Q/E: Rotar | Mouse: Mirar libre</span>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">Presiona ESC o el botón para salir</div>
               </div>
@@ -186,8 +194,25 @@ export default function SteelFramingPage() {
           </div>
 
           {isWalkModeActive && isMobile && (
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-50 pointer-events-auto">
-              <div className="flex gap-2">
+            <div className="absolute inset-0 pointer-events-none z-50">
+              {/* Joystick de Movimiento (Izquierda) */}
+              <div className="absolute bottom-12 left-12 pointer-events-auto">
+                <SteelJoystick 
+                  label="Moverse" 
+                  onMove={(v) => viewerRef.current?.updateJoystickMove(v.x, v.y)} 
+                />
+              </div>
+              
+              {/* Joystick de Mirada (Derecha) */}
+              <div className="absolute bottom-12 right-12 pointer-events-auto">
+                <SteelJoystick 
+                  label="Mirar" 
+                  onMove={(v) => viewerRef.current?.updateJoystickLook(v.x, v.y)} 
+                />
+              </div>
+
+              {/* Controles de Altura Centrales */}
+              <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
                 <Button 
                   variant="secondary" size="icon" className="w-12 h-12 rounded-full opacity-80" 
                   onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
@@ -200,36 +225,6 @@ export default function SteelFramingPage() {
                 >
                   <Zap className="w-6 h-6" />
                 </Button>
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <Button 
-                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
-                  onTouchStart={() => viewerRef.current?.setMovement('forward', true)} onTouchEnd={() => viewerRef.current?.setMovement('forward', false)}
-                >
-                  <ChevronUp className="w-8 h-8" />
-                </Button>
-                <div className="flex gap-4">
-                  <Button 
-                    variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
-                    onTouchStart={() => viewerRef.current?.setMovement('left', true)} onTouchEnd={() => viewerRef.current?.setMovement('left', false)}
-                  >
-                    <ChevronLeft className="w-8 h-8" />
-                  </Button>
-                  <Button 
-                    variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
-                    onTouchStart={() => viewerRef.current?.setMovement('backward', true)} onTouchEnd={() => viewerRef.current?.setMovement('backward', false)}
-                  >
-                    <ChevronDown className="w-8 h-8" />
-                  </Button>
-                  <Button 
-                    variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
-                    onTouchStart={() => viewerRef.current?.setMovement('right', true)} onTouchEnd={() => viewerRef.current?.setMovement('right', false)}
-                  >
-                    <ChevronRight className="w-8 h-8" />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex gap-2">
                 <Button 
                   variant="secondary" size="icon" className="w-12 h-12 rounded-full opacity-80" 
                   onTouchStart={() => viewerRef.current?.setMovement('down', true)} onTouchEnd={() => viewerRef.current?.setMovement('down', false)}

@@ -25,6 +25,12 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
       if (managerRef.current) {
         managerRef.current.setMovement(direction, active);
       }
+    },
+    updateJoystickMove: (x: number, y: number) => {
+      if (managerRef.current) managerRef.current.updateJoystickMove(x, y);
+    },
+    updateJoystickLook: (x: number, y: number) => {
+      if (managerRef.current) managerRef.current.updateJoystickLook(x, y);
     }
   }));
 

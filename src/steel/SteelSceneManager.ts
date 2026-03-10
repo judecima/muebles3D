@@ -24,13 +24,24 @@ export class SteelSceneManager {
   private moveRight = false;
   private moveUp = false;
   private moveDown = false;
-  private isShiftPressed = false; // Estado de carrera rápida
+  private isShiftPressed = false;
+  
+  // Rotación por Teclado
+  private lookUp = false;
+  private lookDown = false;
+  private lookLeft = false;
+  private lookRight = false;
+  private rotateQ = false;
+  private rotateE = false;
+
+  // Vectores de Joystick (Móvil)
+  private joystickMove = new THREE.Vector2(0, 0);
+  private joystickLook = new THREE.Vector2(0, 0);
+
   private velocity = new THREE.Vector3();
   private direction = new THREE.Vector3();
   private prevTime = performance.now();
 
-  // Control Táctil para Mirada
-  private touchStart = new THREE.Vector2();
   private isWalkModeActive = false;
 
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
@@ -70,12 +81,10 @@ export class SteelSceneManager {
     }
     this.container.appendChild(this.renderer.domElement);
 
-    // Controles de Inspección (Orbit)
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
-    // Controles de Caminata (FPS)
-    this.fpControls = new PointerLockControls(this.camera, document.body);
+    this.fpControls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.scene.add(this.fpControls.getObject());
 
     this.fpControls.addEventListener('lock', () => {
@@ -96,8 +105,6 @@ export class SteelSceneManager {
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight.position.set(5000, 10000, 7500);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
 
     const grid = new THREE.GridHelper(40000, 80, this.colors.grid, this.colors.grid);
@@ -115,66 +122,49 @@ export class SteelSceneManager {
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
-
-    // Eventos Táctiles para Móvil
-    this.renderer.domElement.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    this.renderer.domElement.addEventListener('touchmove', this.onTouchMove, { passive: false });
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
     if (!this.isWalkModeActive) return;
     switch (event.code) {
-      case 'ArrowUp':
       case 'KeyW': this.moveForward = true; break;
-      case 'ArrowLeft':
       case 'KeyA': this.moveLeft = true; break;
-      case 'ArrowDown':
       case 'KeyS': this.moveBackward = true; break;
-      case 'ArrowRight':
       case 'KeyD': this.moveRight = true; break;
       case 'Space': this.moveUp = true; break;
-      case 'KeyC': this.moveDown = true; break; // C para bajar
+      case 'KeyC': this.moveDown = true; break;
       case 'ShiftLeft':
-      case 'ShiftRight': this.isShiftPressed = true; break; // Shift para correr
+      case 'ShiftRight': this.isShiftPressed = true; break;
+      
+      // Rotación por Teclado
+      case 'ArrowUp': this.lookUp = true; break;
+      case 'ArrowDown': this.lookDown = true; break;
+      case 'ArrowLeft': this.lookLeft = true; break;
+      case 'ArrowRight': this.lookRight = true; break;
+      case 'KeyQ': this.rotateQ = true; break;
+      case 'KeyE': this.rotateE = true; break;
     }
   };
 
   private onKeyUp = (event: KeyboardEvent) => {
     switch (event.code) {
-      case 'ArrowUp':
       case 'KeyW': this.moveForward = false; break;
-      case 'ArrowLeft':
       case 'KeyA': this.moveLeft = false; break;
-      case 'ArrowDown':
       case 'KeyS': this.moveBackward = false; break;
-      case 'ArrowRight':
       case 'KeyD': this.moveRight = false; break;
       case 'Space': this.moveUp = false; break;
       case 'KeyC': this.moveDown = false; break;
       case 'ShiftLeft':
       case 'ShiftRight': this.isShiftPressed = false; break;
+      
+      // Rotación por Teclado
+      case 'ArrowUp': this.lookUp = false; break;
+      case 'ArrowDown': this.lookDown = false; break;
+      case 'ArrowLeft': this.lookLeft = false; break;
+      case 'ArrowRight': this.lookRight = false; break;
+      case 'KeyQ': this.rotateQ = false; break;
+      case 'KeyE': this.rotateE = false; break;
     }
-  };
-
-  private onTouchStart = (event: TouchEvent) => {
-    if (!this.isWalkModeActive) return;
-    const touch = event.touches[0];
-    this.touchStart.set(touch.clientX, touch.clientY);
-  };
-
-  private onTouchMove = (event: TouchEvent) => {
-    if (!this.isWalkModeActive) return;
-    event.preventDefault();
-    const touch = event.touches[0];
-    const movementX = touch.clientX - this.touchStart.x;
-    const movementY = touch.clientY - this.touchStart.y;
-
-    const rotationSpeed = 0.005;
-    this.camera.rotation.y -= movementX * rotationSpeed;
-    this.camera.rotation.x -= movementY * rotationSpeed;
-    this.camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.camera.rotation.x));
-
-    this.touchStart.set(touch.clientX, touch.clientY);
   };
 
   public setMovement(direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down' | 'sprint', active: boolean) {
@@ -189,8 +179,18 @@ export class SteelSceneManager {
     }
   }
 
+  // Métodos para Joystick (Móvil)
+  public updateJoystickMove(x: number, y: number) {
+    this.joystickMove.set(x, y);
+  }
+
+  public updateJoystickLook(x: number, y: number) {
+    this.joystickLook.set(x, y);
+  }
+
   public enterWalkMode() {
     this.camera.position.y = 1700;
+    this.camera.rotation.set(0, 0, 0);
     this.isWalkModeActive = true;
     try {
       this.fpControls.lock();
@@ -233,25 +233,50 @@ export class SteelSceneManager {
     const delta = (time - this.prevTime) / 1000;
 
     if (this.isWalkModeActive) {
+      // 1. Manejo de Rotación (Teclado + Joystick Look)
+      const rotationSpeed = 1.5 * delta;
+      if (this.lookLeft || this.rotateQ) this.camera.rotation.y += rotationSpeed;
+      if (this.lookRight || this.rotateE) this.camera.rotation.y -= rotationSpeed;
+      if (this.lookUp) this.camera.rotation.x += rotationSpeed;
+      if (this.lookDown) this.camera.rotation.x -= rotationSpeed;
+      
+      // Aplicar Joystick Look
+      if (this.joystickLook.lengthSq() > 0) {
+        this.camera.rotation.y -= this.joystickLook.x * 2.5 * delta;
+        this.camera.rotation.x += this.joystickLook.y * 2.5 * delta;
+      }
+      
+      // Limitar mirada vertical
+      this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
+
+      // 2. Manejo de Velocidad y Dirección
       this.velocity.x -= this.velocity.x * 10.0 * delta;
       this.velocity.z -= this.velocity.z * 10.0 * delta;
       this.velocity.y -= this.velocity.y * 10.0 * delta;
 
-      this.direction.z = Number(this.moveForward) - Number(this.moveBackward);
-      this.direction.x = Number(this.moveRight) - Number(this.moveLeft);
-      this.direction.y = Number(this.moveUp) - Number(this.moveDown);
-      this.direction.normalize();
+      // Combinar Teclado y Joystick Move
+      let dirZ = Number(this.moveForward) - Number(this.moveBackward);
+      let dirX = Number(this.moveRight) - Number(this.moveLeft);
+      
+      if (this.joystickMove.lengthSq() > 0) {
+        dirZ = this.joystickMove.y;
+        dirX = this.joystickMove.x;
+      }
 
-      // NORMAL WALK: 1.4 m/s (1400 mm/s)
-      // FAST WALK (SHIFT): 2.2 m/s (2200 mm/s)
-      // Usamos un factor x10 para compensar la fricción y alcanzar la velocidad deseada en estado estacionario
+      this.direction.z = dirZ;
+      this.direction.x = dirX;
+      this.direction.y = Number(this.moveUp) - Number(this.moveDown);
+      
+      if (this.direction.lengthSq() > 0) this.direction.normalize();
+
       const targetVelocity = this.isShiftPressed ? 2200.0 : 1400.0;
       const speed = targetVelocity * 10.0; 
 
-      if (this.moveForward || this.moveBackward) this.velocity.z -= this.direction.z * speed * delta;
-      if (this.moveLeft || this.moveRight) this.velocity.x -= this.direction.x * speed * delta;
-      if (this.moveUp || this.moveDown) this.velocity.y += this.direction.y * speed * delta;
+      if (this.direction.z !== 0) this.velocity.z -= this.direction.z * speed * delta;
+      if (this.direction.x !== 0) this.velocity.x -= this.direction.x * speed * delta;
+      if (this.direction.y !== 0) this.velocity.y += this.direction.y * speed * delta;
 
+      // 3. Aplicar Movimiento en espacio Mundo pero orientado a Cámara
       const worldDir = new THREE.Vector3();
       this.camera.getWorldDirection(worldDir);
       worldDir.y = 0;
@@ -426,8 +451,6 @@ export class SteelSceneManager {
     this.renderer.domElement.removeEventListener('dblclick', this.onDoubleClick);
     document.removeEventListener('keydown', this.onKeyDown);
     document.removeEventListener('keyup', this.onKeyUp);
-    this.renderer.domElement.removeEventListener('touchstart', this.onTouchStart);
-    this.renderer.domElement.removeEventListener('touchmove', this.onTouchMove);
     if (this.renderer) this.renderer.dispose();
     this.controls.dispose();
     this.fpControls.dispose();
