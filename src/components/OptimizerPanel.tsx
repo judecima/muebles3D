@@ -201,7 +201,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
 
               <div className="flex gap-2">
                 <Button className="flex-1 font-bold uppercase text-xs h-10 bg-slate-900 hover:bg-black" onClick={handleOptimize} disabled={loading}>
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Ejecutar Optimización v9.0'}
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Ejecutar Optimización Industrial'}
                 </Button>
                 {result && (
                   <Button variant="outline" className="h-10 border-primary text-primary" onClick={exportPDF}>
@@ -214,7 +214,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" className="w-full flex justify-between items-center px-4 py-2 bg-slate-50 text-slate-600 rounded-none">
                     <span className="text-xs font-bold flex items-center gap-2">
-                      <Ruler className="w-3.5 h-3.5" /> Ver/Editar Vetas ({targetThickness}mm)
+                      <Ruler className="w-3.5 h-3.5" /> Editar Orientación y Vetas ({targetThickness}mm)
                     </span>
                     {isPartsListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
@@ -232,7 +232,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="libre">Veta: Libre</SelectItem>
+                            <SelectItem value="libre">Veta: Libre / Rotar</SelectItem>
                             <SelectItem value="vertical">Veta: Vertical</SelectItem>
                             <SelectItem value="horizontal">Veta: Horizontal</SelectItem>
                           </SelectContent>
@@ -247,7 +247,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
 
           <Card className={`shadow-sm border-slate-200 bg-white transition-all flex flex-col ${result ? 'opacity-100' : 'opacity-50'}`}>
             <CardHeader className="py-4 px-6 border-b">
-              <CardTitle className="text-xs font-bold uppercase text-slate-500">Métricas Industriales</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase text-slate-500">Métricas de Producción</CardTitle>
             </CardHeader>
             <CardContent className="p-6 flex-1 flex flex-col justify-center gap-6">
               <div className="space-y-2">
@@ -263,8 +263,8 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   <p className="text-lg font-black text-slate-700">{result ? result.totalPanels : '-'}</p>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-lg border">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">Trim</p>
-                  <p className="text-lg font-black text-slate-700">{result ? `${result.trim}mm` : '-'}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">Aprovechamiento</p>
+                  <p className="text-lg font-black text-slate-700">{result ? `${result.totalEfficiency.toFixed(1)}%` : '-'}</p>
                 </div>
               </div>
             </CardContent>
@@ -275,7 +275,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase text-lg">Simulando Cortes Industriales...</p>
+              <p className="font-black text-slate-700 uppercase text-lg">Ejecutando Simulador Industrial v9.0...</p>
             </div>
           ) : error ? (
             <div className="py-20 flex flex-col items-center gap-4 text-red-500 bg-red-50 p-10 rounded-2xl border border-red-100">
@@ -302,7 +302,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   <div key={idx} className="space-y-4">
                     <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
                       <div className="flex flex-col">
-                        <h3 className="text-xs font-black uppercase">Plano de Corte #{panel.panelNumber} ({targetThickness}mm)</h3>
+                        <h3 className="text-xs font-black uppercase">Plano de Corte Industrial #{panel.panelNumber} ({targetThickness}mm)</h3>
                         <span className="text-[10px] text-slate-400 font-bold">{selectedPanel.width}x{selectedPanel.height}mm | Kerf: {result.kerf}mm</span>
                       </div>
                       <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
@@ -336,16 +336,16 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                                }}>
                             <div className="relative w-full h-full overflow-hidden pointer-events-none">
                               {/* Base (Width) - Línea Inferior */}
-                              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.8vw,8px)] font-black text-slate-900 leading-none">
+                              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">
                                 {p.width}
                               </span>
                               {/* Altura (Height) - Línea Izquierda */}
-                              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.8vw,8px)] font-black text-slate-900 leading-none whitespace-nowrap">
+                              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.8vw,10px)] font-black text-slate-900 leading-none whitespace-nowrap">
                                 {p.height}
                               </span>
                               {/* Nombre - Centro */}
                               <div className="absolute inset-0 flex items-center justify-center p-1 text-center">
-                                <span className="text-[min(1.4vw,7px)] text-slate-700 uppercase font-bold truncate w-full px-2">{p.name}</span>
+                                <span className="text-[min(1.4vw,9px)] text-slate-700 uppercase font-bold truncate w-full px-2">{p.name}</span>
                               </div>
                             </div>
                           </div>
@@ -355,7 +355,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
-                      <p className="text-[9px] text-slate-400 italic">Corte de Guillotina v9.0 optimizado para seccionadoras automáticas.</p>
+                      <p className="text-[9px] text-slate-400 italic">Algoritmo de Guillotina v9.0. Optimizado para seccionadoras automáticas con V-Stacking.</p>
                     </div>
                   </div>
                 );

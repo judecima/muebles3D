@@ -40,7 +40,7 @@ export function runOptimization(
     }))
   );
 
-  // Orden inicial Industrial
+  // Orden inicial Industrial: Priorizar piezas grandes para definir franjas
   flatParts.sort((a, b) => {
     const areaA = a.width * a.height;
     const areaB = b.width * b.height;
@@ -63,12 +63,19 @@ export function runOptimization(
   for (let i = 0; i < ITERATIONS; i++) {
     const currentPartsOrder = [...flatParts];
     
+    // Mutar orden y rotaciones estocásticamente
     if (i > 0) {
-      if (i % 20 === 0) {
+      if (i % 25 === 0) {
         shuffle(currentPartsOrder);
       } else {
         mutateOrder(currentPartsOrder);
       }
+      // Mutar rotación aleatoria para piezas 'libre'
+      currentPartsOrder.forEach(p => {
+        if (p.grainDirection === 'libre' && Math.random() > 0.5) {
+          [p.width, p.height] = [p.height, p.width];
+        }
+      });
     }
 
     const currentLayouts = executeLayoutBuilding(currentPartsOrder, usableW, usableH, kerf, partColors);
@@ -79,6 +86,7 @@ export function runOptimization(
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
     
+    // Salida temprana si alcanzamos la meta de Lepton (1 panel, >96% eficiencia)
     if (bestLayouts.length === 1 && (calculateTotalEfficiency(bestLayouts) > 96.5)) break;
   }
 
@@ -102,31 +110,21 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
   while (remainingParts.length > 0) {
     const placedParts: OptimizedPart[] = [];
     const usedIndices = new Set<number>();
-    const holes: Hole[] = [];
     
     let currentY = 0;
     
+    // Construcción por franjas horizontales (Shelves)
     while (currentY < h && usedIndices.size < remainingParts.length) {
       let leaderIdx = -1;
       let shelfH = 0;
 
+      // Buscar el líder de la franja (la pieza más alta que quepa)
       for (let i = 0; i < remainingParts.length; i++) {
         if (usedIndices.has(i)) continue;
         const p = remainingParts[i];
-        
-        const canNormal = p.height <= (h - currentY) && p.width <= w;
-        const canRotated = p.grainDirection === 'libre' && p.width <= (h - currentY) && p.height <= w;
-
-        if (canNormal || canRotated) {
+        if (p.height <= (h - currentY) && p.width <= w) {
           leaderIdx = i;
-          if (canNormal && canRotated) {
-            if (p.width > p.height) {
-               [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
-            }
-          } else if (canRotated) {
-            [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
-          }
-          shelfH = remainingParts[i].height;
+          shelfH = p.height;
           break;
         }
       }
@@ -134,6 +132,7 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
       if (leaderIdx === -1) break;
 
       let currentX = 0;
+      // Rellenar la franja con columnas
       while (currentX < w) {
         let bestColumnIndices: number[] = [];
         let colW = 0;
@@ -142,36 +141,21 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
           if (usedIndices.has(i)) continue;
           const p = remainingParts[i];
           
-          const fitsNormal = p.width <= (w - currentX) && p.height <= shelfH;
-          const fitsRotated = p.grainDirection === 'libre' && p.height <= (w - currentX) && p.width <= shelfH;
-
-          if (fitsNormal || fitsRotated) {
-            if (fitsNormal && fitsRotated) {
-              if (p.width > p.height) {
-                [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
-              }
-            } else if (fitsRotated) {
-              [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
-            }
-
+          // La pieza debe caber en el ancho restante y no superar la altura de la franja
+          if (p.width <= (w - currentX) && p.height <= shelfH) {
             bestColumnIndices = [i];
-            colW = remainingParts[i].width;
+            colW = p.width;
             usedIndices.add(i);
 
-            let remH = shelfH - remainingParts[i].height - kerf;
+            // V-STACKING: Intentar apilar piezas verticalmente en esta columna
+            let remH = shelfH - p.height - kerf;
             while (remH > 0) {
               let subIdx = -1;
               for (let j = 0; j < remainingParts.length; j++) {
                 if (usedIndices.has(j)) continue;
                 const p2 = remainingParts[j];
-                
-                const sFitsNormal = p2.width <= colW && p2.height <= remH;
-                const sFitsRotated = p2.grainDirection === 'libre' && p2.height <= colW && p2.width <= remH;
-
-                if (sFitsNormal || sFitsRotated) {
-                  if (sFitsRotated && !sFitsNormal) {
-                    [remainingParts[j].width, remainingParts[j].height] = [remainingParts[j].height, remainingParts[j].width];
-                  }
+                // La sub-pieza debe caber en el ancho de la columna y el alto remanente
+                if (p2.width <= colW && p2.height <= remH) {
                   subIdx = j;
                   break;
                 }
@@ -189,6 +173,7 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
 
         if (bestColumnIndices.length === 0) break;
 
+        // Registrar piezas en el layout
         let yOffset = 0;
         bestColumnIndices.forEach(idx => {
           const p = remainingParts[idx];
@@ -221,7 +206,8 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
     });
     
     remainingParts = remainingParts.filter((_, idx) => !usedIndices.has(idx));
-    if (panels.length > 15) break;
+    // Limitar paneles para evitar bucles infinitos en casos de error
+    if (panels.length > 10) break;
   }
   return panels;
 }
@@ -231,8 +217,13 @@ function calculateIndustrialScore(layouts: OptimizedPanel[], w: number, h: numbe
   const totalUsedArea = layouts.reduce((acc, l) => acc + l.usedArea, 0);
   const totalAvailableArea = layouts.length * w * h;
   const waste = totalAvailableArea - totalUsedArea;
-  const panelPenalty = (layouts.length - 1) * 5000000;
-  const fragmentation = layouts.length * 1000; 
+  
+  // Penalizaciones industriales:
+  // 1. Penalizar fuertemente el uso de múltiples paneles
+  const panelPenalty = (layouts.length - 1) * 10000000;
+  // 2. Penalizar la fragmentación (huecos pequeños e inútiles)
+  const fragmentation = layouts.length * 5000; 
+  
   return waste + panelPenalty + fragmentation;
 }
 
@@ -261,7 +252,7 @@ function generateColors(parts: PartToCut[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 50%, 0.3)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 75%, 60%, 0.35)`;
   });
   return colors;
 }

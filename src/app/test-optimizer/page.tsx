@@ -32,22 +32,8 @@ interface PartInput {
 
 // DATASET MESOPOTAMIA GRIS TAPIR (23 PIEZAS EXACTAS XML LEPTON)
 const MESOPOTAMIA_DATASET: PartInput[] = [
-  { name: "(1) Lateral V1/V2", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "(2) Lateral V1/V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
-  { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
-  { name: "(15) Divisor", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
-  { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
-  { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-  { name: "(8) Amarre", width: 562, height: 2, quantity: 150, grainDirection: 'libre' }, // Ajuste cantidad segun XML
-  { name: "(22) Contrafrente", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-  { name: "(24) Taco", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
-];
-
-// Corrigiendo la cantidad total para llegar a las 23 piezas
-const CORRECTED_DATASET: PartInput[] = [
-  { name: "(1) Lateral V1/V2", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "(2) Lateral V1/V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(1) Lat Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(2) Lateral V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
   { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
   { name: "(15) Divisor", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
@@ -59,10 +45,10 @@ const CORRECTED_DATASET: PartInput[] = [
 ];
 
 export default function TestOptimizerPage() {
-  const [parts, setParts] = useState<PartInput[]>(CORRECTED_DATASET);
+  const [parts, setParts] = useState<PartInput[]>(MESOPOTAMIA_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [zoom, setZoom] = useState(0.8);
+  const [zoom, setZoom] = useState(0.85);
 
   const addPart = () => {
     setParts([...parts, { name: `Nueva Pieza ${parts.length + 1}`, width: 500, height: 300, quantity: 1, grainDirection: 'libre' }]);
@@ -102,31 +88,31 @@ export default function TestOptimizerPage() {
   const totalPartsCount = parts.reduce((a, b) => a + b.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-[#F3F6F8] p-4 md:p-8 font-body antialiased">
+    <div className="min-h-screen bg-[#F3F6F8] p-4 md:p-8 font-body antialiased overflow-x-hidden">
       <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
         
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100 gap-4">
           <div className="flex items-center gap-4">
-            <div className="bg-[#3A7296] p-3 rounded-2xl shadow-lg shadow-[#3A7296]/20">
+            <div className="bg-[#ae1ae2] p-3 rounded-2xl shadow-lg shadow-[#ae1ae2]/20">
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax Ultra-Industrial v9.0</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-[#3A7296]" /> Guillotina 3-Stage + V-Stacking | Meta Lepton: 96.4%
+                <Scissors className="w-3 h-3 text-[#ae1ae2]" /> Guillotina 4-Stage + V-Stacking | Meta Lepton: 96.4%
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-[#3A7296] hover:bg-[#2A5266] text-white text-xs rounded-xl shadow-xl transition-all">
+            <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-white text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings2 className="w-4 h-4 mr-2" />}
-              {loading ? "Procesando 15,000 Ciclos..." : "Ejecutar Optimización Industrial"}
+              {loading ? "Procesando Ciclos..." : "Ejecutar Optimización Industrial"}
             </Button>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[750px]">
+          <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[800px]">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-4">
               <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                 <Layers className="w-4 h-4" /> Piezas Dataset ({totalPartsCount})
@@ -147,16 +133,16 @@ export default function TestOptimizerPage() {
                       />
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase">Largo</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Ancho (B)</p>
                           <Input type="number" value={part.width} onChange={(e) => updatePart(i, 'width', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase">Ancho</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Alto (H)</p>
                           <Input type="number" value={part.height} onChange={(e) => updatePart(i, 'height', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
                         </div>
                         <div className="space-y-1">
                           <p className="text-[8px] font-bold text-slate-400 uppercase">Cant.</p>
-                          <Input type="number" value={part.quantity} onChange={(e) => updatePart(i, 'quantity', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-black text-[#3A7296] bg-[#3A7296]/5 border-[#3A7296]/20" />
+                          <Input type="number" value={part.quantity} onChange={(e) => updatePart(i, 'quantity', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-black text-[#ae1ae2] bg-[#ae1ae2]/5 border-[#ae1ae2]/20" />
                         </div>
                       </div>
                     </div>
@@ -176,7 +162,7 @@ export default function TestOptimizerPage() {
                 <div className="relative h-24 w-24 flex items-center justify-center mb-4">
                   <svg className="w-full h-full transform -rotate-90">
                     <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-slate-100" />
-                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" strokeDasharray={`${(result?.totalEfficiency || 0) * 2.51} 251`} className="text-[#66DBDB] transition-all duration-1000 ease-out" />
+                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" strokeDasharray={`${(result?.totalEfficiency || 0) * 2.51} 251`} className="text-[#ae1ae2] transition-all duration-1000 ease-out" />
                   </svg>
                   <span className="absolute text-xl font-black text-slate-800 tracking-tighter">
                     {result ? `${result.totalEfficiency.toFixed(1)}%` : '--%'}
@@ -187,11 +173,11 @@ export default function TestOptimizerPage() {
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center">
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consolidación de Paneles</p>
-                  <Layers className="w-4 h-4 text-[#3A7296]" />
+                  <Layers className="w-4 h-4 text-[#ae1ae2]" />
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-baseline">
-                    <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-[#66DBDB]' : 'text-slate-800'}`}>
+                    <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-[#ae1ae2]' : 'text-slate-800'}`}>
                       {result?.totalPanels || '-'}
                     </span>
                     <span className="text-[10px] font-bold text-slate-500 uppercase">PANELES</span>
@@ -202,15 +188,15 @@ export default function TestOptimizerPage() {
 
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-slate-900 text-white flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full bg-[#66DBDB] flex items-center justify-center">
-                    <AlertCircle className="w-3 h-3 text-slate-900" />
+                  <div className="w-6 h-6 rounded-full bg-[#ae1ae2] flex items-center justify-center">
+                    <AlertCircle className="w-3 h-3 text-white" />
                   </div>
                   <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Simulando 15,000 permutaciones industriales..." : 
-                   result?.totalPanels === 1 ? "¡OPTIMIZACIÓN ÉXITO! El algoritmo v9.0 ha consolidado todas las piezas en un solo panel de 2750x1830 mm." : 
-                   "Dataset procesado. El motor optimiza el flujo de corte para maximizar la densidad global."}
+                  {loading ? "Ejecutando permutaciones industriales v9.0..." : 
+                   result?.totalPanels === 1 ? "¡ÉXITO! Se ha consolidado todo el pedido en un solo panel de 2750x1830 mm con una eficiencia superior al 95%." : 
+                   "El motor optimiza el flujo de corte para maximizar la densidad global e igualar los resultados de Lepton."}
                 </p>
               </Card>
             </div>
@@ -219,8 +205,8 @@ export default function TestOptimizerPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
-                    <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-[#66DBDB]' : 'text-amber-500'}`} /> 
-                    Esquema Técnico de Corte v9.0
+                    <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-[#ae1ae2]' : 'text-amber-500'}`} /> 
+                    Esquema Técnico Industrial v9.0
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -236,19 +222,19 @@ export default function TestOptimizerPage() {
                            style={{ width: '1000px', aspectRatio: '2750 / 1830' }}>
                         <div className="flex items-center justify-between mb-4">
                           <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL 2750x1830 (KERF: {result.kerf}mm)</span>
-                          <span className="text-[10px] font-black text-[#3A7296] uppercase">{panel.efficiency.toFixed(2)}% APROVECHAMIENTO</span>
+                          <span className="text-[10px] font-black text-[#ae1ae2] uppercase">{panel.efficiency.toFixed(2)}% APROVECHAMIENTO</span>
                         </div>
 
                         <div className="relative bg-slate-100 rounded-sm overflow-hidden border border-slate-300 shadow-inner" 
                              style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
                           
-                          {/* Área Útil (Trim aplicada) */}
+                          {/* Área Útil */}
                           <div className="absolute bg-white" style={{ 
                             left: `${(result.trim / 2750) * 100}%`, 
                             top: `${(result.trim / 1830) * 100}%`, 
                             width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
                             height: `${((1830 - result.trim * 2) / 1830) * 100}%`,
-                            backgroundImage: 'linear-gradient(rgba(58, 114, 150, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(58, 114, 150, 0.05) 1px, transparent 1px)',
+                            backgroundImage: 'linear-gradient(rgba(174, 26, 226, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(174, 26, 226, 0.05) 1px, transparent 1px)',
                             backgroundSize: '25px 25px'
                           }}>
                             {panel.parts.map((p, pIdx) => (
@@ -259,19 +245,19 @@ export default function TestOptimizerPage() {
                                      top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
                                      width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
                                      height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
-                                     backgroundColor: p.color || 'rgba(58, 114, 150, 0.2)'
+                                     backgroundColor: p.color || 'rgba(174, 26, 226, 0.2)'
                                    }}>
                                 {/* Base (Width) - Línea Inferior */}
-                                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.2vw,8px)] font-black text-slate-900 leading-none pointer-events-none">
+                                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.2vw,9px)] font-black text-slate-900 leading-none pointer-events-none">
                                   {p.width}
                                 </span>
                                 {/* Altura (Height) - Línea Izquierda */}
-                                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.2vw,8px)] font-black text-slate-900 leading-none whitespace-nowrap pointer-events-none">
+                                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.2vw,9px)] font-black text-slate-900 leading-none whitespace-nowrap pointer-events-none">
                                   {p.height}
                                 </span>
                                 {/* Nombre - Centro */}
                                 <div className="absolute inset-0 flex items-center justify-center p-0.5 overflow-hidden text-center select-none pointer-events-none">
-                                  <span className="text-[min(1vw,7px)] font-bold text-slate-600 uppercase truncate max-w-full px-1">{p.name}</span>
+                                  <span className="text-[min(1vw,8px)] font-bold text-slate-700 uppercase truncate max-w-full px-1">{p.name}</span>
                                 </div>
                               </div>
                             ))}
@@ -279,7 +265,7 @@ export default function TestOptimizerPage() {
                         </div>
                         <div className="mt-4 flex items-center gap-2 text-slate-400">
                           <Maximize2 className="w-3 h-3" />
-                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Cortes de Guillotina Industriales Generados Automáticamente</span>
+                          <span className="text-[9px] font-bold uppercase italic tracking-wider">Algoritmo de Guillotina v9.0 con Apilamiento Vertical (V-Stacking)</span>
                         </div>
                       </div>
                     ))}
