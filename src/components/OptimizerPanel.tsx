@@ -90,7 +90,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
         );
 
         if (res.optimizedLayout.length === 0) {
-          setError("Piezas demasiado grandes.");
+          setError("Piezas demasiado grandes para el panel.");
         } else {
           setResult(res);
         }
@@ -135,7 +135,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v12.1
+                <Settings2 className="w-4 h-4" /> ArquiMax v12.1.1 Industrial
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -267,10 +267,17 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
         </div>
 
         <div className="w-full">
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5" />
+              <p className="text-sm font-bold">{error}</p>
+            </div>
+          )}
+
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase">Calculando Guillotina v12.1...</p>
+              <p className="font-black text-slate-700 uppercase">Calculando ArquiMax v12.1.1...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -289,10 +296,15 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   <div className="relative bg-slate-200 shadow-2xl rounded-sm mx-auto overflow-hidden" 
                        style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                     
+                    {/* Área de Refilado (Trim) */}
                     <div className="absolute inset-0 bg-slate-400/20 pointer-events-none z-10" 
-                         style={{ borderStyle: 'solid', borderWidth: `${(result.trim / selectedPanel.height) * 100}% ${(result.trim / selectedPanel.width) * 100}%` }}>
+                         style={{ 
+                           borderStyle: 'solid', 
+                           borderWidth: `${(result.trim / selectedPanel.height) * 100}% ${(result.trim / selectedPanel.width) * 100}%` 
+                         }}>
                     </div>
 
+                    {/* Área Útil de Trabajo */}
                     <div className="absolute bg-white" style={{ 
                       left: `${(result.trim / selectedPanel.width) * 100}%`, 
                       top: `${(result.trim / selectedPanel.height) * 100}%`, 
@@ -312,15 +324,21 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                                backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
                              }}>
                           <div className="relative w-full h-full overflow-hidden pointer-events-none">
+                            {/* Medida Base */}
                             <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">{p.width}</span>
+                            {/* Medida Altura */}
                             <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.8vw,10px)] font-black text-slate-900 leading-none whitespace-nowrap">{p.height}</span>
+                            {/* Nombre de Pieza */}
                             <div className="absolute inset-0 flex items-center justify-center p-1 text-center"><span className="text-[min(1.4vw,9px)] text-slate-700 uppercase font-bold truncate w-full px-2">{p.name}</span></div>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="flex gap-4 items-center px-2"><Info className="w-3 h-3 text-slate-400" /><p className="text-[9px] text-slate-400 italic">Optimización ArquiMax v12.1. Compactación perimetral para máximo sobrante.</p></div>
+                  <div className="flex gap-4 items-center px-2">
+                    <Info className="w-3 h-3 text-slate-400" />
+                    <p className="text-[9px] text-slate-400 italic">Compactación perimetral (0,0). Guillotina estricta v12.1.1.</p>
+                  </div>
                 </div>
               ))}
             </div>
