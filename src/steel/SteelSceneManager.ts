@@ -95,7 +95,6 @@ export class SteelSceneManager {
     });
 
     this.fpControls.addEventListener('unlock', () => {
-      // Solo desactivar si realmente queremos salir (no por un fallo de permisos)
       if (this.isWalkModeActive) {
         this.controls.enabled = true;
         this.isWalkModeActive = false;
@@ -194,33 +193,34 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    // 1. Calcular centro de la casa para teletransporte
+    // 1. Calcular centro de la casa de forma segura
+    this.houseGroup.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
+    
     if (!box.isEmpty() && isFinite(box.min.x)) {
       box.getCenter(center);
     } else {
       center.set(0, 0, 0);
     }
     
-    // 2. Posicionar cámara
+    // 2. Posicionar cámara dentro de la vivienda a altura humana (1700mm)
     this.camera.position.set(center.x, 1700, center.z);
     this.camera.rotation.set(0, 0, 0);
+    this.camera.lookAt(center.x, 1700, center.z - 1000);
     
-    // 3. Activar lógica de navegación (esto habilita joysticks y teclado)
+    // 3. Activar lógica de navegación
     this.isWalkModeActive = true;
     this.controls.enabled = false;
     if (this.onWalkModeLock) this.onWalkModeLock(true);
 
-    // 4. Intentar bloqueo de ratón defensivamente (puede fallar en sandboxes)
+    // 4. Intentar bloqueo de ratón (defensivo ante SecurityError)
     try {
-      // Verificar si el documento permite PointerLock antes de llamar
-      if (document.fullscreenEnabled || (document as any).webkitFullscreenEnabled || true) {
+      if (this.fpControls && typeof this.fpControls.lock === 'function') {
         this.fpControls.lock();
       }
     } catch (err) {
-      console.warn('No se pudo solicitar Pointer Lock debido a restricciones de seguridad del navegador.');
-      // El modo caminata sigue activo gracias al paso 3
+      console.warn('Pointer Lock bloqueado por sandbox. Navegación manual activa.');
     }
   }
 
@@ -415,7 +415,9 @@ export class SteelSceneManager {
   }
 
   private fitCamera() {
+    this.houseGroup.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.houseGroup);
+    
     if (box.isEmpty() || !isFinite(box.min.x)) return;
 
     const center = new THREE.Vector3();
@@ -424,8 +426,12 @@ export class SteelSceneManager {
     box.getSize(size);
 
     const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim === 0) return;
+
     const fov = this.camera.fov * (Math.PI / 180);
-    const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.8;
+    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.8;
+    
+    if (!isFinite(cameraDistance) || cameraDistance < 100) cameraDistance = 5000;
 
     this.camera.position.set(center.x + cameraDistance, center.y + cameraDistance, center.z + cameraDistance);
     this.controls.target.copy(center);
@@ -445,7 +451,7 @@ export class SteelSceneManager {
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
     if (this.renderer) this.renderer.dispose();
-    this.controls.dispose();
-    this.fpControls.dispose();
+    if (this.controls) this.controls.dispose();
+    if (this.fpControls) this.fpControls.dispose();
   }
 }
