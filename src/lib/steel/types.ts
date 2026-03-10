@@ -31,6 +31,8 @@ export interface LayerVisibility {
 }
 
 export interface SteelHouseConfig {
+  width: number;
+  length: number;
   globalWallHeight: number;
   walls: SteelWall[];
   layers: LayerVisibility;

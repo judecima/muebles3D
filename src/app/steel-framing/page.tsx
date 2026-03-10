@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
 import { SteelJoystick } from '@/components/steel/SteelJoystick';
@@ -14,7 +14,6 @@ import {
   Move,
   Settings2,
   Compass,
-  MousePointer2,
   Keyboard,
   ArrowUp,
   ArrowDown,
@@ -28,16 +27,18 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-const INITIAL_WALLS: SteelWall[] = [
-  { id: 'w1', length: 6000, height: 2600, thickness: 100, x: -3000, z: -3000, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: 2500 }], studSpacing: 400 },
-  { id: 'w2', length: 6000, height: 2600, thickness: 100, x: 3000, z: -3000, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: 2400, sillHeight: 900 }], studSpacing: 400 },
-  { id: 'w3', length: 6000, height: 2600, thickness: 100, x: 3000, z: 3000, rotation: 180, openings: [], studSpacing: 400 },
-  { id: 'w4', length: 6000, height: 2600, thickness: 100, x: -3000, z: 3000, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: 2250, sillHeight: 900 }], studSpacing: 400 },
+const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
+  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: w/2 - 450 }], studSpacing: 400 },
+  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: l/2 - 600, sillHeight: 900 }], studSpacing: 400 },
+  { id: 'w3', length: w, height: h, thickness: 100, x: w/2, z: l/2, rotation: 180, openings: [], studSpacing: 400 },
+  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: l/2 - 750, sillHeight: 900 }], studSpacing: 400 },
 ];
 
 const INITIAL_CONFIG: SteelHouseConfig = {
+  width: 6000,
+  length: 6000,
   globalWallHeight: 2600,
-  walls: INITIAL_WALLS,
+  walls: createInitialWalls(6000, 6000, 2600),
   layers: {
     exteriorPanels: true,
     interiorPanels: false,
@@ -62,6 +63,32 @@ export default function SteelFramingPage() {
     updateJoystickMove: (x: number, y: number) => void,
     updateJoystickLook: (x: number, y: number) => void
   }>(null);
+
+  // Ajuste automático de muros al cambiar dimensiones globales
+  useEffect(() => {
+    // Solo reajustamos si hay exactamente 4 muros (el rectángulo base)
+    // Si el usuario añadió más, el reajuste automático podría ser confuso, 
+    // pero por ahora vinculamos los primeros 4 ID originales si existen.
+    const newWalls = config.walls.map(w => {
+      if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
+      if (w.id === 'w2') return { ...w, length: config.length, x: config.width/2, z: -config.length/2 };
+      if (w.id === 'w3') return { ...w, length: config.width, x: config.width/2, z: config.length/2 };
+      if (w.id === 'w4') return { ...w, length: config.length, x: -config.width/2, z: config.length/2 };
+      return w;
+    });
+    
+    // Solo disparamos la actualización si realmente hubo cambios en las props globales
+    // para evitar loops infinitos
+    const hasChanges = newWalls.some((w, i) => 
+      w.length !== config.walls[i]?.length || 
+      w.x !== config.walls[i]?.x || 
+      w.z !== config.walls[i]?.z
+    );
+
+    if (hasChanges) {
+      setConfig(prev => ({ ...prev, walls: newWalls }));
+    }
+  }, [config.width, config.length]);
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening) => {
     setSelectedOpening({ wallId, opening });
@@ -125,7 +152,9 @@ export default function SteelFramingPage() {
                 </SheetHeader>
                 <SteelControlPanel 
                   config={config} 
-                  onConfigChange={setConfig} 
+                  onConfigChange={(newConfig) => {
+                    setConfig(newConfig);
+                  }} 
                 />
               </SheetContent>
             </Sheet>

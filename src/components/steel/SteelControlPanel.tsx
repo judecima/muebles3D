@@ -12,13 +12,11 @@ import {
   Plus, 
   Trash2, 
   Home, 
-  Settings2,
   Layout,
   DoorOpen,
   Box,
   Layers,
-  Activity,
-  ChevronDown
+  Maximize2
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -90,13 +88,43 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Home className="w-5 h-5 text-blue-400" /> 
-            <span>Steel Framing v2.0</span>
+            <span>Steel Framing v2.5</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal">SISTEMA ESTRUCTURAL AUTOMÁTICO</span>
+          <span className="text-[10px] opacity-70 font-normal">DISEÑO PARAMÉTRICO GLOBAL</span>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="space-y-6 pt-6 px-4 pb-20">
+        {/* Dimensiones Globales */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Maximize2 className="w-4 h-4 text-blue-500" />
+            <Label className="text-xs font-bold uppercase text-slate-500">Dimensiones Globales (mm)</Label>
+          </div>
+          <div className="grid grid-cols-2 gap-3 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+            <div className="space-y-1">
+              <Label className="text-[9px] font-black uppercase text-blue-600">Ancho (X)</Label>
+              <Input 
+                type="number" 
+                value={config.width} 
+                onChange={(e) => onConfigChange({ ...config, width: parseInt(e.target.value) || 0 })}
+                className="h-8 text-xs font-bold border-blue-200 focus:ring-blue-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[9px] font-black uppercase text-blue-600">Largo (Z)</Label>
+              <Input 
+                type="number" 
+                value={config.length} 
+                onChange={(e) => onConfigChange({ ...config, length: parseInt(e.target.value) || 0 })}
+                className="h-8 text-xs font-bold border-blue-200 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Capas de Visualización */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
@@ -165,14 +193,14 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                   <div className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
                     {idx + 1}
                   </div>
-                  <span className="text-xs font-bold text-slate-700">Muro {wall.length}mm</span>
+                  <span className="text-xs font-bold text-slate-700">Muro {Math.round(wall.length)}mm</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold uppercase text-slate-400">Longitud (mm)</Label>
-                    <Input type="number" value={wall.length} onChange={(e) => updateWall(wall.id, 'length', parseInt(e.target.value))} className="h-8 text-xs" />
+                    <Input type="number" value={Math.round(wall.length)} onChange={(e) => updateWall(wall.id, 'length', parseInt(e.target.value))} className="h-8 text-xs" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold uppercase text-slate-400">Espaciado Mont.</Label>
@@ -191,11 +219,11 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold uppercase text-slate-400">Posición X</Label>
-                    <Input type="number" value={wall.x} onChange={(e) => updateWall(wall.id, 'x', parseInt(e.target.value))} className="h-8 text-xs" />
+                    <Input type="number" value={Math.round(wall.x)} onChange={(e) => updateWall(wall.id, 'x', parseInt(e.target.value))} className="h-8 text-xs" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold uppercase text-slate-400">Posición Z</Label>
-                    <Input type="number" value={wall.z} onChange={(e) => updateWall(wall.id, 'z', parseInt(e.target.value))} className="h-8 text-xs" />
+                    <Input type="number" value={Math.round(wall.z)} onChange={(e) => updateWall(wall.id, 'z', parseInt(e.target.value))} className="h-8 text-xs" />
                   </div>
                 </div>
 
