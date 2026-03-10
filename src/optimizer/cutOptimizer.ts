@@ -9,7 +9,7 @@ interface PartToCut {
 }
 
 /**
- * ArquiMax Deep Engine v6.0 Ultra Pro
+ * ArquiMax Deep Engine v6.0 Ultra
  * Algoritmo de Guillotina de 3 Etapas (Shelf-Packing con Apilamiento Vertical Agresivo).
  * Optimizado para igualar la eficiencia industrial de Lepton (+95%).
  */
@@ -137,7 +137,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
 
           if (fitsNormal || fitsRotated) {
             columnLeaderIdx = i;
-            // Preferimos la orientación que use menos ancho
+            // Preferimos la orientación que use menos ancho para el stack
             if (fitsNormal && fitsRotated) {
               if (p.width > p.height) {
                 [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];

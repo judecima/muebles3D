@@ -28,6 +28,7 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
+// Dataset Mesopotania del XML de Lepton (23 Piezas totales)
 const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(1) V1 ESTANTES", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(2) V2 ESTANTES", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
