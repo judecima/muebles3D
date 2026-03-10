@@ -1,4 +1,24 @@
-export type FurnitureType = 'bajoMesada' | 'rackTV' | 'escritorio' | 'alacena' | 'placard' | 'biblioteca' | 'alacenaFlip' | 'bajomesada-cajonera' | 'porta-anafe';
+export type FurnitureType = 
+  | 'bajoMesada' 
+  | 'rackTV' 
+  | 'escritorio' 
+  | 'alacena' 
+  | 'placard' 
+  | 'biblioteca' 
+  | 'alacenaFlip' 
+  | 'bajomesada-cajonera' 
+  | 'porta-anafe'
+  | 'cabinet_base_120_2p3c'
+  | 'cabinet_base_140_3p3c'
+  | 'cabinet_wall_60_1p'
+  | 'cabinet_wall_120_3p'
+  | 'cabinet_wall_140_3p'
+  | 'cabinet_pantry_60_2p'
+  | 'cabinet_microwave_60'
+  | 'cabinet_hood_60'
+  | 'cabinet_base_single_60_1p'
+  | 'cabinet_base_double_80_2p';
+
 export type FurnitureColor = 'blanco' | 'gris_claro' | 'grafito' | 'roble_claro' | 'nogal' | 'negro';
 export type GrainDirection = 'vertical' | 'horizontal' | 'libre';
 
@@ -13,11 +33,11 @@ export const COLOR_PALETTE: Record<FurnitureColor, string> = {
 
 export interface Part {
   id: string;
-  groupId?: string; // Identificador de grupo para interacción independiente
+  groupId?: string; 
   name: string;
-  width: number;  // Dimensión 3D X
-  height: number; // Dimensión 3D Y
-  depth: number;  // Dimensión 3D Z
+  width: number;  
+  height: number; 
+  depth: number;  
   x: number;
   y: number;
   z: number;
@@ -25,7 +45,6 @@ export interface Part {
   pivot?: { x: number; y: number; z: number };
   isHardware?: boolean;
   
-  // Propiedades técnicas para despiece
   cutLargo: number;
   cutAncho: number;
   cutEspesor: number;

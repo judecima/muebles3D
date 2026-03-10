@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItemGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FurnitureType, FurnitureDimensions, FurnitureColor } from '@/lib/types';
 import { 
@@ -18,7 +18,8 @@ import {
   Undo2,
   FileDown,
   Layout,
-  Layers
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 
 interface ControlPanelProps {
@@ -61,11 +62,12 @@ export function ControlPanel({
     onDimensionsChange({ ...dimensions, hasShelf: checked });
   };
 
-  const isHeightFixed = type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
+  const isCatalog = type.startsWith('cabinet_');
+  const isHeightFixed = isCatalog || type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
   const isWidthSlider = type === 'escritorio';
-  const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
-  const forceBack = type === 'placard' || type === 'rackTV';
-  const canHaveShelf = type === 'bajoMesada' || type === 'alacena' || type === 'porta-anafe';
+  const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip' || type === 'bajomesada-cajonera' || type === 'porta-anafe' || isCatalog;
+  const forceBack = type === 'placard' || type === 'rackTV' || type.includes('pantry') || type.includes('wall');
+  const canHaveShelf = type === 'bajoMesada' || type === 'alacena' || type === 'porta-anafe' || isCatalog;
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -81,21 +83,29 @@ export function ControlPanel({
       
       <CardContent className="space-y-6 pt-6 px-4 pb-20">
         <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase text-slate-500">Tipo de Proyecto</Label>
+          <Label className="text-xs font-bold uppercase text-slate-500">Módulo de Proyecto</Label>
           <Select value={type} onValueChange={(v) => onTypeChange(v as FurnitureType)}>
-            <SelectTrigger className="w-full bg-slate-50 border-slate-200">
+            <SelectTrigger className="w-full bg-slate-50 border-slate-200 h-11">
               <SelectValue placeholder="Seleccionar mueble" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="placard">Placard</SelectItem>
-              <SelectItem value="escritorio">Escritorio</SelectItem>
-              <SelectItem value="bajoMesada">Bajo Mesada (Puertas)</SelectItem>
-              <SelectItem value="bajomesada-cajonera">Bajo Mesada (Cajonera)</SelectItem>
-              <SelectItem value="porta-anafe">Porta-Anafe</SelectItem>
-              <SelectItem value="alacena">Alacena Superior (Batiente)</SelectItem>
-              <SelectItem value="alacenaFlip">Alacena Superior (Abatible Pistón)</SelectItem>
+            <SelectContent className="max-h-[400px]">
+              <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mb-1">Modelos Paramétricos</div>
+              <SelectItem value="placard">Placard Vestidor</SelectItem>
+              <SelectItem value="escritorio">Escritorio Industrial</SelectItem>
+              <SelectItem value="bajoMesada">Bajo Mesada (Paramétrico)</SelectItem>
               <SelectItem value="rackTV">Rack TV</SelectItem>
-              <SelectItem value="biblioteca">Biblioteca</SelectItem>
+              
+              <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mt-2 mb-1">Catálogo Dielfe (Estándar)</div>
+              <SelectItem value="cabinet_base_120_2p3c">Bajo 1.20m (2P+3C)</SelectItem>
+              <SelectItem value="cabinet_base_140_3p3c">Bajo 1.40m (3P+3C)</SelectItem>
+              <SelectItem value="cabinet_base_single_60_1p">Bajo 0.60m (1P)</SelectItem>
+              <SelectItem value="cabinet_base_double_80_2p">Bajo 0.80m (2P)</SelectItem>
+              <SelectItem value="cabinet_wall_120_3p">Alacena 1.20m (3P)</SelectItem>
+              <SelectItem value="cabinet_wall_140_3p">Alacena 1.40m (3P)</SelectItem>
+              <SelectItem value="cabinet_wall_60_1p">Alacena 0.60m (1P)</SelectItem>
+              <SelectItem value="cabinet_hood_60">Alacena Campana (0.60m)</SelectItem>
+              <SelectItem value="cabinet_pantry_60_2p">Despensero 0.60m (2P)</SelectItem>
+              <SelectItem value="cabinet_microwave_60">Torre Hornos (0.60m)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -125,7 +135,7 @@ export function ControlPanel({
           ) : (
             <div className="space-y-1">
               <Label className="text-[10px] font-bold uppercase text-slate-500">Ancho (mm)</Label>
-              <Input name="width" type="number" value={dimensions.width} onChange={handleChange} className="h-9 border-slate-200" />
+              <Input name="width" type="number" value={dimensions.width} onChange={handleChange} className="h-9 border-slate-200" disabled={isCatalog} />
             </div>
           )}
 
@@ -145,7 +155,7 @@ export function ControlPanel({
             </div>
             <div className="space-y-1">
               <Label className="text-[10px] font-bold uppercase text-slate-500">Prof. (mm)</Label>
-              <Input name="depth" type="number" value={dimensions.depth} onChange={handleChange} className="h-9 border-slate-200" />
+              <Input name="depth" type="number" value={dimensions.depth} onChange={handleChange} className="h-9 border-slate-200" disabled={isCatalog} />
             </div>
           </div>
 

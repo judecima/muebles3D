@@ -29,6 +29,17 @@ const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   alacenaFlip: { width: 500, height: 300, depth: 320, thickness: 18, hasBack: true, hasShelf: false },
   'bajomesada-cajonera': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true },
   'porta-anafe': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
+  // Nuevos modelos catálogo Dielfe
+  'cabinet_base_120_2p3c': { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_base_140_3p3c': { width: 1400, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_wall_60_1p': { width: 600, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_wall_120_3p': { width: 1200, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_wall_140_3p': { width: 1400, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_pantry_60_2p': { width: 600, height: 2100, depth: 600, thickness: 18, hasBack: true },
+  'cabinet_microwave_60': { width: 600, height: 2100, depth: 600, thickness: 18, hasBack: true },
+  'cabinet_hood_60': { width: 600, height: 300, depth: 320, thickness: 18, hasBack: true },
+  'cabinet_base_single_60_1p': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_base_double_80_2p': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
 };
 
 export default function Home() {
@@ -46,6 +57,9 @@ export default function Home() {
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
   const getEngine = (t: FurnitureType) => {
+    if (t.startsWith('cabinet_')) {
+      return (d: FurnitureDimensions) => require('@/engines/kitchenCatalogEngine').kitchenCatalogEngine(t, d);
+    }
     switch (t) {
       case 'bajoMesada': return require('@/engines/kitchenBaseEngine').kitchenBaseEngine;
       case 'escritorio': return require('@/engines/deskEngine').deskEngine;
@@ -139,7 +153,6 @@ export default function Home() {
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.text("Listado Detallado de Cortes y Herrajes", 15, 20);
     
-    // Piezas MDF
     const panelRows = parts.filter(p => !p.isHardware).map(p => [
       p.name, p.cutLargo, p.cutAncho, p.cutEspesor, 1, p.grainDirection
     ]);
@@ -153,7 +166,6 @@ export default function Home() {
       alternateRowStyles: { fillColor: [250, 250, 250] }
     });
 
-    // Herrajes
     const aggregatedHardware = parts.filter(p => p.isHardware).reduce((acc, p) => {
       acc[p.name] = (acc[p.name] || 0) + 1;
       return acc;
@@ -247,7 +259,7 @@ export default function Home() {
             <div className="flex-1 relative">
               <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
               <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full border border-slate-200 shadow-sm pointer-events-none">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{type}</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{type.replace(/_/g, ' ')}</span>
               </div>
             </div>
             <div className="h-1/3 border-t bg-white min-h-[200px] shrink-0">
