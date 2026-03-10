@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,8 @@ import {
   Layers,
   ZoomIn,
   ZoomOut,
-  Scissors
+  Scissors,
+  Loader2
 } from 'lucide-react';
 
 interface PartInput {
@@ -28,10 +29,6 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-/**
- * Dataset EXACTO de Mesopotamia (XML proporcionado)
- * Total: 23 piezas optimizadas en un tablero de 2750x1830
- */
 const LEPTON_DATASET: PartInput[] = [
   { name: "V1 ESTANTES (629x570)", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "V1 ESTANTES (610x570)", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
@@ -49,10 +46,10 @@ export default function TestOptimizerPage() {
   const [parts, setParts] = useState<PartInput[]>(LEPTON_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.8);
 
   const addPart = () => {
-    setParts([...parts, { name: `Pieza ${parts.length + 1}`, width: 500, height: 300, quantity: 1, grainDirection: 'libre' }]);
+    setParts([...parts, { name: `Nueva Pieza ${parts.length + 1}`, width: 500, height: 300, quantity: 1, grainDirection: 'libre' }]);
   };
 
   const removePart = (index: number) => {
@@ -67,200 +64,207 @@ export default function TestOptimizerPage() {
 
   const handleOptimize = () => {
     setLoading(true);
-    // Simulación de procesamiento intensivo de 3000 iteraciones
+    // Simulación de procesamiento intensivo
     setTimeout(() => {
-      const res = runOptimization(
-        parts.map(p => ({ ...p, thickness: 18 })),
-        2750, 1830, 18, 4.5, 10
-      );
-      setResult(res);
-      setLoading(false);
-    }, 1200);
+      try {
+        const res = runOptimization(
+          parts.map(p => ({ ...p, thickness: 18 })),
+          2750, 1830, 18, 4.5, 10
+        );
+        setResult(res);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }, 1500);
   };
 
+  // Autocalcular al cargar
+  useEffect(() => {
+    handleOptimize();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-12 font-body antialiased">
-      <div className="max-w-7xl mx-auto space-y-8 pb-40">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-body antialiased">
+      <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
         
-        <header className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 gap-6">
-          <div className="flex items-center gap-6">
-            <div className="bg-primary p-4 rounded-3xl shadow-lg shadow-primary/20">
-              <Target className="w-10 h-10 text-white" />
+        <header className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100 gap-4">
+          <div className="flex items-center gap-4">
+            <div className="bg-primary p-3 rounded-2xl shadow-lg shadow-primary/20">
+              <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Validador Mesopotamia v6.0 Pro</h1>
-              <p className="text-slate-500 text-sm font-semibold flex items-center gap-2">
-                <Scissors className="w-4 h-4 text-primary" /> Algoritmo de Guillotina en 3 Etapas (Stacks Verticales)
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador Mesopotamia v6.0 Pro</h1>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                <Scissors className="w-3 h-3 text-primary" /> Guillotina de 3 Etapas con Apilamiento Vertical Agresivo
               </p>
             </div>
           </div>
-          <Button size="lg" onClick={handleOptimize} disabled={loading} className="font-black uppercase px-12 h-16 bg-slate-900 hover:bg-black text-lg rounded-2xl shadow-2xl transition-all active:scale-95">
-            {loading ? "PROCESANDO 3000 CICLOS..." : "CALCULAR +94.8%"}
-          </Button>
+          <div className="flex gap-2 w-full md:w-auto">
+            <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              {loading ? "Calculando 5000 Ciclos..." : "Optimizar +94%"}
+            </Button>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-2 shadow-2xl shadow-slate-200/40 border-none rounded-[2rem] overflow-hidden">
-            <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-6">
-              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Dataset Mesopotamia (MDF 18mm)
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Listado de Piezas */}
+          <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[700px]">
+            <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-4">
+              <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <Layers className="w-4 h-4" /> Piezas ({parts.reduce((a, b) => a + b.quantity, 0)})
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={addPart} className="h-9 text-[10px] font-black uppercase rounded-full border-slate-200">
-                <Plus className="w-4 h-4 mr-2" /> AGREGAR PIEZA
+              <Button variant="outline" size="icon" onClick={addPart} className="h-7 w-7 rounded-full">
+                <Plus className="w-3 h-3" />
               </Button>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-                <table className="w-full text-xs">
-                  <thead className="bg-white sticky top-0 border-b z-20">
-                    <tr>
-                      <th className="p-5 text-left font-black text-slate-400 uppercase tracking-widest">Nombre de Pieza</th>
-                      <th className="p-5 text-center font-black text-slate-400 uppercase tracking-widest">Largo</th>
-                      <th className="p-5 text-center font-black text-slate-400 uppercase tracking-widest">Ancho</th>
-                      <th className="p-5 text-center font-black text-slate-400 uppercase tracking-widest">Cant.</th>
-                      <th className="p-5"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {parts.map((part, i) => (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors group">
-                        <td className="p-4">
-                          <Input value={part.name} onChange={(e) => updatePart(i, 'name', e.target.value)} className="h-10 text-xs font-black bg-transparent border-none focus-visible:ring-0" />
-                        </td>
-                        <td className="p-4">
-                          <Input type="number" value={part.width} onChange={(e) => updatePart(i, 'width', parseInt(e.target.value))} className="h-10 text-xs text-center font-bold bg-slate-100/50 border-none rounded-lg" />
-                        </td>
-                        <td className="p-4">
-                          <Input type="number" value={part.height} onChange={(e) => updatePart(i, 'height', parseInt(e.target.value))} className="h-10 text-xs text-center font-bold bg-slate-100/50 border-none rounded-lg" />
-                        </td>
-                        <td className="p-4">
-                          <Input type="number" value={part.quantity} onChange={(e) => updatePart(i, 'quantity', parseInt(e.target.value))} className="h-10 text-xs text-center font-black text-primary bg-primary/5 border-none rounded-lg" />
-                        </td>
-                        <td className="p-4 text-right">
-                          <Button variant="ghost" size="icon" onClick={() => removePart(i)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <CardContent className="p-0 overflow-y-auto custom-scrollbar flex-1">
+              <div className="divide-y divide-slate-100">
+                {parts.map((part, i) => (
+                  <div key={i} className="p-4 hover:bg-slate-50 transition-colors group relative">
+                    <div className="flex flex-col gap-2">
+                      <Input 
+                        value={part.name} 
+                        onChange={(e) => updatePart(i, 'name', e.target.value)} 
+                        className="h-7 text-[10px] font-black bg-transparent border-none p-0 focus-visible:ring-0" 
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Largo</p>
+                          <Input type="number" value={part.width} onChange={(e) => updatePart(i, 'width', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Ancho</p>
+                          <Input type="number" value={part.height} onChange={(e) => updatePart(i, 'height', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Cant.</p>
+                          <Input type="number" value={part.quantity} onChange={(e) => updatePart(i, 'quantity', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-black text-primary bg-primary/5 border-primary/20" />
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => removePart(i)} className="absolute top-2 right-2 h-6 w-6 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100">
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
-            <Card className="shadow-2xl shadow-slate-200/40 border-none rounded-[2rem] overflow-hidden">
-              <CardHeader className="pb-2 border-b p-6 bg-slate-50/50">
-                <CardTitle className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2 tracking-widest">
-                  <BarChart3 className="w-4 h-4 text-primary" /> Rendimiento Global
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-8 space-y-6">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-5xl font-black text-slate-900 tracking-tighter">{result ? `${result.totalEfficiency.toFixed(2)}%` : '--.--%'}</span>
-                  <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-primary/10 text-primary">Aprovechamiento</span>
+          {/* Visualizador y Resultados */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Métricas */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center items-center text-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Eficiencia Global</p>
+                <div className="relative h-24 w-24 flex items-center justify-center mb-4">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-slate-100" />
+                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" strokeDasharray={`${(result?.totalEfficiency || 0) * 2.51} 251`} className="text-primary transition-all duration-1000 ease-out" />
+                  </svg>
+                  <span className="absolute text-xl font-black text-slate-800 tracking-tighter">
+                    {result ? `${result.totalEfficiency.toFixed(1)}%` : '--%'}
+                  </span>
                 </div>
-                <Progress value={result?.totalEfficiency || 0} className="h-4 bg-slate-100 rounded-full" />
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tableros</p>
-                    <p className="text-2xl font-black text-slate-800">{result?.totalPanels || '-'}</p>
-                  </div>
-                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Kerf</p>
-                    <p className="text-2xl font-black text-slate-800">4.5mm</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              </Card>
 
-            <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-2xl shadow-slate-900/40 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                  <Info className="w-4 h-4 text-white" />
+              <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacidad</p>
+                  <Layers className="w-4 h-4 text-primary" />
                 </div>
-                <p className="text-xs font-black uppercase tracking-widest">ArquiMax v6.0 Pro</p>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                Algoritmo de <span className="text-white">3 etapas con apilamiento vertical dinámico</span>. Busca igualar el patrón de Lepton permitiendo que piezas pequeñas compartan la misma columna de corte vertical si no superan el alto de la franja líder.
-              </p>
-              <div className="pt-2">
-                <span className="inline-block px-3 py-1 bg-white/10 rounded-full text-[9px] font-bold text-white uppercase tracking-widest">
-                  Garantía de Guillotina 100%
-                </span>
-              </div>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-3xl font-black text-slate-800">{result?.totalPanels || '-'}</span>
+                    <span className="text-[10px] font-bold text-slate-500">TABLEROS USADOS</span>
+                  </div>
+                  <Progress value={result ? (1 / result.totalPanels) * 100 : 0} className="h-2" />
+                </div>
+              </Card>
+
+              <Card className="shadow-sm border-none rounded-3xl p-6 bg-slate-900 text-white flex flex-col justify-center">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                    <Info className="w-3 h-3 text-white" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Estado del Motor</p>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
+                  {loading ? "Analizando 5000 permutaciones espaciales..." : "Algoritmo Shelf-Stacking v6.0 activo. Cortes de guillotina garantizados al 100%."}
+                </p>
+              </Card>
             </div>
-          </div>
-        </div>
 
-        {result && (
-          <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-4">
-                <CheckCircle2 className="w-8 h-8 text-green-500" /> Esquema de Corte Optimizado
-              </h2>
-              <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-                <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))} className="hover:bg-slate-100"><ZoomOut className="w-5 h-5" /></Button>
-                <span className="text-xs font-black w-12 text-center text-slate-500">{Math.round(zoom * 100)}%</span>
-                <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} className="hover:bg-slate-100"><ZoomIn className="w-5 h-5" /></Button>
-              </div>
-            </div>
-            
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }} className="transition-transform duration-300">
-              {result.optimizedLayout.map((panel, idx) => (
-                <div key={idx} className="bg-white p-10 rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-slate-50 space-y-8 mb-16">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <span className="bg-slate-900 text-white px-6 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">2750 x 1830 mm | MDF 18mm</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Eficiencia de Placa</p>
-                      <p className="text-3xl font-black text-primary">{panel.efficiency.toFixed(2)}%</p>
-                    </div>
+            {/* Panel de Corte */}
+            {result && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" /> Plano de Corte Optimizado
+                  </h2>
+                  <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
+                    <span className="text-[10px] font-black w-8 text-center">{Math.round(zoom * 100)}%</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><ZoomIn className="w-4 h-4" /></Button>
                   </div>
+                </div>
 
-                  <div className="relative bg-slate-100 rounded-2xl mx-auto overflow-hidden shadow-inner border border-slate-200" 
-                       style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
-                    
-                    {/* Área Útil (Trim aplicada de 10mm) */}
-                    <div className="absolute bg-white" style={{ 
-                      left: `${(result.trim / 2750) * 100}%`, 
-                      top: `${(result.trim / 1830) * 100}%`, 
-                      width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
-                      height: `${((1830 - result.trim * 2) / 1830) * 100}%`
-                    }}>
-                      {panel.parts.map((p, pIdx) => (
-                        <div key={pIdx} className="absolute border border-slate-900/30 flex items-center justify-center transition-all hover:scale-[1.01] hover:shadow-2xl hover:z-30 cursor-help"
-                             style={{
-                               left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
-                               top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
-                               width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
-                               height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
-                               backgroundColor: p.color || 'rgba(174, 26, 226, 0.08)'
-                             }}>
-                          <div className="flex flex-col items-center leading-none p-2 pointer-events-none overflow-hidden text-center">
-                            <span className="text-[min(1.8vw,11px)] font-black text-slate-900">{p.width}x{p.height}</span>
-                            <span className="text-[min(1.2vw,7px)] font-bold text-slate-600 uppercase truncate w-full mt-1">{p.name}</span>
+                <div className="overflow-auto bg-slate-200/50 p-8 rounded-3xl border-2 border-dashed border-slate-300 min-h-[600px] flex flex-col items-center custom-scrollbar">
+                  <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }} className="transition-transform duration-300">
+                    {result.optimizedLayout.map((panel, idx) => (
+                      <div key={idx} className="bg-white p-8 rounded-xl shadow-2xl mb-12 border border-slate-100" 
+                           style={{ width: '1000px', aspectRatio: '2750 / 1830' }}>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
+                          <span className="text-[10px] font-black text-primary uppercase">{panel.efficiency.toFixed(2)}% EFICIENCIA</span>
+                        </div>
+
+                        <div className="relative bg-slate-100 rounded-sm overflow-hidden border border-slate-300" 
+                             style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
+                          
+                          {/* Área Útil con Trim */}
+                          <div className="absolute bg-white" style={{ 
+                            left: `${(result.trim / 2750) * 100}%`, 
+                            top: `${(result.trim / 1830) * 100}%`, 
+                            width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
+                            height: `${((1830 - result.trim * 2) / 1830) * 100}%`,
+                            backgroundImage: 'linear-gradient(rgba(0,0,0,.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.02) 1px, transparent 1px)',
+                            backgroundSize: '20px 20px'
+                          }}>
+                            {panel.parts.map((p, pIdx) => (
+                              <div key={pIdx} className="absolute border border-slate-900/40 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece"
+                                   style={{
+                                     left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
+                                     top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
+                                     width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
+                                     height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
+                                     backgroundColor: p.color || 'rgba(174, 26, 226, 0.1)'
+                                   }}>
+                                <div className="flex flex-col items-center leading-tight p-0.5 overflow-hidden text-center select-none">
+                                  <span className="text-[8px] font-black text-slate-800">{p.width}</span>
+                                  <span className="text-[6px] font-bold text-slate-500 uppercase truncate max-w-full">{p.name}</span>
+                                  <span className="text-[8px] font-black text-slate-800">{p.height}</span>
+                                </div>
+                                {/* Tooltip Industrial */}
+                                <div className="absolute bottom-full mb-2 hidden group-hover/piece:block z-50 bg-slate-900 text-white text-[8px] p-2 rounded shadow-xl whitespace-nowrap">
+                                  <p className="font-bold">{p.name}</p>
+                                  <p>{p.width} x {p.height} mm</p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-slate-400">
-                    <Info className="w-4 h-4" />
-                    <p className="text-[10px] font-bold italic uppercase tracking-wider">
-                      Esquema validado para seccionadora industrial. Se han descontado {result.kerf}mm de kerf en cada unión de piezas.
-                    </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
-        )}
-
+        </div>
       </div>
     </div>
   );

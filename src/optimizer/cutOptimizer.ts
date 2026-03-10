@@ -41,8 +41,8 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
 
-  // Aumentamos a 3000 iteraciones para búsqueda exhaustiva de combinaciones de apilamiento
-  const ITERATIONS = 3000; 
+  // Aumentamos a 5000 iteraciones para búsqueda exhaustiva de combinaciones de apilamiento
+  const ITERATIONS = 5000; 
   let bestEfficiency = -1;
   let bestLayouts: OptimizedPanel[] = [];
 
@@ -56,8 +56,13 @@ export function runOptimization(
       currentParts.sort((a, b) => b.height - a.height);
     } else if (i === 2) {
       currentParts.sort((a, b) => b.width - a.width);
-    } else {
+    } else if (i % 10 === 0) {
       shuffle(currentParts);
+    } else {
+      // Mezcla ligera
+      const idx1 = Math.floor(Math.random() * currentParts.length);
+      const idx2 = Math.floor(Math.random() * currentParts.length);
+      [currentParts[idx1], currentParts[idx2]] = [currentParts[idx2], currentParts[idx1]];
     }
 
     const currentLayouts = executeGuillotineShelf(currentParts, usableW, usableH, kerf, partColors);
@@ -93,30 +98,31 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
 
   while (remainingParts.length > 0) {
     const placedParts: OptimizedPart[] = [];
-    const usedInPanel = new Set<number>();
+    const usedInPanelIndices = new Set<number>();
     
     let currentY = 0;
     
-    while (currentY < h && usedInPanel.size < remainingParts.length) {
+    while (currentY < h && usedInPanelIndices.size < remainingParts.length) {
       // 1. Determinar el líder de la franja (la pieza más alta que quepa en el ancho útil)
       let leaderIdx = -1;
       let shelfH = 0;
 
       for (let i = 0; i < remainingParts.length; i++) {
-        if (usedInPanel.has(i)) continue;
+        if (usedInPanelIndices.has(i)) continue;
         const p = remainingParts[i];
         
-        // Intentar orientaciones para definir la altura de la franja (líder)
+        // Intentar sin rotar
         if (p.height <= (h - currentY) && p.width <= w) {
           leaderIdx = i;
           shelfH = p.height;
           break;
         }
         
+        // Intentar rotado (solo si grainDirection es 'libre')
         if (p.grainDirection === 'libre' && p.width <= (h - currentY) && p.height <= w) {
           leaderIdx = i;
           shelfH = p.width;
-          // Rotación temporal del líder
+          // Rotación del líder
           [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
           break;
         }
@@ -126,26 +132,25 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
 
       let currentX = 0;
       while (currentX < w) {
-        let bestColumn: number[] = [];
+        let bestColumnIndices: number[] = [];
         let colW = 0;
 
         // 2. Buscar piezas para llenar la columna verticalmente (Etapa 3 de Guillotina)
-        // Buscamos la primera pieza que define el ancho de la columna (Stack Leader)
         for (let i = 0; i < remainingParts.length; i++) {
-          if (usedInPanel.has(i)) continue;
+          if (usedInPanelIndices.has(i)) continue;
           const p = remainingParts[i];
           
           if (p.width <= (w - currentX) && p.height <= shelfH) {
-            bestColumn = [i];
+            bestColumnIndices = [i];
             colW = p.width;
-            usedInPanel.add(i);
+            usedInPanelIndices.add(i);
             
             // INTENTO DE APILAMIENTO AGRESIVO: Llenar el resto del alto de la franja (shelfH)
             let remH = shelfH - p.height - kerf;
             while (remH > 0) {
               let subPieceIdx = -1;
               for (let j = 0; j < remainingParts.length; j++) {
-                if (usedInPanel.has(j)) continue;
+                if (usedInPanelIndices.has(j)) continue;
                 const p2 = remainingParts[j];
                 
                 // Debe caber en el ancho definido por la columna y en el alto restante de la franja
@@ -162,8 +167,8 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
               }
               
               if (subPieceIdx !== -1) {
-                bestColumn.push(subPieceIdx);
-                usedInPanel.add(subPieceIdx);
+                bestColumnIndices.push(subPieceIdx);
+                usedInPanelIndices.add(subPieceIdx);
                 remH -= (remainingParts[subPieceIdx].height + kerf);
               } else {
                 break; 
@@ -173,11 +178,11 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
           }
         }
 
-        if (bestColumn.length === 0) break;
+        if (bestColumnIndices.length === 0) break;
 
         // Registrar las piezas apiladas en la columna
         let yOffset = 0;
-        bestColumn.forEach(idx => {
+        bestColumnIndices.forEach(idx => {
           const p = remainingParts[idx];
           placedParts.push({
             name: p.name,
@@ -207,10 +212,9 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
       totalArea: w * h
     });
     
-    remainingParts = remainingParts.filter((_, idx) => !usedInPanel.has(idx));
+    remainingParts = remainingParts.filter((_, idx) => !usedInPanelIndices.has(idx));
     
-    // Failsafe para evitar bucles si hay piezas imposibles
-    if (usedInPanel.size === 0 && remainingParts.length > 0) break;
+    if (usedInPanelIndices.size === 0 && remainingParts.length > 0) break;
   }
   return panels;
 }
