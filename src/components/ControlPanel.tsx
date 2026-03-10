@@ -84,7 +84,7 @@ export function ControlPanel({
             <Settings2 className="w-5 h-5" /> 
             <span>Red Arquimax</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal">DISEÑADOR TÉCNICO V15.1</span>
+          <span className="text-[10px] opacity-70 font-normal">DISEÑADOR TÉCNICO V15.2</span>
         </CardTitle>
       </CardHeader>
       
@@ -122,33 +122,10 @@ export function ControlPanel({
         </div>
 
         <div className="space-y-4">
-          {isWidthSlider ? (
-            <div className="space-y-3">
-              <div className="flex justify-between items-end">
-                <Label className="text-xs font-bold uppercase text-slate-500">Ancho del Escritorio</Label>
-                <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                  {dimensions.width} mm
-                </span>
-              </div>
-              <Slider
-                value={[dimensions.width]}
-                min={800}
-                max={1500}
-                step={10}
-                onValueChange={handleSliderChange}
-                className="py-4"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                <span>Min: 800 mm</span>
-                <span>Max: 1500 mm</span>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <Label className="text-[10px] font-bold uppercase text-slate-500">Ancho (mm)</Label>
-              <Input name="width" type="number" value={dimensions.width} onChange={handleChange} className="h-9 border-slate-200" disabled={isCatalog} />
-            </div>
-          )}
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase text-slate-500">Ancho (mm)</Label>
+            <Input name="width" type="number" value={dimensions.width} onChange={handleChange} className="h-9 border-slate-200" disabled={isCatalog && type !== 'cabinet_hood_60'} />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -175,10 +152,7 @@ export function ControlPanel({
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                 <div className="flex items-center gap-2">
                   <Layout className="w-4 h-4 text-slate-500" />
-                  <div className="flex flex-col">
-                    <Label className="text-xs font-bold uppercase text-slate-600">Fondo (MDF 3mm)</Label>
-                    {forceBack && <span className="text-[8px] text-primary/70 font-bold uppercase">Obligatorio</span>}
-                  </div>
+                  <Label className="text-xs font-bold uppercase text-slate-600">Fondo (MDF 3mm)</Label>
                 </div>
                 <Switch 
                   checked={forceBack ? true : dimensions.hasBack} 
@@ -194,7 +168,7 @@ export function ControlPanel({
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-slate-500" />
                     <Label className="text-xs font-bold uppercase text-slate-600">
-                      {is3Doors ? 'Estante Grande (Sección 1)' : 'Estante Interior'}
+                      {is3Doors ? 'Estante Grande (L+R)' : 'Estante Interior'}
                     </Label>
                   </div>
                   <Switch 
@@ -206,7 +180,7 @@ export function ControlPanel({
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                     <div className="flex items-center gap-2">
                       <Layers className="w-4 h-4 text-slate-500" />
-                      <Label className="text-xs font-bold uppercase text-slate-600">Estante Pequeño (Sección 2)</Label>
+                      <Label className="text-xs font-bold uppercase text-slate-600">Estante Pequeño (R)</Label>
                     </div>
                     <Switch 
                       checked={dimensions.hasShelf2} 

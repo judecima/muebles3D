@@ -1,20 +1,21 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Bajo Mesada Red Arquimax v15.0
- * Construcción tipo sándwich con cálculo de bisagras según normativa.
+ * Motor para Bajo Mesada Paramétrico Red Arquimax v15.2
+ * Estructura Sándwich (Tapas W) + Bisagras Calculadas + Rieles por Juego.
  */
 export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T, hasBack, hasShelf } = dim;
   const innerW = W - 2 * T;
   const sideH = H - T; 
 
+  // 1. Estructura Sándwich
   const parts: Part[] = [
     { id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
     { id: 'lat-R', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'amarre-front', name: 'Amarre Frontal (H)', width: innerW, height: T, depth: 60, x: W/2, y: H - T/2, z: D/2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'amarre-back', name: 'Amarre Trasero (V)', width: innerW, height: 60, depth: T, x: W/2, y: H - 30, z: -D/2 + T/2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'amarre-front', name: 'Amarre Frontal', width: innerW, height: T, depth: 60, x: W/2, y: H - T/2, z: D/2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'amarre-back', name: 'Amarre Trasero', width: innerW, height: 60, depth: T, x: W/2, y: H - 30, z: -D/2 + T/2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
   ];
 
   if (hasBack) {
@@ -25,19 +26,20 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ id: 'estante-interno', name: 'Estante Interno', width: innerW - 2, height: T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: innerW - 2, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
   }
 
+  // 2. Puertas y Bisagras Calculadas
   const doorH = H - 3; 
   const doorW = (W - 3) / 2; 
   const doorY = doorH / 2;
   
   const addHinges = (doorId: string, h: number, w: number, pivotX: number, dY: number) => {
-    let count = 2;
-    if (h > 900 && h <= 1500) count = 3;
-    else if (h > 1500 && h <= 2000) count = 4;
-    else if (h > 2000 && h <= 2400) count = 5;
+    let count = h <= 900 ? 2 : h <= 1500 ? 3 : h <= 2000 ? 4 : 5;
     if (w > 600) count += 1;
 
     for (let i = 0; i < count; i++) {
-      const posY = (dY - h/2 + 100) + (i * (h - 200) / (count - 1));
+      let posY = dY - h/2 + 100;
+      if (count > 1) {
+        posY = (dY - h/2 + 100) + (i * (h - 200) / (count - 1));
+      }
       parts.push({
         id: `hinge-${doorId}-${i}`, name: 'Bisagra Euro 35mm', width: 35, height: 35, depth: 12,
         x: pivotX === 0 ? T : W - T, y: posY, z: D/2 - 10, type: 'hardware', isHardware: true,
@@ -51,5 +53,5 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
   parts.push({ id: `k-door-R`, name: `Puerta Derecha`, width: doorW, height: doorH, depth: T, x: W - 1.5 - doorW/2, y: doorY, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
   addHinges('R', doorH, doorW, W, doorY);
 
-  return { parts, summary: 'Bajo mesada estructural con bisagras calculadas por altura.', hasDoors: true, hasDrawers: false };
+  return { parts, summary: 'Bajo mesada estructural sándwich v15.2.', hasDoors: true, hasDrawers: false };
 }

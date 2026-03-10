@@ -57,8 +57,6 @@ export class SceneManager {
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
     dirLight.position.set(1000, 2000, 1500);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
 
     const groundGeom = new THREE.PlaneGeometry(10000, 10000);
@@ -102,7 +100,7 @@ export class SceneManager {
       const groupId = object.userData.groupId || id;
       const type = object.userData.type;
 
-      this.highlightObject(object);
+      this.highlightGroup(groupId);
 
       if (type?.includes('door')) {
         const isOpen = !this.itemStates.get(groupId);
@@ -114,20 +112,24 @@ export class SceneManager {
     }
   };
 
-  private highlightObject(object: THREE.Object3D) {
-    object.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        const originalMaterial = child.material as THREE.MeshStandardMaterial;
-        child.material = originalMaterial.clone();
-        (child.material as THREE.MeshStandardMaterial).emissive.setHex(this.colors.highlight);
-        (child.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.4;
-
-        setTimeout(() => {
-          if (child.material) {
-            (child.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
-            (child.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
+  private highlightGroup(groupId: string) {
+    this.partsMap.forEach((obj) => {
+      if (obj.userData.groupId === groupId || obj.userData.id === groupId) {
+        obj.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            const mat = child.material as THREE.MeshStandardMaterial;
+            if (mat.emissive) {
+              mat.emissive.setHex(this.colors.highlight);
+              mat.emissiveIntensity = 0.4;
+              setTimeout(() => {
+                if (mat.emissive) {
+                  mat.emissive.setHex(0);
+                  mat.emissiveIntensity = 0;
+                }
+              }, 300);
+            }
           }
-        }, 300);
+        });
       }
     });
   }
@@ -147,66 +149,26 @@ export class SceneManager {
   }
 
   private updateAnimations() {
-    // Calculamos los offsets por grupo primero para sincronizar piezas
-    const groupOffsets = new Map<string, number>();
-    
     this.itemStates.forEach((isOpen, groupId) => {
       let currentOffset = this.animationOffsets.get(groupId) || 0;
-      
-      // Buscamos una profundidad de referencia para el grupo (típicamente 450-500mm)
-      // Si no hay piezas del grupo visibles aún, usamos un valor por defecto
-      let referenceDepth = 450;
-      
-      const targetOffset = isOpen ? referenceDepth * 0.8 : 0;
+      const targetOffset = isOpen ? 350 : 0;
       
       if (Math.abs(targetOffset - currentOffset) > 0.1) {
         currentOffset += (targetOffset - currentOffset) * 0.15;
       } else {
         currentOffset = targetOffset;
       }
-      
       this.animationOffsets.set(groupId, currentOffset);
-      groupOffsets.set(groupId, currentOffset);
     });
 
-    this.partsMap.forEach((obj, id) => {
+    this.partsMap.forEach((obj) => {
       const type = obj.userData.type;
-      const groupId = obj.userData.groupId || id;
+      const groupId = obj.userData.groupId || obj.userData.id;
 
       if (type === 'drawer') {
-        const offset = groupOffsets.get(groupId) || 0;
+        const offset = this.animationOffsets.get(groupId) || 0;
         const orig = obj.userData.originalPosition as THREE.Vector3;
         obj.position.z = orig.z + offset;
-      }
-    });
-  }
-
-  private updateAllPistons() {
-    this.partsMap.forEach((pistonObj) => {
-      if (pistonObj.userData.type === 'piston-body' && pistonObj.userData.config) {
-        const config = pistonObj.userData.config;
-        const doorPivotGroup = this.partsMap.get(config.doorId);
-        if (!doorPivotGroup) return;
-
-        const doorMesh = doorPivotGroup.children[0];
-        const rod = pistonObj.getObjectByName('rod');
-        
-        const worldAnchorPuerta = doorMesh.localToWorld(new THREE.Vector3(
-          config.anchorPuertaLocal.x,
-          config.anchorPuertaLocal.y,
-          config.anchorPuertaLocal.z
-        ));
-
-        pistonObj.lookAt(worldAnchorPuerta);
-
-        const currentDistance = pistonObj.position.distanceTo(worldAnchorPuerta);
-        
-        if (rod) {
-          const cylinderLen = config.lengthClosed * 0.6;
-          const extension = currentDistance - cylinderLen;
-          const baseRodLen = config.lengthClosed * 0.4;
-          rod.scale.z = Math.max(0.01, extension / baseRodLen);
-        }
       }
     });
   }
@@ -216,7 +178,6 @@ export class SceneManager {
     requestAnimationFrame(this.animate);
     this.controls.update();
     this.updateAnimations();
-    this.updateAllPistons();
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -230,36 +191,21 @@ export class SceneManager {
     this.itemStates.clear();
     this.animationOffsets.clear();
 
-    const hexBase = COLOR_PALETTE[color];
-    const baseColor = new THREE.Color(hexBase);
+    const baseColor = new THREE.Color(COLOR_PALETTE[color]);
     const interiorColor = baseColor.clone().offsetHSL(0, 0, 0.1); 
 
     parts.forEach(part => {
-      if (part.type === 'piston-body') {
-        this.createPiston(part);
-        return;
-      }
-
       let geometry: THREE.BufferGeometry;
       if (part.isHardware && part.name.includes('Bisagra')) {
-        const radius = 17.5; 
-        const height = 12;
-        geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
-        if (part.groupId?.includes('flip') || part.id.includes('flip')) {
-          geometry.rotateX(0); 
-        } else {
-          geometry.rotateZ(Math.PI / 2); 
-        }
+        geometry = new THREE.CylinderGeometry(17.5, 17.5, 12, 32);
+        geometry.rotateZ(Math.PI / 2); 
       } else {
         geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
       }
 
       let material: THREE.MeshStandardMaterial;
       if (part.isHardware) {
-        let colorVal = this.colors.hinge;
-        if (part.name.includes('Riel')) colorVal = this.colors.rail;
-        if (part.name.includes('Pistón')) colorVal = this.colors.piston_body;
-        material = new THREE.MeshStandardMaterial({ color: colorVal, roughness: 0.2, metalness: 0.8 });
+        material = new THREE.MeshStandardMaterial({ color: part.name.includes('Riel') ? this.colors.rail : this.colors.hinge, roughness: 0.2, metalness: 0.8 });
       } else if (part.name.includes('Fondo')) {
         material = new THREE.MeshStandardMaterial({ color: this.colors.mdf_back, roughness: 0.9 });
       } else {
@@ -267,12 +213,7 @@ export class SceneManager {
                            (part.name.includes('Cajón') && !part.name.includes('Frente')) ||
                            part.name.includes('Refuerzo') ||
                            part.name.includes('Divisor');
-        
-        material = new THREE.MeshStandardMaterial({ 
-          color: isInternal ? interiorColor : baseColor, 
-          roughness: 0.7, 
-          metalness: 0.05 
-        });
+        material = new THREE.MeshStandardMaterial({ color: isInternal ? interiorColor : baseColor, roughness: 0.7 });
       }
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -280,7 +221,7 @@ export class SceneManager {
 
       if (!part.isHardware) {
         const edges = new THREE.EdgesGeometry(geometry);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.5 }));
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.3 }));
         mesh.add(line);
       }
 
@@ -289,24 +230,17 @@ export class SceneManager {
       mesh.userData.id = part.id;
       mesh.userData.groupId = part.groupId;
 
-      if ((part.type === 'door-left' || part.type === 'door-right' || part.type === 'door-flip') && part.pivot) {
+      if ((part.type?.includes('door')) && part.pivot) {
         const pivotGroup = new THREE.Group();
         pivotGroup.position.set(part.pivot.x, part.pivot.y, part.pivot.z);
-        
         let offsetX = 0, offsetY = 0, offsetZ = 0;
         if (part.type === 'door-left') offsetX = part.width / 2;
         else if (part.type === 'door-right') offsetX = -part.width / 2;
-        else if (part.type === 'door-flip') {
-          offsetY = -part.height / 2;
-          offsetZ = part.depth / 2;
-        }
-
+        else if (part.type === 'door-flip') { offsetY = -part.height / 2; offsetZ = part.depth / 2; }
         mesh.position.set(offsetX, offsetY, offsetZ);
         pivotGroup.add(mesh);
+        pivotGroup.userData = { ...mesh.userData };
         pivotGroup.userData.originalPosition = pivotGroup.position.clone();
-        pivotGroup.userData.type = part.type;
-        pivotGroup.userData.id = part.id;
-        pivotGroup.userData.groupId = part.groupId;
         this.furnitureGroup.add(pivotGroup);
         this.partsMap.set(part.id, pivotGroup);
       } else {
@@ -317,50 +251,6 @@ export class SceneManager {
     });
 
     this.fitCameraToFurniture();
-  }
-
-  private createPiston(part: Part) {
-    if (!part.pistonConfig) return;
-    const config = part.pistonConfig;
-    const group = new THREE.Group();
-    group.position.set(config.anchorMueble.x, config.anchorMueble.y, config.anchorMueble.z);
-
-    const L_closed = config.lengthClosed;
-    const cylLen = L_closed * 0.6;
-    const rodLen = L_closed * 0.4;
-
-    const cylinderGeom = new THREE.CylinderGeometry(5, 5, cylLen, 16);
-    cylinderGeom.rotateX(Math.PI / 2); 
-    cylinderGeom.translate(0, 0, cylLen / 2);
-    const cylinderMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_body, roughness: 0.9 });
-    const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
-    group.add(cylinder);
-
-    const rodGeom = new THREE.CylinderGeometry(3, 3, rodLen, 16);
-    rodGeom.rotateX(Math.PI / 2);
-    rodGeom.translate(0, 0, rodLen / 2);
-    const rodMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_rod, metalness: 1, roughness: 0.1 });
-    const rod = new THREE.Mesh(rodGeom, rodMat);
-    rod.name = 'rod';
-    rod.position.z = cylLen;
-    group.add(rod);
-
-    const ballGeom = new THREE.SphereGeometry(6, 16, 16);
-    const ballMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8 });
-    const ballMueble = new THREE.Mesh(ballGeom, ballMat);
-    group.add(ballMueble);
-    const ballPuerta = new THREE.Mesh(ballGeom, ballMat);
-    ballPuerta.position.z = rodLen;
-    rod.add(ballPuerta);
-    
-    group.userData.id = part.id;
-    group.userData.groupId = part.groupId;
-    group.userData.type = 'piston-body';
-    group.userData.config = config;
-    group.userData.originalPosition = group.position.clone();
-    
-    this.furnitureGroup.add(group);
-    this.partsMap.set(part.id, group);
   }
 
   public fitCameraToFurniture() {
@@ -380,23 +270,18 @@ export class SceneManager {
 
   public setDoors(open: boolean) {
     this.partsMap.forEach((obj, id) => {
-      const type = obj.userData.type;
-      if (type === 'door-left' || type === 'door-right' || type === 'door-flip') {
-        const groupId = obj.userData.groupId || id;
-        this.toggleSingleDoor(groupId, open);
+      if (obj.userData.type?.includes('door')) {
+        this.toggleSingleDoor(obj.userData.groupId || id, open);
       }
     });
   }
 
   public setDrawers(open: boolean) {
-    const drawerGroups = new Set<string>();
+    const groups = new Set<string>();
     this.partsMap.forEach((obj, id) => {
-      if (obj.userData.type === 'drawer') {
-        const groupId = obj.userData.groupId || id;
-        drawerGroups.add(groupId);
-      }
+      if (obj.userData.type === 'drawer') groups.add(obj.userData.groupId || id);
     });
-    drawerGroups.forEach(groupId => this.toggleSingleDrawer(groupId, open));
+    groups.forEach(g => this.toggleSingleDrawer(g, open));
   }
 
   public explodeView(factor: number) {
@@ -415,31 +300,14 @@ export class SceneManager {
       obj.position.copy(obj.userData.originalPosition);
       obj.rotation.set(0, 0, 0);
       this.itemStates.set(id, false);
-      const groupId = obj.userData.groupId || id;
-      this.itemStates.set(groupId, false);
-      this.animationOffsets.set(groupId, 0);
+      this.animationOffsets.set(id, 0);
     });
   }
 
   public getScreenshot(): string {
-    if (!this.renderer || !this.scene || !this.camera) return '';
-    const originalPos = this.camera.position.clone();
-    const originalTarget = this.controls.target.clone();
-    const box = new THREE.Box3().setFromObject(this.furnitureGroup);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const dist = Math.max(size.x, size.y, size.z) * 2.5;
-    this.camera.position.set(center.x + dist, center.y + dist, center.z + dist);
-    this.controls.target.copy(center);
-    this.controls.update();
+    if (!this.renderer) return '';
     this.renderer.render(this.scene, this.camera);
-    const data = this.renderer.domElement.toDataURL('image/png');
-    this.camera.position.copy(originalPos);
-    this.controls.target.copy(originalTarget);
-    this.controls.update();
-    return data;
+    return this.renderer.domElement.toDataURL('image/png');
   }
 
   private disposeObject(obj: THREE.Object3D) {
@@ -454,16 +322,7 @@ export class SceneManager {
 
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
-    this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
-    if (this.renderer) {
-      this.renderer.dispose();
-      if (this.renderer.domElement?.parentNode) {
-        this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
-      }
-    }
+    if (this.renderer) this.renderer.dispose();
     this.controls.dispose();
-    this.partsMap.clear();
-    this.itemStates.clear();
-    this.animationOffsets.clear();
   }
 }
