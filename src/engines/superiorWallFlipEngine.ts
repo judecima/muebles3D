@@ -45,7 +45,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'horizontal'
   });
 
-  // Cálculo Normativo de Bisagras 90°
+  // Cálculo Normativo de Bisagras 90° (Mínimo 2)
   let hingeCount = doorW <= 600 ? 2 : doorW <= 1200 ? 3 : 4;
   for (let i = 0; i < hingeCount; i++) {
     const posX = i === 0 ? 100 : (i === 1 ? W - 100 : W/2);
@@ -63,19 +63,18 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
   sides.forEach(side => {
     const sideX = side === 'left' ? T + 10 : W - T - 10;
     
-    // Punto de anclaje en el lateral del mueble (Fijo, desplazado hacia atrás e inferior)
-    // Se asegura de estar dentro del volumen
+    // Punto de anclaje en el lateral del mueble (Fijo)
     const anchorMueble = { x: sideX, y: H * 0.4, z: -D / 2 + 50 };
     
-    // Punto de anclaje en la puerta (Relativo al pivot de la puerta)
-    // Se posiciona cerca del eje superior para permitir el torque de apertura
+    // Punto de anclaje en la puerta (Fijo en la puerta a la altura de las bisagras)
+    // doorH/2 es el borde superior de la puerta en su espacio local.
+    // Lo situamos a la altura de las bisagras (aprox 10mm del borde superior)
     const anchorPuertaLocal = { 
       x: side === 'left' ? -doorW/2 + 30 : doorW/2 - 30, 
-      y: doorH/2 - 70, // Cerca del eje de rotación superior
+      y: doorH/2 - 10, 
       z: -T/2 
     };
 
-    // La profundidad (depth) aquí representa la longitud mínima (cerrado) del pistón
     const lengthClosed = 190; 
 
     parts.push({
