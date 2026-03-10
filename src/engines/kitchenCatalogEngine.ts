@@ -1,11 +1,8 @@
 import { Part, FurnitureDimensions, FurnitureModel, FurnitureType } from '@/lib/types';
 
 /**
- * Motor de Catálogo Red Arquimax v15.9 Industrial
- * - Estructura Sándwich (Base/Tapa ancho W).
- * - Cajones de 6 piezas sincronizadas con huelgo 3mm.
- * - Descuento simétrico de 13mm para rieles.
- * - Soporte para Despenseros de 2 Puertas (2P) con 4 estantes internos.
+ * Motor de Catálogo Red Arquimax v16.0 Industrial
+ * Especialización: Despenseros y Torres de Horno con arquitectura de Sándwich Estricta.
  */
 export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensions): FurnitureModel {
   const T = dim.thickness || 18;
@@ -20,7 +17,7 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
   const midGap = 2;  // Luz entre frentes
 
   // Estructura Sándwich: Tapas de ancho completo W
-  const sideH = isBase ? (H - T) : (H - 2 * T);
+  const sideH = (isBase) ? (H - T) : (H - 2 * T);
   const innerW = W - 2 * T;
   const parts: Part[] = [];
 
@@ -84,6 +81,56 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
   };
 
   switch (type) {
+    case 'cabinet_pantry_60_2p': {
+      hasDoors = true;
+      const doorW = (W - sideGap*2 - midGap) / 2;
+      const doorH = H - topGap;
+      const doorY = H / 2;
+      
+      // Puertas
+      parts.push({ id: 'door-L', name: 'Puerta Despensero Izq', width: doorW, height: doorH, depth: T, x: sideGap + doorW/2, y: doorY, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
+      addHinges('door-L', doorH, doorW, 0, doorY);
+      parts.push({ id: 'door-R', name: 'Puerta Despensero Der', width: doorW, height: doorH, depth: T, x: W - sideGap - doorW/2, y: doorY, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
+      addHinges('door-R', doorH, doorW, W, doorY);
+
+      // 4 Estantes internos
+      for (let i = 1; i <= 4; i++) {
+        parts.push({ id: `sh-${i}`, name: 'Estante Despensero', width: innerW, height: T, depth: D * 0.9, x: W/2, y: (H / 5) * i, z: 0, type: 'static', cutLargo: innerW, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
+      }
+      break;
+    }
+
+    case 'cabinet_microwave_60': {
+      hasDoors = true;
+      const bottomH = 750;
+      const nicheH = 450;
+      const topH = H - bottomH - nicheH - T*2;
+
+      // Divisores del nicho
+      parts.push({ id: 'div-niche-B', name: 'Base Nicho Horno', width: innerW, height: T, depth: D, x: W/2, y: bottomH, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
+      parts.push({ id: 'div-niche-T', name: 'Techo Nicho Horno', width: innerW, height: T, depth: D, x: W/2, y: bottomH + nicheH, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
+
+      // Puertas Inferiores (2)
+      const dW_inf = (W - sideGap*2 - midGap) / 2;
+      const dH_inf = bottomH - T - topGap;
+      const dY_inf = (bottomH + T) / 2;
+      parts.push({ id: 'd-inf-L', name: 'Puerta Inferior Izq', width: dW_inf, height: dH_inf, depth: T, x: sideGap + dW_inf/2, y: dY_inf, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: dY_inf, z: D/2 }, cutLargo: dH_inf, cutAncho: dW_inf, cutEspesor: T, grainDirection: 'vertical' });
+      addHinges('d-inf-L', dH_inf, dW_inf, 0, dY_inf);
+      parts.push({ id: 'd-inf-R', name: 'Puerta Inferior Der', width: dW_inf, height: dH_inf, depth: T, x: W - sideGap - dW_inf/2, y: dY_inf, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: dY_inf, z: D/2 }, cutLargo: dH_inf, cutAncho: dW_inf, cutEspesor: T, grainDirection: 'vertical' });
+      addHinges('d-inf-R', dH_inf, dW_inf, W, dY_inf);
+
+      // Puerta Superior (1)
+      const dW_sup = W - sideGap*2;
+      const dH_sup = H - (bottomH + nicheH + T) - topGap;
+      const dY_sup = (H - T + (bottomH + nicheH + T)) / 2;
+      parts.push({ id: 'd-sup', name: 'Puerta Superior Torre', width: dW_sup, height: dH_sup, depth: T, x: W/2, y: dY_sup, z: D/2 + T/2, type: 'door-right', pivot: { x: W, y: dY_sup, z: D/2 }, cutLargo: dH_sup, cutAncho: dW_sup, cutEspesor: T, grainDirection: 'vertical' });
+      addHinges('d-sup', dH_sup, dW_sup, W, dY_sup);
+
+      // Estantes extra
+      parts.push({ id: 'sh-inf', name: 'Estante Inferior', width: innerW, height: T, depth: D*0.9, x: W/2, y: bottomH/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D*0.9, cutEspesor: T, grainDirection: 'horizontal' });
+      break;
+    }
+
     case 'cabinet_base_140_3p3c':
     case 'cabinet_base_120_2p3c': {
       hasDoors = true; hasDrawers = true;
@@ -139,21 +186,10 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
         }
       }
       if (hasShelf) {
-        if (isTower) {
-          const numShelves = 4;
-          for (let i = 1; i <= numShelves; i++) {
-            parts.push({
-              id: `sh-${i}`, name: 'Estante Interno', width: innerW, height: T, depth: D * 0.9,
-              x: W/2, y: (H / (numShelves + 1)) * i, z: 0, type: 'static',
-              cutLargo: innerW, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal'
-            });
-          }
-        } else {
-          parts.push({ id: 'sh', name: 'Estante Interno', width: innerW, height: T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
-        }
+        parts.push({ id: 'sh', name: 'Estante Interno', width: innerW, height: T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
       }
     }
   }
 
-  return { parts, summary: `Catálogo v15.9 Industrial: Estructura sándwich y Torres de 4 estantes.`, hasDoors, hasDrawers };
+  return { parts, summary: `Catálogo v16.0 Industrial: Especialización en torres y despenseros con apoyo real.`, hasDoors, hasDrawers };
 }
