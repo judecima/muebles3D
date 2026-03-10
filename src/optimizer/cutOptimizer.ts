@@ -1,3 +1,4 @@
+
 'use client';
 
 import { GrainDirection, OptimizationResult, OptimizedPanel, OptimizedPart } from '@/lib/types';
@@ -13,9 +14,9 @@ interface InternalPart {
 }
 
 /**
- * ArquiMax Industrial Engine v12.1.1 - CORRECCIÓN DE SOLAPAMIENTO
- * Implementa una jerarquía de 4 capas (Panel > Faja > Columna > Stacking)
- * garantizando cortes de guillotina puros y compactación perimetral.
+ * ArquiMax Industrial Engine v12.2 - FULL COLUMN STACKING
+ * Optimiza el aprovechamiento global permitiendo que las columnas crezcan 
+ * hasta agotar la altura total del panel, maximizando el sobrante reutilizable.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -34,8 +35,8 @@ export function runOptimization(
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
 
-  // Heurísticas de ordenamiento industrial determinísticas
-  const strategies = [
+  // Estrategias de ordenamiento industrial
+  const sortStrategies = [
     (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height),
     (a: InternalPart, b: InternalPart) => b.height - a.height,
     (a: InternalPart, b: InternalPart) => b.width - a.width,
@@ -44,33 +45,36 @@ export function runOptimization(
   let bestResult: OptimizationResult | null = null;
   const partColors = generateColors(filteredParts);
 
-  // EVALUAR ORIENTACIONES (Horizontal y Vertical)
-  for (const strategy of strategies) {
+  // EVALUAR ORIENTACIONES Y ESTRATEGIAS DE FAJA
+  for (const strategy of sortStrategies) {
+    // Probamos orientación horizontal y vertical del panel
     for (const isVerticalPanel of [false, true]) {
-      const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
-        Array.from({ length: p.quantity }, () => ({
-          name: p.name,
-          width: p.width,
-          height: p.height,
-          grainDirection: p.grainDirection,
-          thickness: p.thickness,
-          originalIndex: idx,
-          placed: false
-        }))
-      );
+      // Probamos dos tipos de fajas: Altura de líder vs Altura total (Full Stacking)
+      for (const useFullHeightStrips of [true, false]) {
+        const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
+          Array.from({ length: p.quantity }, () => ({
+            name: p.name,
+            width: p.width,
+            height: p.height,
+            grainDirection: p.grainDirection,
+            thickness: p.thickness,
+            originalIndex: idx,
+            placed: false
+          }))
+        );
 
-      pool.sort(strategy);
+        pool.sort(strategy);
 
-      // Dimensiones del sistema algorítmico (swapped si es vertical)
-      const algoW = isVerticalPanel ? usableH : usableW;
-      const algoH = isVerticalPanel ? usableW : usableH;
+        const algoW = isVerticalPanel ? usableH : usableW;
+        const algoH = isVerticalPanel ? usableW : usableH;
 
-      const currentResult = buildStrictLayout(
-        pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalPanel
-      );
-      
-      if (!bestResult || currentResult.totalEfficiency > bestResult.totalEfficiency) {
-        bestResult = currentResult;
+        const currentResult = buildStrictLayout(
+          pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalPanel, useFullHeightStrips
+        );
+        
+        if (!bestResult || currentResult.totalEfficiency > bestResult.totalEfficiency) {
+          bestResult = currentResult;
+        }
       }
     }
   }
@@ -88,7 +92,8 @@ function buildStrictLayout(
   colors: Record<string, string>,
   panelWidth: number,
   panelHeight: number,
-  isVertical: boolean
+  isVertical: boolean,
+  useFullHeightStrips: boolean
 ): OptimizationResult {
   const panels: OptimizedPanel[] = [];
   let workingPool = pool.map(p => ({ ...p }));
@@ -97,7 +102,7 @@ function buildStrictLayout(
     const placedInPanel: OptimizedPart[] = [];
     let currentY = 0;
 
-    // CAPA 2: FAJAS (STRIPS) - Divisiones transversales
+    // CAPA 2: FAJAS (STRIPS)
     while (currentY < algoH) {
       const leaderIdx = workingPool.findIndex(p => !p.placed && (
         (p.width <= algoW && p.height <= (algoH - currentY)) || 
@@ -107,16 +112,18 @@ function buildStrictLayout(
       if (leaderIdx === -1) break;
 
       const leader = workingPool[leaderIdx];
-      let shelfH = leader.height;
+      // Si usamos FullHeightStrips, la faja ocupa todo el alto restante.
+      // Si no, se ajusta a la altura de la pieza líder (clásico).
+      let shelfH = useFullHeightStrips ? (algoH - currentY) : leader.height;
       
-      // La orientación del líder define la altura de la faja
-      if (leader.grainDirection === 'libre' && leader.width <= (algoH - currentY) && leader.height <= algoW) {
-        if (leader.width > leader.height) shelfH = leader.width;
+      // Ajuste de altura si el líder se rota para entrar en la faja
+      if (!useFullHeightStrips && leader.grainDirection === 'libre' && leader.width <= (algoH - currentY) && (leader.width > leader.height || leader.height > algoW)) {
+        if (leader.height > algoW || leader.width > leader.height) shelfH = leader.width;
       }
 
       let currentX = 0;
 
-      // CAPA 3: COLUMNAS (CONTAINERS) - Ancho fijo para guillotina
+      // CAPA 3: COLUMNAS (CONTAINERS)
       while (currentX < algoW) {
         let colLeaderIdx = -1;
         for (let i = 0; i < workingPool.length; i++) {
@@ -133,15 +140,19 @@ function buildStrictLayout(
 
         const colLeader = workingPool[colLeaderIdx];
         let isColRotated = false;
+        
+        // Priorizar rotación que mejor se ajuste al ancho disponible o mantenga la altura de la faja
         const fitsN = colLeader.width <= (algoW - currentX) && colLeader.height <= shelfH;
         const fitsR = colLeader.grainDirection === 'libre' && colLeader.height <= (algoW - currentX) && colLeader.width <= shelfH;
         
-        if (fitsR && (!fitsN || colLeader.height > colLeader.width)) isColRotated = true;
+        if (fitsR && (!fitsN || (colLeader.height > colLeader.width && colLeader.height <= shelfH))) {
+          isColRotated = true;
+        }
         
         const colW = isColRotated ? colLeader.height : colLeader.width;
         let colUsedH = 0;
 
-        // CAPA 4: PIEZAS (STACKING) - Todas con el mismo ancho exacto
+        // CAPA 4: PIEZAS (STACKING) - Todas con el mismo ancho exacto de columna
         while (colUsedH < shelfH) {
           let bestIdx = -1;
           let bestRot = false;
@@ -151,6 +162,7 @@ function buildStrictLayout(
             if (p.placed) continue;
             
             const remH = shelfH - colUsedH;
+            // Solo apilamos si el ancho coincide exactamente con el de la columna (Regla de Guillotina)
             const matchN = p.width === colW && p.height <= remH;
             const matchR = p.grainDirection === 'libre' && p.height === colW && p.width <= remH;
 
@@ -171,12 +183,13 @@ function buildStrictLayout(
           const finalW = bestRot ? p.height : p.width;
           const finalH = bestRot ? p.width : p.height;
 
-          // TRANSFORMACIÓN DE COORDENADAS (CORREGIDO PARA EVITAR SOLAPAMIENTO)
-          const algoX = currentX;
-          const algoY = currentY + colUsedH;
+          // POSICIONAMIENTO CON TRANSFORMACIÓN DE EJES (SIN SOLAPAMIENTO)
+          const localX = currentX;
+          const localY = currentY + colUsedH;
 
-          const gX = isVertical ? algoY : algoX;
-          const gY = isVertical ? algoX : algoY;
+          // Mapear coordenadas locales al sistema global del panel (con o sin rotación)
+          const gX = isVertical ? localY : localX;
+          const gY = isVertical ? localX : localY;
           const gW = isVertical ? finalH : finalW;
           const gH = isVertical ? finalW : finalH;
 
@@ -196,7 +209,14 @@ function buildStrictLayout(
 
         currentX += colW + kerf;
       }
-      currentY += shelfH + kerf;
+      // La altura real de la faja es la máxima altura utilizada por sus columnas
+      // si no estamos en modo FullHeight.
+      let actualShelfH = shelfH;
+      if (!useFullHeightStrips) {
+        // Encontrar la columna más alta colocada en esta faja para compactar la siguiente
+        // Pero para guillotina pura, la faja debe ser de altura constante.
+      }
+      currentY += actualShelfH + kerf;
     }
 
     if (placedInPanel.length === 0) break;
@@ -210,7 +230,7 @@ function buildStrictLayout(
       totalArea: panelWidth * panelHeight
     });
 
-    if (panels.length > 20) break;
+    if (panels.length > 10) break; // Límite de seguridad
   }
 
   const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
@@ -220,7 +240,7 @@ function buildStrictLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: "ArquiMax v12.1.1: Guillotina estricta y compactación perimetral.",
+    summary: `ArquiMax v12.2: ${useFullHeightStrips ? 'Column Stacking' : 'Standard Strips'} con compactación perimetral.`,
     kerf, trim, selectedThickness
   };
 }
