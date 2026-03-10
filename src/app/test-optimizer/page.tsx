@@ -35,6 +35,9 @@ const DEFAULT_PARTS: PartInput[] = [
   { name: "V1 ESTANTES (1)", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "V2 ESTANTES (2)", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "V1 CAJ BASE (4)", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
+  { name: "V1 LATS (6)", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+  { name: "V1 FRENTES (5)", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+  { name: "V1 PUERTA (8)", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
@@ -58,6 +61,7 @@ export default function TestOptimizerPage() {
 
   const handleOptimize = () => {
     setLoading(true);
+    // Simulamos carga para UX industrial
     setTimeout(() => {
       const res = runOptimization(
         parts.map(p => ({ ...p, thickness: 18 })),
@@ -79,11 +83,11 @@ export default function TestOptimizerPage() {
             </div>
             <div>
               <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Laboratorio ArquiMax v7.5</h1>
-              <p className="text-slate-500 text-sm font-medium">Validador Industrial de Medio Panel (1375mm)</p>
+              <p className="text-slate-500 text-sm font-medium">Optimizador Industrial: Unidad de Venta 1375mm</p>
             </div>
           </div>
           <Button size="lg" onClick={handleOptimize} disabled={loading} className="font-black uppercase px-10 h-14 bg-slate-900 hover:bg-black">
-            {loading ? "CALCULANDO..." : "OPTIMIZAR AHORA"}
+            {loading ? "ANALIZANDO 3000 CICLOS..." : "OPTIMIZAR AHORA"}
           </Button>
         </header>
 
@@ -152,13 +156,13 @@ export default function TestOptimizerPage() {
             <Card className="shadow-sm border-slate-200">
               <CardHeader className="pb-2 border-b">
                 <CardTitle className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" /> Métricas ArquiMax
+                  <BarChart3 className="w-4 h-4" /> Métricas de Aprovechamiento
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6 space-y-4">
                 <div className="flex justify-between items-baseline">
                   <span className="text-4xl font-black text-slate-900">{result ? `${result.totalEfficiency.toFixed(2)}%` : '--.--%'}</span>
-                  <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-primary/10 text-primary">Aprovechamiento</span>
+                  <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-primary/10 text-primary">Eficiencia Global</span>
                 </div>
                 <Progress value={result?.totalEfficiency || 0} className="h-2.5 bg-slate-100" />
                 <div className="grid grid-cols-2 gap-3">
@@ -167,7 +171,7 @@ export default function TestOptimizerPage() {
                     <p className="text-lg font-black text-slate-800">{result?.totalPanels || '-'}</p>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-xl border text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Corte Vertical</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase">Unidad Venta</p>
                     <p className="text-lg font-black text-slate-800">1375mm</p>
                   </div>
                 </div>
@@ -177,10 +181,10 @@ export default function TestOptimizerPage() {
             <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-4">
               <div className="flex items-center gap-3">
                 <Info className="w-5 h-5 text-primary" />
-                <p className="text-xs font-bold uppercase tracking-widest">Lógica de Venta</p>
+                <p className="text-xs font-bold uppercase tracking-widest">Compromiso Industrial</p>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                El motor prioriza el <span className="text-white font-bold">Medio Panel Horizontal</span>. En un tablero de 2750x1830, el límite es de <span className="text-primary font-bold">1375mm</span> de ancho manteniendo la altura completa.
+                El motor prioriza el <span className="text-white font-bold">Medio Panel Vertical</span>. El límite es de <span className="text-primary font-bold">1375mm</span> de ancho. El algoritmo compacta las piezas hacia la izquierda para maximizar el área libre sobrante.
               </p>
             </div>
           </div>
@@ -189,7 +193,7 @@ export default function TestOptimizerPage() {
         {result && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-green-500" /> Plano de Corte Industrial
+              <CheckCircle2 className="w-6 h-6 text-green-500" /> Plano de Corte Optimizado
             </h2>
             
             {result.optimizedLayout.map((panel, idx) => (
@@ -197,10 +201,10 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex gap-4 items-center">
                     <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
-                    <span className="text-sm font-black text-slate-800">2750 x 1830 mm (Área Útil: {2750 - result.trim*2}x{1830 - result.trim*2}mm)</span>
+                    <span className="text-sm font-black text-slate-800">2750 x 1830 mm (Útil: {2750 - result.trim*2}x{1830 - result.trim*2}mm)</span>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Uso Global</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Uso Tablero</p>
                     <p className="text-xl font-black text-primary">{panel.efficiency.toFixed(2)}%</p>
                   </div>
                 </div>
@@ -243,7 +247,7 @@ export default function TestOptimizerPage() {
                 <div className="flex gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 items-center">
                   <ArrowRightToLine className="w-5 h-5 text-primary" />
                   <p className="text-[10px] text-slate-500 font-medium italic">
-                    El motor ArquiMax v7.5 ha evaluado la distribución para maximizar el área libre en la mitad derecha del panel, favoreciendo la venta de Medio Panel (1375mm).
+                    El motor ArquiMax v7.5 ha compactado las piezas hacia la izquierda. Si el bloque total no supera los 1375mm, el operario puede realizar un único corte vertical para liberar el medio panel restante para reventa.
                   </p>
                 </div>
               </div>

@@ -17,7 +17,8 @@ interface PartToCut {
 
 /**
  * ArquiMax Deep Engine v7.5 (Multi-Strategy Guillotine)
- * Optimizado para Medio Panel Horizontal (Corte vertical a los 1375mm).
+ * Optimizado para Medio Panel Vertical (Corte a los 1375mm).
+ * Maximiza compactación eliminando espacios innecesarios entre piezas.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -51,20 +52,24 @@ export function runOptimization(
   let bestScore = -Infinity;
   let bestLayouts: OptimizedPanel[] = [];
 
+  // Estrategias de empaquetado: Horizontal Strips vs Vertical Strips
   const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
 
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = [...flatParts];
     const strategy = strategies[i % strategies.length];
     
+    // Variamos el orden de las piezas para explorar el espacio de soluciones
     if (i % 4 === 0) currentParts.sort((a, b) => b.height - a.height || b.width - a.width);
     else if (i % 4 === 1) currentParts.sort((a, b) => b.width - a.width || b.height - a.height);
     else if (i % 4 === 2) currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     else shuffle(currentParts);
 
     const currentLayouts = executeGuillotineStrategy(currentParts, usableW, usableH, kerf, partColors, strategy);
-    // Evaluamos contra medio panel (usableW / 2)
-    const score = calculateScore(currentLayouts, usableW / 2);
+    
+    // El "Medio Panel" de Red Arquimax es un corte vertical a la mitad del largo (1375mm)
+    const halfWidth = usableW / 2;
+    const score = calculateScore(currentLayouts, halfWidth);
 
     if (score > bestScore) {
       bestScore = score;
@@ -78,13 +83,16 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: efficiency,
-    summary: `ArquiMax v7.5: Eficiencia ${efficiency.toFixed(2)}%. Prioridad: Medio Panel (1375mm).`,
+    summary: `ArquiMax v7.5: Eficiencia ${efficiency.toFixed(2)}%. Prioridad: Compactación Industrial y Medio Panel (1375mm).`,
     kerf,
     trim,
     selectedThickness
   };
 }
 
+/**
+ * Ejecuta una estrategia de empaquetado por franjas (Strip Packing) con compactación vertical.
+ */
 function executeGuillotineStrategy(
   parts: PartToCut[], 
   w: number, 
@@ -106,11 +114,16 @@ function executeGuillotineStrategy(
         let stripLeaderIdx = -1;
         let stripLeaderRotated = false;
 
+        // Buscamos la pieza más alta para liderar la franja
         for (let i = 0; i < remainingParts.length; i++) {
           if (placedInThisPanel.has(i)) continue;
           const p = remainingParts[i];
-          if (p.width <= w && p.height <= (h - currentY)) { stripLeaderIdx = i; stripLeaderRotated = false; break; }
-          if (p.grainDirection === 'libre' && p.height <= w && p.width <= (h - currentY)) { stripLeaderIdx = i; stripLeaderRotated = true; break; }
+          if (p.width <= w && p.height <= (h - currentY)) { 
+            stripLeaderIdx = i; stripLeaderRotated = false; break; 
+          }
+          if (p.grainDirection === 'libre' && p.height <= w && p.width <= (h - currentY)) { 
+            stripLeaderIdx = i; stripLeaderRotated = true; break; 
+          }
         }
         if (stripLeaderIdx === -1) break;
 
@@ -118,9 +131,11 @@ function executeGuillotineStrategy(
         const stripH = stripLeaderRotated ? firstPart.width : firstPart.height;
         let currentX = 0;
 
+        // Llenamos la franja horizontalmente
         while (currentX < w && remainingParts.length > 0) {
           let stackLeaderIdx = -1;
           let stackLeaderRotated = false;
+
           for (let i = 0; i < remainingParts.length; i++) {
             if (placedInThisPanel.has(i)) continue;
             const p = remainingParts[i];
@@ -138,6 +153,7 @@ function executeGuillotineStrategy(
           const stackW = stackLeaderRotated ? stackLeader.height : stackLeader.width;
           let stackY = 0;
 
+          // COMPACTACIÓN VERTICAL: Llenamos el alto de la franja apilando piezas
           while (stackY < stripH && remainingParts.length > 0) {
             let partInStackIdx = -1;
             let partInStackRotated = false;
@@ -157,7 +173,15 @@ function executeGuillotineStrategy(
             const p = remainingParts[partInStackIdx];
             const finalW = partInStackRotated ? p.height : p.width;
             const finalH = partInStackRotated ? p.width : p.height;
-            placedParts.push({ name: p.name, x: currentX, y: currentY + stackY, width: finalW, height: finalH, rotated: partInStackRotated, color: partColors[p.name] });
+            placedParts.push({ 
+              name: p.name, 
+              x: currentX, 
+              y: currentY + stackY, 
+              width: finalW, 
+              height: finalH, 
+              rotated: partInStackRotated, 
+              color: partColors[p.name] 
+            });
             stackY += finalH + kerf;
             placedInThisPanel.add(partInStackIdx);
           }
@@ -166,6 +190,7 @@ function executeGuillotineStrategy(
         currentY += stripH + kerf;
       }
     } else {
+      // Estrategia de Franjas Verticales (útil cuando se busca liberar medio panel lateral)
       let currentX = 0;
       while (currentX < w && remainingParts.length > 0) {
         let stripLeaderIdx = -1;
@@ -202,6 +227,7 @@ function executeGuillotineStrategy(
           const stackH = stackLeaderRotated ? stackLeader.width : stackLeader.height;
           let stackX = 0;
 
+          // Compactación Horizontal dentro de la franja vertical
           while (stackX < stripW && remainingParts.length > 0) {
             let pIdx = -1;
             let pRot = false;
@@ -217,7 +243,15 @@ function executeGuillotineStrategy(
             const p = remainingParts[pIdx];
             const fW = pRot ? p.height : p.width;
             const fH = pRot ? p.width : p.height;
-            placedParts.push({ name: p.name, x: currentX + stackX, y: currentY, width: fW, height: fH, rotated: pRot, color: partColors[p.name] });
+            placedParts.push({ 
+              name: p.name, 
+              x: currentX + stackX, 
+              y: currentY, 
+              width: fW, 
+              height: fH, 
+              rotated: pRot, 
+              color: partColors[p.name] 
+            });
             stackX += fW + kerf;
             placedInThisPanel.add(pIdx);
           }
@@ -229,23 +263,40 @@ function executeGuillotineStrategy(
 
     if (placedInThisPanel.size === 0) break;
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
-    panels.push({ panelNumber: panels.length + 1, parts: placedParts, efficiency: (usedArea / (w * h)) * 100, usedArea, totalArea: w * h });
+    panels.push({ 
+      panelNumber: panels.length + 1, 
+      parts: placedParts, 
+      efficiency: (usedArea / (w * h)) * 100, 
+      usedArea, 
+      totalArea: w * h 
+    });
     remainingParts = remainingParts.filter((_, idx) => !placedInThisPanel.has(idx));
   }
   return panels;
 }
 
+/**
+ * Calcula el puntaje de una solución. Favorece la compactación y liberar la mitad derecha (1375mm).
+ */
 function calculateScore(layouts: OptimizedPanel[], halfWidth: number): number {
   if (layouts.length === 0) return -Infinity;
   const firstPanel = layouts[0];
   const maxX = firstPanel.parts.reduce((max, p) => Math.max(max, p.x + p.width), 0);
   
-  // Bonus si cabe en medio panel (1375mm)
+  // Eficiencia base del panel
   let score = firstPanel.efficiency;
-  if (maxX <= halfWidth) score += 500; // Gran incentivo para entrar en medio panel
   
-  // Penalización por paneles extra
-  score -= (layouts.length - 1) * 2000;
+  // BONO: Si cabe en medio panel (1375mm), damos un incentivo enorme.
+  if (maxX <= halfWidth) {
+    score += 5000; 
+  }
+  
+  // BONO COMPACTACIÓN: Premiamos layouts donde el maxX sea menor (piezas más juntas a la izquierda).
+  score += (1 - (maxX / (halfWidth * 2))) * 1000;
+
+  // PENALIZACIÓN: Cada tablero extra reduce drásticamente el score.
+  score -= (layouts.length - 1) * 10000;
+  
   return score;
 }
 
