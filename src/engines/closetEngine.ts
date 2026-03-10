@@ -1,8 +1,8 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Placard Red Arquimax v15.0
- * Estructura sándwich reforzada y herrajes calculados.
+ * Motor para Placard Red Arquimax v15.1
+ * Estructura sándwich reforzada y huelgo de cajones de 3mm.
  */
 export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T } = dim;
@@ -31,10 +31,7 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const doorY = drawerSectionH + (doorSectionH / 2);
 
   const addHinges = (doorId: string, h: number, w: number, pivotX: number, dY: number) => {
-    let count = 2;
-    if (h > 900 && h <= 1500) count = 3;
-    else if (h > 1500 && h <= 2000) count = 4;
-    else if (h > 2000 && h <= 2400) count = 5;
+    let count = h <= 900 ? 2 : h <= 1500 ? 3 : h <= 2000 ? 4 : 5;
     if (w > 600) count += 1;
 
     for (let i = 0; i < count; i++) {
@@ -52,17 +49,18 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   parts.push({ id: 'closet-door-R', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, x: W - doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-right', pivot: { x: W, y: doorY, z: D / 2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
   addHinges('R', doorH, doorW, W, doorY);
 
-  const drFrontH = (drawerSectionH - T - 20) / 2;
+  const drawerGap = 3; // Gap estandarizado
+  const drFrontH = (drawerSectionH - T - (2 * drawerGap)) / 2;
   const drW = innerW - 26;
   const drD = D - 50;
 
   for (let i = 0; i < 2; i++) {
-    const pY = T + 10 + (i * (drFrontH + 10)) + (drFrontH / 2);
+    const pY = T + 5 + (i * (drFrontH + drawerGap)) + (drFrontH / 2);
     const prefix = `closet-dr-${i}`;
     parts.push({ id: `${prefix}-front`, name: `Frente Cajón`, width: W - 4, height: drFrontH, depth: T, x: W/2, y: pY, z: D/2 + T/2, type: 'drawer', cutLargo: drFrontH, cutAncho: W-4, cutEspesor: T, grainDirection: 'horizontal' });
     parts.push({ id: `${prefix}-rail-L`, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drD, x: T + 6.5, y: pY, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
     parts.push({ id: `${prefix}-rail-R`, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drD, x: W - T - 6.5, y: pY, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   }
 
-  return { parts, summary: 'Placard v15.0: Estructura sándwich, cajonera industrial y bisagras calculadas.', hasDoors: true, hasDrawers: true };
+  return { parts, summary: 'Placard v15.1: Estructura sándwich, gap 3mm.', hasDoors: true, hasDrawers: true };
 }
