@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { SteelHouseConfig, SteelWall } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
 
 export class SteelSceneManager {
   private scene: THREE.Scene;
@@ -10,18 +10,26 @@ export class SteelSceneManager {
   private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls;
   private houseGroup: THREE.Group;
+  private openingsGroup: THREE.Group;
   private container: HTMLElement;
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+
+  private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
 
   private colors = {
     background: 0xf1f5f9,
     wall: 0x94a3b8,
     grid: 0xd1d5db,
     floor: 0xe2e8f0,
-    outline: 0x475569
+    outline: 0x475569,
+    openingHover: 0x3b82f6
   };
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void) {
     this.container = container;
+    this.onOpeningDoubleClickCallback = onOpeningDoubleClick;
+    
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(this.colors.background);
 
@@ -51,7 +59,6 @@ export class SteelSceneManager {
     dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
 
-    // Suelo / Grid
     const grid = new THREE.GridHelper(40000, 80, this.colors.grid, this.colors.grid);
     grid.position.y = -0.5;
     this.scene.add(grid);
@@ -59,8 +66,12 @@ export class SteelSceneManager {
     this.houseGroup = new THREE.Group();
     this.scene.add(this.houseGroup);
 
+    this.openingsGroup = new THREE.Group();
+    this.scene.add(this.openingsGroup);
+
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
+    this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
   }
 
   private onWindowResize = () => {
@@ -68,6 +79,24 @@ export class SteelSceneManager {
     this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+  };
+
+  private onDoubleClick = (event: MouseEvent) => {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.openingsGroup.children);
+
+    if (intersects.length > 0) {
+      const openingMesh = intersects[0].object;
+      const wallId = openingMesh.userData.wallId;
+      const opening = openingMesh.userData.opening;
+      if (this.onOpeningDoubleClickCallback && wallId && opening) {
+        this.onOpeningDoubleClickCallback(wallId, opening);
+      }
+    }
   };
 
   private animate = () => {
@@ -78,30 +107,35 @@ export class SteelSceneManager {
   };
 
   public buildHouse(config: SteelHouseConfig) {
-    // Limpiar escena previa
     while (this.houseGroup.children.length > 0) {
       const child = this.houseGroup.children[0];
       this.disposeObject(child);
       this.houseGroup.remove(child);
     }
 
-    // Calcular límites para el suelo
+    while (this.openingsGroup.children.length > 0) {
+      const child = this.openingsGroup.children[0];
+      this.disposeObject(child);
+      this.openingsGroup.remove(child);
+    }
+
     const wallsBox = new THREE.Box3();
     
     config.walls.forEach(wall => {
       const wallMesh = this.createWallMesh(wall);
       this.houseGroup.add(wallMesh);
       wallsBox.expandByObject(wallMesh);
+      
+      this.createOpeningTriggers(wall);
     });
 
-    // Añadir Platea (suelo de hormigón de la casa)
     if (!wallsBox.isEmpty()) {
       const size = new THREE.Vector3();
       wallsBox.getSize(size);
       const center = new THREE.Vector3();
       wallsBox.getCenter(center);
 
-      const floorGeom = new THREE.PlaneGeometry(size.x + 1000, size.z + 1000);
+      const floorGeom = new THREE.PlaneGeometry(size.x + 2000, size.z + 2000);
       const floorMat = new THREE.MeshStandardMaterial({ color: this.colors.floor });
       const floor = new THREE.Mesh(floorGeom, floorMat);
       floor.rotation.x = -Math.PI / 2;
@@ -114,7 +148,6 @@ export class SteelSceneManager {
   }
 
   private createWallMesh(wall: SteelWall): THREE.Mesh {
-    // Crear la forma del muro
     const shape = new THREE.Shape();
     shape.moveTo(0, 0);
     shape.lineTo(wall.length, 0);
@@ -122,7 +155,6 @@ export class SteelSceneManager {
     shape.lineTo(0, wall.height);
     shape.lineTo(0, 0);
 
-    // Añadir huecos para aberturas
     wall.openings.forEach(op => {
       const hole = new THREE.Path();
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
@@ -135,7 +167,6 @@ export class SteelSceneManager {
       shape.holes.push(hole);
     });
 
-    // Extruir para dar espesor
     const extrudeSettings = {
       steps: 1,
       depth: wall.thickness,
@@ -151,18 +182,44 @@ export class SteelSceneManager {
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    
-    // Posicionamiento y Rotación
     mesh.position.set(wall.x, 0, wall.z);
     mesh.rotation.y = (wall.rotation * Math.PI) / 180;
-    
-    // Centramos el espesor del muro sobre su línea de eje
     mesh.translateZ(-wall.thickness / 2);
 
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
     return mesh;
+  }
+
+  private createOpeningTriggers(wall: SteelWall) {
+    wall.openings.forEach(op => {
+      const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+      const geometry = new THREE.BoxGeometry(op.width, op.height, wall.thickness + 2);
+      const material = new THREE.MeshBasicMaterial({ 
+        color: this.colors.openingHover, 
+        transparent: true, 
+        opacity: 0,
+        depthWrite: false
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      
+      const wallMatrix = new THREE.Matrix4();
+      wallMatrix.makeRotationY((wall.rotation * Math.PI) / 180);
+      wallMatrix.setPosition(wall.x, 0, wall.z);
+
+      const localPos = new THREE.Vector3(op.position + op.width / 2, sill + op.height / 2, 0);
+      localPos.applyMatrix4(wallMatrix);
+      
+      mesh.position.copy(localPos);
+      mesh.rotation.y = (wall.rotation * Math.PI) / 180;
+      
+      mesh.userData.wallId = wall.id;
+      mesh.userData.opening = op;
+
+      this.openingsGroup.add(mesh);
+    });
   }
 
   private fitCamera() {
@@ -195,6 +252,7 @@ export class SteelSceneManager {
 
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
+    this.renderer.domElement.removeEventListener('dblclick', this.onDoubleClick);
     if (this.renderer) this.renderer.dispose();
     this.controls.dispose();
   }

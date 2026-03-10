@@ -1,20 +1,21 @@
 'use client';
 
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef, forwardRef } from 'react';
 import { SteelSceneManager } from '@/steel/SteelSceneManager';
-import { SteelHouseConfig } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelOpening } from '@/lib/steel/types';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
+  onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void;
 }
 
-export const SteelViewer = forwardRef(({ config }: SteelViewerProps, ref) => {
+export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick }: SteelViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SteelSceneManager | null>(null);
 
   useEffect(() => {
     if (containerRef.current && !managerRef.current) {
-      managerRef.current = new SteelSceneManager(containerRef.current);
+      managerRef.current = new SteelSceneManager(containerRef.current, onOpeningDoubleClick);
     }
 
     return () => {
@@ -23,7 +24,7 @@ export const SteelViewer = forwardRef(({ config }: SteelViewerProps, ref) => {
         managerRef.current = null;
       }
     };
-  }, []);
+  }, [onOpeningDoubleClick]);
 
   useEffect(() => {
     if (managerRef.current) {
