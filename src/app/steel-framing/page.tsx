@@ -19,7 +19,9 @@ import {
   ArrowDown,
   Zap,
   Gamepad2,
-  MousePointer
+  MousePointer,
+  MoveHorizontal,
+  MoveVertical
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -66,9 +68,6 @@ export default function SteelFramingPage() {
 
   // Ajuste automático de muros al cambiar dimensiones globales
   useEffect(() => {
-    // Solo reajustamos si hay exactamente 4 muros (el rectángulo base)
-    // Si el usuario añadió más, el reajuste automático podría ser confuso, 
-    // pero por ahora vinculamos los primeros 4 ID originales si existen.
     const newWalls = config.walls.map(w => {
       if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
       if (w.id === 'w2') return { ...w, length: config.length, x: config.width/2, z: -config.length/2 };
@@ -77,8 +76,6 @@ export default function SteelFramingPage() {
       return w;
     });
     
-    // Solo disparamos la actualización si realmente hubo cambios en las props globales
-    // para evitar loops infinitos
     const hasChanges = newWalls.some((w, i) => 
       w.length !== config.walls[i]?.length || 
       w.x !== config.walls[i]?.x || 
@@ -175,7 +172,7 @@ export default function SteelFramingPage() {
               }}
             >
               <Compass className="w-3.5 h-3.5 mr-2" /> 
-              {isWalkModeActive ? "Navegación Manual Activa" : "Entrar Modo Caminata"}
+              {isWalkModeActive ? "Salir de Navegación" : "Entrar Modo Caminata"}
             </Button>
             <Button variant="outline" size="sm" className="h-8 px-3 text-[10px] font-bold">
               <Download className="w-3.5 h-3.5 mr-2" /> 
@@ -213,28 +210,28 @@ export default function SteelFramingPage() {
               <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300 pointer-events-auto">
                 <div className="flex items-center gap-2 mb-2">
                   <Gamepad2 className="w-4 h-4 text-blue-400" />
-                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">EXPLORACIÓN ACTIVA</span>
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NAVEGACIÓN ACTIVA</span>
                 </div>
                 <div className="grid grid-cols-1 gap-y-2">
                   <div className="flex items-center gap-2">
                     <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">WASD / Flechas: Mover y Mirar</span>
+                    <span className="text-[9px] font-medium uppercase">WASD: Moverse | Flechas: Mirar</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <MousePointer className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">Mouse: Mirada Libre (si permitido)</span>
+                    <span className="text-[9px] font-medium uppercase italic text-slate-500">Ratón desactivado (Evita errores de seguridad)</span>
                   </div>
                 </div>
-                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">Presiona el botón de la cabecera para salir</div>
+                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic text-center">Presiona el botón superior para salir</div>
               </div>
             )}
           </div>
 
-          {isWalkModeActive && (isMobile || true) && ( 
+          {isWalkModeActive && (
             <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
               <div className="absolute bottom-16 left-16 pointer-events-auto">
                 <SteelJoystick 
-                  label="Movimiento" 
+                  label="Moverse" 
                   onMove={(v) => viewerRef.current?.updateJoystickMove(v.x, v.y)} 
                 />
               </div>

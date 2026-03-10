@@ -4,7 +4,6 @@ import * as React from 'react';
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { SteelSceneManager } from '@/steel/SteelSceneManager';
 import { SteelHouseConfig, SteelOpening } from '@/lib/steel/types';
-import { useToast } from '@/hooks/use-toast';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
@@ -15,7 +14,6 @@ interface SteelViewerProps {
 export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkModeLock }: SteelViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SteelSceneManager | null>(null);
-  const { toast } = useToast();
 
   useImperativeHandle(ref, () => ({
     enterWalkMode: () => {
@@ -43,15 +41,6 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
         onOpeningDoubleClick,
         onWalkModeLock
       );
-
-      // Configurar el manejador de errores de Pointer Lock
-      managerRef.current.setPointerLockErrorHandler(() => {
-        toast({
-          title: "Modo Caminata Manual",
-          description: "El navegador bloqueó el control del ratón. Navegue usando las teclas WASD o joysticks.",
-          variant: "default",
-        });
-      });
     }
 
     return () => {
@@ -60,7 +49,7 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
         managerRef.current = null;
       }
     };
-  }, [onOpeningDoubleClick, onWalkModeLock, toast]);
+  }, [onOpeningDoubleClick, onWalkModeLock]);
 
   useEffect(() => {
     if (managerRef.current) {

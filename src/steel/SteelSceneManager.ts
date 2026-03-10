@@ -2,7 +2,6 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
 
 export class SteelSceneManager {
@@ -10,7 +9,6 @@ export class SteelSceneManager {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls;
-  private fpControls: PointerLockControls;
   private houseGroup: THREE.Group;
   private openingsGroup: THREE.Group;
   private structuralGroup: THREE.Group;
@@ -27,7 +25,7 @@ export class SteelSceneManager {
   private moveDown = false;
   private isShiftPressed = false;
   
-  // Rotación (Mirar)
+  // Rotación (Mirar) - Ahora controlada por Teclas de Flecha o Joysticks
   private lookUp = false;
   private lookDown = false;
   private lookLeft = false;
@@ -35,19 +33,15 @@ export class SteelSceneManager {
 
   private joystickMove = new THREE.Vector2(0, 0);
   private joystickLook = new THREE.Vector2(0, 0);
-  private lastMouseX = 0;
-  private lastMouseY = 0;
 
   private velocity = new THREE.Vector3();
   private direction = new THREE.Vector3();
   private prevTime = performance.now();
 
   private isWalkModeActive = false;
-  private isPointerLockEnabled = false;
 
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
   private onWalkModeLock?: (locked: boolean) => void;
-  private onPointerLockError?: () => void;
 
   private colors = {
     background: 0xf1f5f9,
@@ -94,18 +88,6 @@ export class SteelSceneManager {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
-    this.fpControls = new PointerLockControls(this.camera, this.renderer.domElement);
-    this.scene.add(this.fpControls.getObject());
-
-    this.fpControls.addEventListener('lock', () => {
-      this.isPointerLockEnabled = true;
-      this.controls.enabled = false;
-    });
-
-    this.fpControls.addEventListener('unlock', () => {
-      this.isPointerLockEnabled = false;
-    });
-
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     this.scene.add(ambientLight);
 
@@ -130,21 +112,8 @@ export class SteelSceneManager {
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
-    this.renderer.domElement.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
-    document.addEventListener('pointerlockerror', this.handlePointerLockError);
-  }
-
-  private handlePointerLockError = () => {
-    console.warn('Pointer Lock Error detectado por el navegador.');
-    if (this.onPointerLockError) {
-      this.onPointerLockError();
-    }
-  };
-
-  public setPointerLockErrorHandler(handler: () => void) {
-    this.onPointerLockError = handler;
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
@@ -182,24 +151,6 @@ export class SteelSceneManager {
     }
   };
 
-  private onMouseMove = (event: MouseEvent) => {
-    if (!this.isWalkModeActive) return;
-    if (this.isPointerLockEnabled) return;
-
-    const sensitivity = 0.002;
-    const deltaX = event.movementX !== undefined ? event.movementX : (event.clientX - this.lastMouseX);
-    const deltaY = event.movementY !== undefined ? event.movementY : (event.clientY - this.lastMouseY);
-
-    if (Math.abs(deltaX) < 300 && Math.abs(deltaY) < 300) {
-      this.camera.rotation.y -= deltaX * sensitivity;
-      this.camera.rotation.x -= deltaY * sensitivity;
-      this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
-    }
-
-    this.lastMouseX = event.clientX;
-    this.lastMouseY = event.clientY;
-  };
-
   public setMovement(direction: string, active: boolean) {
     switch (direction) {
       case 'forward': this.moveForward = active; break;
@@ -225,6 +176,7 @@ export class SteelSceneManager {
     this.controls.enabled = false;
     if (this.onWalkModeLock) this.onWalkModeLock(true);
 
+    // Teletransporte al centro de la casa
     this.houseGroup.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
@@ -237,15 +189,6 @@ export class SteelSceneManager {
     
     this.camera.position.set(center.x, 1700, center.z);
     this.camera.rotation.set(0, 0, 0);
-
-    try {
-      if (this.fpControls && typeof this.fpControls.lock === 'function') {
-        this.fpControls.lock();
-      }
-    } catch (err) {
-      console.warn('Acceso a Pointer Lock bloqueado por el sandbox. Usando navegación manual.');
-      if (this.onPointerLockError) this.onPointerLockError();
-    }
   }
 
   private onWindowResize = () => {
@@ -282,17 +225,20 @@ export class SteelSceneManager {
     const delta = Math.min((time - this.prevTime) / 1000, 0.1);
 
     if (this.isWalkModeActive) {
+      // Rotación por teclado (Flechas)
       const rotationSpeed = 1.8 * delta;
       if (this.lookLeft) this.camera.rotation.y += rotationSpeed;
       if (this.lookRight) this.camera.rotation.y -= rotationSpeed;
       if (this.lookUp) this.camera.rotation.x += rotationSpeed;
       if (this.lookDown) this.camera.rotation.x -= rotationSpeed;
       
+      // Rotación por Joystick
       if (this.joystickLook.lengthSq() > 0) {
         this.camera.rotation.y -= this.joystickLook.x * 3.5 * delta;
         this.camera.rotation.x += this.joystickLook.y * 3.5 * delta;
       }
       
+      // Limitar mirada vertical
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
 
       this.velocity.x -= this.velocity.x * 10.0 * delta;
@@ -402,6 +348,7 @@ export class SteelSceneManager {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
+    // Soleras Superior e Inferior
     structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
     structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
 
@@ -412,12 +359,14 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(studHeight, validX, this.profileFlange, 90, 'PGC', color));
     };
 
+    // Montantes de encuentro (Extremos)
     addStud(0); 
     addStud(this.profileFlange); 
     
     addStud(wall.length - this.profileFlange); 
     addStud(wall.length - this.profileFlange * 2); 
 
+    // Distribución automática de montantes
     const studCount = Math.floor(wall.length / wall.studSpacing);
     for (let i = 1; i <= studCount; i++) {
       let x = i * wall.studSpacing;
@@ -428,23 +377,29 @@ export class SteelSceneManager {
       }
     }
 
+    // Estructura de Vanos
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const opTop = sill + op.height;
 
       if (layers.lintels) {
+        // King Studs
         addStud(op.position - this.profileFlange);
         addStud(op.position + op.width);
 
+        // Jack Studs
         structuralGroup.add(this.createProfile(opTop - this.profileFlange, op.position, this.profileFlange, 90, 'PGC', this.colors.steel));
         structuralGroup.add(this.createProfile(opTop - this.profileFlange, op.position + op.width - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.steel));
 
+        // Dintel
         structuralGroup.add(this.createProfile(op.width, op.position, opTop, 0, 'PGU', this.colors.lintel));
 
+        // Umbral (si es ventana)
         if (op.type === 'window') {
           structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
         }
 
+        // Cripples
         const crippleSpacing = wall.studSpacing;
         for (let x = op.position + crippleSpacing; x < op.position + op.width - this.profileFlange; x += crippleSpacing) {
           structuralGroup.add(this.createProfile(wall.height - opTop - this.profileFlange, x, opTop + this.profileFlange, 90, 'PGC'));
@@ -616,9 +571,7 @@ export class SteelSceneManager {
 
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
-    document.removeEventListener('pointerlockerror', this.handlePointerLockError);
     if (this.renderer) this.renderer.dispose();
     if (this.controls) this.controls.dispose();
-    if (this.fpControls) this.fpControls.dispose();
   }
 }
