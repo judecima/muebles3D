@@ -111,7 +111,6 @@ export function ControlPanel({
               <SelectItem value="cabinet_wall_120_3p">Alacena 1.20m (3P)</SelectItem>
               <SelectItem value="cabinet_wall_140_3p">Alacena 1.40m (3P)</SelectItem>
               <SelectItem value="cabinet_wall_60_1p">Alacena 0.60m (1P)</SelectItem>
-              <SelectItem value="cabinet_hood_60">Alacena Campana (0.60m)</SelectItem>
               <SelectItem value="cabinet_pantry_60_2p">Despensero 0.60m (2P)</SelectItem>
               <SelectItem value="cabinet_microwave_60">Torre Hornos (0.60m)</SelectItem>
             </SelectContent>
