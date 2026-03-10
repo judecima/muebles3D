@@ -183,24 +183,34 @@ export class SceneManager {
         obj.position.z = orig.z + offset;
       }
 
-      // Cinemática de Pistones
+      // Cinemática Industrial de Pistones v15.7
       if (type === 'piston-body') {
         const config = obj.userData.pistonConfig;
         const door = this.partsMap.get(config.doorId);
+        
         if (door) {
-          // Obtener punto de anclaje de la puerta en el mundo global
-          const anchorPuertaLocal = new THREE.Vector3(config.anchorPuertaLocal.x, config.anchorPuertaLocal.y, config.anchorPuertaLocal.z);
-          const targetGlobal = door.localToWorld(anchorPuertaLocal);
+          // El anclaje del mueble es la posición de origen fija
+          const cabinetAnchor = new THREE.Vector3(config.anchorMueble.x, config.anchorMueble.y, config.anchorMueble.z);
           
-          // El pistón mira al punto de la puerta
-          obj.lookAt(targetGlobal);
+          // Calculamos la posición del anclaje de la puerta en el espacio del mundo
+          const doorAnchorLocal = new THREE.Vector3(config.anchorPuertaLocal.x, config.anchorPuertaLocal.y, config.anchorPuertaLocal.z);
+          const doorAnchorWorld = door.localToWorld(doorAnchorLocal.clone());
+          
+          // Sincronizamos la posición del cuerpo al anclaje del mueble
+          obj.position.copy(cabinetAnchor);
+          
+          // El pistón mira siempre hacia el punto de anclaje de la puerta
+          obj.lookAt(doorAnchorWorld);
 
-          // Escalar el vástago (hijo del cuerpo)
+          // Calculamos la distancia actual entre anclajes para escalar el vástago
+          const currentDist = cabinetAnchor.distanceTo(doorAnchorWorld);
+          
           const rod = obj.getObjectByName('piston-rod');
           if (rod) {
-            const currentDist = obj.position.distanceTo(targetGlobal);
-            const scale = currentDist / config.lengthClosed;
-            rod.scale.z = scale;
+            // El vástago se escala linealmente para cerrar el gap entre anclajes
+            // Consideramos la longitud cerrada como factor de escala 1
+            const scaleFactor = currentDist / config.lengthClosed;
+            rod.scale.z = scaleFactor;
           }
         }
       }
@@ -232,22 +242,23 @@ export class SceneManager {
       let mesh: THREE.Object3D;
 
       if (part.type === 'piston-body') {
-        // Crear cuerpo del pistón
-        const bodyGeom = new THREE.CylinderGeometry(8, 8, part.depth, 16);
-        bodyGeom.rotateX(Math.PI / 2);
-        bodyGeom.translate(0, 0, part.depth / 2);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_body });
+        // Estructura de Pistón Telescópico v15.7
+        const bodyGeom = new THREE.CylinderGeometry(6, 6, part.depth, 16);
+        bodyGeom.rotateX(Math.PI / 2); // Alinear cilindro con eje Z
+        bodyGeom.translate(0, 0, part.depth / 2); // Pivotear en el extremo
+        
+        const bodyMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_body, metalness: 0.5, roughness: 0.3 });
         const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
         
-        // Crear vástago como hijo
-        const rodGeom = new THREE.CylinderGeometry(4, 4, part.depth, 16);
+        // Vástago interno móvil
+        const rodGeom = new THREE.CylinderGeometry(3.5, 3.5, part.depth, 16);
         rodGeom.rotateX(Math.PI / 2);
         rodGeom.translate(0, 0, part.depth / 2);
-        const rodMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_rod });
+        const rodMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_rod, metalness: 0.8, roughness: 0.1 });
         const rodMesh = new THREE.Mesh(rodGeom, rodMat);
         rodMesh.name = 'piston-rod';
+        
         bodyMesh.add(rodMesh);
-
         mesh = bodyMesh;
       } else {
         let geometry: THREE.BufferGeometry;

@@ -1,10 +1,10 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Alacena Rebatible Red Arquimax v15.6 Industrial
+ * Motor para Alacena Rebatible Red Arquimax v15.7 Industrial
  * - Estructura Sándwich: Base y Tapa de ancho completo (W).
  * - Laterales confinados: H - 2T.
- * - Sistema de Pistones a Gas cinemáticos.
+ * - Sistema de Pistones a Gas cinemáticos internos (v15.7).
  */
 export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T, hasBack } = dim;
@@ -34,6 +34,7 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
   const doorH = H - 3; 
   const doorY = doorH / 2;
 
+  // Pivotaje en la parte superior del mueble (H), centrado en profundidad (D/2) para alinearse con los laterales
   parts.push({ 
     id: 'door-flip', 
     name: 'Puerta Abatible', 
@@ -55,26 +56,32 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   }
 
-  // Pistones Neumáticos con Cinemática Real
+  // Pistones Neumáticos con Cinemática Real v15.7 (Internos)
   const pistonCount = W <= 800 ? 1 : 2;
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
   sides.forEach(side => {
     const sideX = side === 'left' ? T + 10 : W - T - 10;
-    // Anclaje en el mueble (fijo)
-    const anchorMueble = { x: sideX, y: H * 0.4, z: D * 0.2 };
-    // Anclaje en la puerta (relativo al centro de la puerta para el render)
-    // El punto de la puerta debe estar cerca de la bisagra pero lo suficiente para pivotear
+    
+    // Punto de anclaje en el lateral del mueble (Fijo, desplazado hacia atrás e inferior)
+    // Se asegura de estar dentro del volumen
+    const anchorMueble = { x: sideX, y: H * 0.4, z: -D / 2 + 50 };
+    
+    // Punto de anclaje en la puerta (Relativo al pivot de la puerta)
+    // Se posiciona cerca del eje superior para permitir el torque de apertura
     const anchorPuertaLocal = { 
-      x: side === 'left' ? -doorW/2 + 40 : doorW/2 - 40, 
-      y: doorH/2 - 120, 
+      x: side === 'left' ? -doorW/2 + 30 : doorW/2 - 30, 
+      y: doorH/2 - 70, // Cerca del eje de rotación superior
       z: -T/2 
     };
+
+    // La profundidad (depth) aquí representa la longitud mínima (cerrado) del pistón
+    const lengthClosed = 190; 
 
     parts.push({
       id: `piston-${side}`,
       name: 'Pistón a Gas',
-      width: 15, height: 15, depth: 220, 
+      width: 14, height: 14, depth: lengthClosed, 
       x: anchorMueble.x, y: anchorMueble.y, z: anchorMueble.z, 
       type: 'piston-body',
       isHardware: true,
@@ -84,11 +91,11 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
         anchorMueble,
         anchorPuertaLocal,
         doorId: 'door-flip',
-        lengthClosed: 220,
-        lengthOpen: 340
+        lengthClosed: lengthClosed,
+        lengthOpen: 290
       }
     });
   });
 
-  return { parts, summary: `Alacena rebatible v15.6 Industrial: Cinemática de pistones y sándwich de apoyo.`, hasDoors: true, hasDrawers: false };
+  return { parts, summary: `Alacena rebatible v15.7 Industrial: Mecanismo de pistón interno y estructura sándwich.`, hasDoors: true, hasDrawers: false };
 }
