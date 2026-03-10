@@ -5,8 +5,8 @@ export interface SteelOpening {
   type: OpeningType;
   width: number;
   height: number;
-  position: number; // Distancia desde el inicio (izq) del muro
-  sillHeight?: number; // Altura desde el suelo (para ventanas)
+  position: number; 
+  sillHeight?: number; 
 }
 
 export interface SteelWall {
@@ -16,11 +16,23 @@ export interface SteelWall {
   thickness: number;
   x: number;
   z: number;
-  rotation: number; // en grados
+  rotation: number;
   openings: SteelOpening[];
+  studSpacing: 400 | 600;
+}
+
+export interface LayerVisibility {
+  exteriorPanels: boolean;
+  interiorPanels: boolean;
+  steelProfiles: boolean;
+  crossBracing: boolean;
+  lintels: boolean;
+  reinforcements: boolean;
 }
 
 export interface SteelHouseConfig {
   globalWallHeight: number;
   walls: SteelWall[];
+  layers: LayerVisibility;
+  structuralMode: boolean;
 }

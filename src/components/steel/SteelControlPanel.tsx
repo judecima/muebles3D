@@ -5,20 +5,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { SteelHouseConfig, SteelWall, SteelOpening, OpeningType } from '@/lib/steel/types';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SteelHouseConfig, SteelWall, SteelOpening, OpeningType, LayerVisibility } from '@/lib/steel/types';
 import { 
   Plus, 
   Trash2, 
   Home, 
-  Move, 
-  Maximize2, 
-  RotateCw,
+  Settings2,
   Layout,
   DoorOpen,
-  Box
+  Box,
+  Layers,
+  Activity,
+  ChevronDown
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Switch } from '@/components/ui/switch';
 
 interface SteelControlPanelProps {
   config: SteelHouseConfig;
@@ -36,7 +40,8 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
       x: 0,
       z: 0,
       rotation: 0,
-      openings: []
+      openings: [],
+      studSpacing: 400
     };
     onConfigChange({ ...config, walls: [...config.walls, newWall] });
   };
@@ -48,6 +53,13 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
   const updateWall = (id: string, field: keyof SteelWall, value: any) => {
     const newWalls = config.walls.map(w => w.id === id ? { ...w, [field]: value } : w);
     onConfigChange({ ...config, walls: newWalls });
+  };
+
+  const toggleLayer = (layer: keyof LayerVisibility) => {
+    onConfigChange({
+      ...config,
+      layers: { ...config.layers, [layer]: !config.layers[layer] }
+    });
   };
 
   const addOpening = (wallId: string, type: OpeningType) => {
@@ -78,13 +90,56 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Home className="w-5 h-5 text-blue-400" /> 
-            <span>Steel Framing v1.0</span>
+            <span>Steel Framing v2.0</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal">CONFIGURADOR DE ESTRUCTURA</span>
+          <span className="text-[10px] opacity-70 font-normal">SISTEMA ESTRUCTURAL AUTOMÁTICO</span>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="space-y-6 pt-6 px-4 pb-20">
+        {/* Capas de Visualización */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Layers className="w-4 h-4 text-primary" />
+            <Label className="text-xs font-bold uppercase text-slate-500">Capas de Visualización</Label>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase text-slate-600">Modo Estructural</span>
+              <Switch 
+                checked={config.structuralMode} 
+                onCheckedChange={(val) => onConfigChange({ ...config, structuralMode: val })} 
+              />
+            </div>
+            <Separator className="my-1" />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox id="ext-pan" checked={config.layers.exteriorPanels} onCheckedChange={() => toggleLayer('exteriorPanels')} />
+                <Label htmlFor="ext-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Exteriores</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="int-pan" checked={config.layers.interiorPanels} onCheckedChange={() => toggleLayer('interiorPanels')} />
+                <Label htmlFor="int-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Interiores</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="profiles" checked={config.layers.steelProfiles} onCheckedChange={() => toggleLayer('steelProfiles')} />
+                <Label htmlFor="profiles" className="text-[10px] font-bold uppercase cursor-pointer">Perfilería (PGC/PGU)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="bracing" checked={config.layers.crossBracing} onCheckedChange={() => toggleLayer('crossBracing')} />
+                <Label htmlFor="bracing" className="text-[10px] font-bold uppercase cursor-pointer text-red-500">Cruces San Andrés</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="lintels" checked={config.layers.lintels} onCheckedChange={() => toggleLayer('lintels')} />
+                <Label htmlFor="lintels" className="text-[10px] font-bold uppercase cursor-pointer text-blue-500">Dinteles y Refuerzos</Label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase text-slate-500">Altura Global Muros (mm)</Label>
           <Input 
@@ -94,8 +149,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
             className="h-10 border-slate-200"
           />
         </div>
-
-        <Separator />
 
         <div className="flex items-center justify-between mb-2">
           <Label className="text-xs font-bold uppercase text-slate-500">Muros del Proyecto</Label>
@@ -122,8 +175,16 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                     <Input type="number" value={wall.length} onChange={(e) => updateWall(wall.id, 'length', parseInt(e.target.value))} className="h-8 text-xs" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-bold uppercase text-slate-400">Rotación (°)</Label>
-                    <Input type="number" value={wall.rotation} onChange={(e) => updateWall(wall.id, 'rotation', parseInt(e.target.value))} className="h-8 text-xs" />
+                    <Label className="text-[10px] font-bold uppercase text-slate-400">Espaciado Mont.</Label>
+                    <Select value={wall.studSpacing.toString()} onValueChange={(val) => updateWall(wall.id, 'studSpacing', parseInt(val))}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="400">400 mm</SelectItem>
+                        <SelectItem value="600">600 mm</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -136,6 +197,11 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                     <Label className="text-[10px] font-bold uppercase text-slate-400">Posición Z</Label>
                     <Input type="number" value={wall.z} onChange={(e) => updateWall(wall.id, 'z', parseInt(e.target.value))} className="h-8 text-xs" />
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold uppercase text-slate-400">Rotación (°)</Label>
+                  <Input type="number" value={wall.rotation} onChange={(e) => updateWall(wall.id, 'rotation', parseInt(e.target.value))} className="h-8 text-xs" />
                 </div>
 
                 <div className="pt-2 border-t space-y-3">

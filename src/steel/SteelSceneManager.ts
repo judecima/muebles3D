@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
-import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
 
 export class SteelSceneManager {
   private scene: THREE.Scene;
@@ -13,6 +13,7 @@ export class SteelSceneManager {
   private fpControls: PointerLockControls;
   private houseGroup: THREE.Group;
   private openingsGroup: THREE.Group;
+  private structuralGroup: THREE.Group;
   private container: HTMLElement;
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
@@ -31,10 +32,7 @@ export class SteelSceneManager {
   private lookDown = false;
   private lookLeft = false;
   private lookRight = false;
-  private rotateQ = false;
-  private rotateE = false;
 
-  // Vectores de Joystick / Mouse Delta
   private joystickMove = new THREE.Vector2(0, 0);
   private joystickLook = new THREE.Vector2(0, 0);
   private lastMouseX = 0;
@@ -56,8 +54,17 @@ export class SteelSceneManager {
     grid: 0xd1d5db,
     floor: 0xe2e8f0,
     outline: 0x475569,
-    openingHover: 0x3b82f6
+    openingHover: 0x3b82f6,
+    steel: 0xb0b0b0,
+    bracing: 0xff4444,
+    lintel: 0x4444ff,
+    panel_ext: 0x94a3b8,
+    panel_int: 0xe2e8f0
   };
+
+  private profileWidth = 100;
+  private profileThickness = 1.2;
+  private profileFlange = 40;
 
   constructor(
     container: HTMLElement, 
@@ -90,7 +97,6 @@ export class SteelSceneManager {
     this.fpControls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.scene.add(this.fpControls.getObject());
 
-    // Listeners para PointerLock - Sincronizamos estado interno
     this.fpControls.addEventListener('lock', () => {
       this.isPointerLockEnabled = true;
       this.controls.enabled = false;
@@ -118,6 +124,9 @@ export class SteelSceneManager {
     this.openingsGroup = new THREE.Group();
     this.scene.add(this.openingsGroup);
 
+    this.structuralGroup = new THREE.Group();
+    this.scene.add(this.structuralGroup);
+
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
@@ -137,13 +146,10 @@ export class SteelSceneManager {
       case 'KeyC': this.moveDown = true; break;
       case 'ShiftLeft':
       case 'ShiftRight': this.isShiftPressed = true; break;
-      
       case 'ArrowUp': this.lookUp = true; break;
       case 'ArrowDown': this.lookDown = true; break;
       case 'ArrowLeft': this.lookLeft = true; break;
       case 'ArrowRight': this.lookRight = true; break;
-      case 'KeyQ': this.rotateQ = true; break;
-      case 'KeyE': this.rotateE = true; break;
     }
   };
 
@@ -157,37 +163,24 @@ export class SteelSceneManager {
       case 'KeyC': this.moveDown = false; break;
       case 'ShiftLeft':
       case 'ShiftRight': this.isShiftPressed = false; break;
-      
       case 'ArrowUp': this.lookUp = false; break;
       case 'ArrowDown': this.lookDown = false; break;
       case 'ArrowLeft': this.lookLeft = false; break;
       case 'ArrowRight': this.lookRight = false; break;
-      case 'KeyQ': this.rotateQ = false; break;
-      case 'KeyE': this.rotateE = false; break;
     }
   };
 
   private onMouseMove = (event: MouseEvent) => {
     if (!this.isWalkModeActive) return;
+    if (this.isPointerLockEnabled) return;
 
-    // Si el puntero está bloqueado, PointerLockControls ya maneja la cámara internamente
-    if (this.isPointerLockEnabled) {
-      this.lastMouseX = event.clientX;
-      this.lastMouseY = event.clientY;
-      return;
-    }
-
-    // FALLBACK: Mirada manual si Pointer Lock está bloqueado por el sandbox
     const sensitivity = 0.002;
-    // Usamos movementX/Y preferentemente, o el delta manual si no están disponibles
     const deltaX = event.movementX !== undefined ? event.movementX : (event.clientX - this.lastMouseX);
     const deltaY = event.movementY !== undefined ? event.movementY : (event.clientY - this.lastMouseY);
 
-    // Evitamos saltos bruscos si el cursor entra/sale del lienzo
     if (Math.abs(deltaX) < 300 && Math.abs(deltaY) < 300) {
       this.camera.rotation.y -= deltaX * sensitivity;
       this.camera.rotation.x -= deltaY * sensitivity;
-      // Límite de mirada vertical para evitar dar la vuelta completa
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
     }
 
@@ -216,13 +209,10 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    // 1. Activar estado de navegación inmediatamente
-    // Esto garantiza que WASD y Joysticks funcionen incluso si falla el bloqueo del mouse
     this.isWalkModeActive = true;
     this.controls.enabled = false;
     if (this.onWalkModeLock) this.onWalkModeLock(true);
 
-    // 2. Teletransporte al interior de la casa
     this.houseGroup.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
@@ -232,31 +222,16 @@ export class SteelSceneManager {
       center.set(0, 0, 0);
     }
     
-    // Altura humana (1.7m)
     this.camera.position.set(center.x, 1700, center.z);
     this.camera.rotation.set(0, 0, 0);
 
-    // 3. Intento defensivo de Pointer Lock (API del navegador)
-    // Usamos un bloque try/catch muy agresivo para capturar el SecurityError en entornos sandboxed
     try {
-      // Intentamos el bloqueo. Si falla, el catch lo silencia y seguimos con el fallback manual.
       if (this.fpControls && typeof this.fpControls.lock === 'function') {
         this.fpControls.lock();
       }
     } catch (err) {
-      // Capturamos SecurityError: Failed to execute 'requestPointerLock' on 'Element'
-      // No imprimimos error para no disparar el overlay de Next.js
-      console.warn('Pointer Lock bloqueado por política de seguridad. Usando controles manuales.');
+      console.warn('Pointer Lock blocked. Using manual controls.');
     }
-  }
-
-  public exitWalkMode() {
-    this.isWalkModeActive = false;
-    this.controls.enabled = true;
-    if (this.onWalkModeLock) this.onWalkModeLock(false);
-    try {
-      this.fpControls.unlock();
-    } catch (e) {}
   }
 
   private onWindowResize = () => {
@@ -293,10 +268,9 @@ export class SteelSceneManager {
     const delta = Math.min((time - this.prevTime) / 1000, 0.1);
 
     if (this.isWalkModeActive) {
-      // Manejo de Rotación (Teclado/Joystick)
       const rotationSpeed = 1.8 * delta;
-      if (this.lookLeft || this.rotateQ) this.camera.rotation.y += rotationSpeed;
-      if (this.lookRight || this.rotateE) this.camera.rotation.y -= rotationSpeed;
+      if (this.lookLeft) this.camera.rotation.y += rotationSpeed;
+      if (this.lookRight) this.camera.rotation.y -= rotationSpeed;
       if (this.lookUp) this.camera.rotation.x += rotationSpeed;
       if (this.lookDown) this.camera.rotation.x -= rotationSpeed;
       
@@ -307,7 +281,6 @@ export class SteelSceneManager {
       
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
 
-      // Manejo de Movimiento
       this.velocity.x -= this.velocity.x * 10.0 * delta;
       this.velocity.z -= this.velocity.z * 10.0 * delta;
       this.velocity.y -= this.velocity.y * 10.0 * delta;
@@ -356,26 +329,44 @@ export class SteelSceneManager {
 
   public buildHouse(config: SteelHouseConfig) {
     while (this.houseGroup.children.length > 0) {
-      const child = this.houseGroup.children[0];
-      this.disposeObject(child);
-      this.houseGroup.remove(child);
+      this.disposeObject(this.houseGroup.children[0]);
+      this.houseGroup.remove(this.houseGroup.children[0]);
     }
 
     while (this.openingsGroup.children.length > 0) {
-      const child = this.openingsGroup.children[0];
-      this.disposeObject(child);
-      this.openingsGroup.remove(child);
+      this.disposeObject(this.openingsGroup.children[0]);
+      this.openingsGroup.remove(this.openingsGroup.children[0]);
+    }
+
+    while (this.structuralGroup.children.length > 0) {
+      this.disposeObject(this.structuralGroup.children[0]);
+      this.structuralGroup.remove(this.structuralGroup.children[0]);
     }
 
     const wallsBox = new THREE.Box3();
     
     config.walls.forEach(wall => {
-      const wallMesh = this.createWallMesh(wall);
-      this.houseGroup.add(wallMesh);
-      wallsBox.expandByObject(wallMesh);
+      const wallGroup = new THREE.Group();
+      wallGroup.position.set(wall.x, 0, wall.z);
+      wallGroup.rotation.y = (wall.rotation * Math.PI) / 180;
+      this.houseGroup.add(wallGroup);
+
+      // Paneles
+      if (!config.structuralMode) {
+        if (config.layers.exteriorPanels) wallGroup.add(this.createPanelMesh(wall, 'exterior'));
+        if (config.layers.interiorPanels) wallGroup.add(this.createPanelMesh(wall, 'interior'));
+      }
+
+      // Estructura
+      if (config.layers.steelProfiles) {
+        this.generateWallStructure(wall, wallGroup, config.layers);
+      }
+
+      wallsBox.expandByObject(wallGroup);
       this.createOpeningTriggers(wall);
     });
 
+    // Suelo
     if (!wallsBox.isEmpty() && isFinite(wallsBox.min.x)) {
       const size = new THREE.Vector3();
       wallsBox.getSize(size);
@@ -396,7 +387,102 @@ export class SteelSceneManager {
     }
   }
 
-  private createWallMesh(wall: SteelWall): THREE.Mesh {
+  private generateWallStructure(wall: SteelWall, group: THREE.Group, layers: LayerVisibility) {
+    const structuralGroup = new THREE.Group();
+    group.add(structuralGroup);
+
+    // Solera Inferior
+    structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
+    // Solera Superior
+    structuralGroup.add(this.createProfile(wall.length, wall.height - this.profileFlange, 0, 0, 'PGU'));
+
+    // Montantes
+    const studCount = Math.ceil(wall.length / wall.studSpacing);
+    for (let i = 0; i <= studCount; i++) {
+      let x = i * wall.studSpacing;
+      if (x > wall.length) x = wall.length - this.profileThickness;
+
+      // Verificar si choca con abertura
+      const inOpening = wall.openings.some(op => x > op.position && x < (op.position + op.width));
+      if (!inOpening) {
+        structuralGroup.add(this.createProfile(wall.height, x, 0, 90, 'PGC'));
+      }
+    }
+
+    // Estructura de Aberturas
+    wall.openings.forEach(op => {
+      const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+      
+      if (layers.lintels) {
+        // King Studs (laterales externos)
+        structuralGroup.add(this.createProfile(wall.height, op.position - this.profileWidth, 0, 90, 'PGC'));
+        structuralGroup.add(this.createProfile(wall.height, op.position + op.width, 0, 90, 'PGC'));
+
+        // Jack Studs (sostienen dintel)
+        structuralGroup.add(this.createProfile(sill + op.height, op.position, 0, 90, 'PGC'));
+        structuralGroup.add(this.createProfile(sill + op.height, op.position + op.width - this.profileWidth, 0, 90, 'PGC'));
+
+        // Dintel (Beam)
+        structuralGroup.add(this.createProfile(op.width, op.position, sill + op.height, 0, 'PGU', this.colors.lintel));
+        
+        // Cripples (montantes cortos arriba y abajo)
+        const crippleCount = Math.ceil(op.width / wall.studSpacing);
+        for (let j = 1; j < crippleCount; j++) {
+          const cx = op.position + j * wall.studSpacing;
+          if (cx < op.position + op.width) {
+            structuralGroup.add(this.createProfile(wall.height - (sill + op.height), cx, sill + op.height, 90, 'PGC'));
+            if (op.type === 'window') {
+              structuralGroup.add(this.createProfile(sill, cx, 0, 90, 'PGC'));
+            }
+          }
+        }
+      }
+    });
+
+    // Cruces de San Andrés
+    if (layers.crossBracing && (wall.length > 3000 || wall.height > 2500)) {
+      this.addCrossBracing(wall, structuralGroup);
+    }
+  }
+
+  private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number): THREE.Mesh {
+    const geom = new THREE.BoxGeometry(
+      rotZ === 90 ? this.profileFlange : len, 
+      rotZ === 90 ? len : this.profileFlange, 
+      this.profileWidth
+    );
+    const mat = new THREE.MeshStandardMaterial({ color: color || this.colors.steel, metalness: 0.8, roughness: 0.2 });
+    const mesh = new THREE.Mesh(geom, mat);
+    
+    // Ajustar pivote a esquina
+    const offX = rotZ === 90 ? this.profileFlange / 2 : len / 2;
+    const offY = rotZ === 90 ? len / 2 : this.profileFlange / 2;
+    mesh.position.set(x + offX, y + offY, 0);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  private addCrossBracing(wall: SteelWall, group: THREE.Group) {
+    const bracingMat = new THREE.MeshStandardMaterial({ color: this.colors.bracing, metalness: 0.9 });
+    const createDiagonal = (x1: number, y1: number, x2: number, y2: number) => {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+      
+      const geom = new THREE.BoxGeometry(dist, 50, 5);
+      const mesh = new THREE.Mesh(geom, bracingMat);
+      mesh.position.set(x1 + dx / 2, y1 + dy / 2, this.profileWidth / 2 + 5);
+      mesh.rotation.z = angle;
+      group.add(mesh);
+    };
+
+    createDiagonal(0, 0, wall.length, wall.height);
+    createDiagonal(wall.length, 0, 0, wall.height);
+  }
+
+  private createPanelMesh(wall: SteelWall, side: 'exterior' | 'interior'): THREE.Mesh {
     const shape = new THREE.Shape();
     shape.moveTo(0, 0);
     shape.lineTo(wall.length, 0);
@@ -415,13 +501,13 @@ export class SteelSceneManager {
       shape.holes.push(hole);
     });
 
-    const geometry = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: wall.thickness, beveled: false });
-    const material = new THREE.MeshStandardMaterial({ color: this.colors.wall, side: THREE.DoubleSide });
+    const geometry = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: 15, beveled: false });
+    const color = side === 'exterior' ? this.colors.panel_ext : this.colors.panel_int;
+    const material = new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geometry, material);
     
-    mesh.position.set(wall.x, 0, wall.z);
-    mesh.rotation.y = (wall.rotation * Math.PI) / 180;
-    mesh.translateZ(-wall.thickness / 2);
+    const zPos = side === 'exterior' ? (wall.thickness / 2) : (-wall.thickness / 2 - 15);
+    mesh.position.set(0, 0, zPos);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
@@ -431,7 +517,7 @@ export class SteelSceneManager {
   private createOpeningTriggers(wall: SteelWall) {
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      const geometry = new THREE.BoxGeometry(op.width, op.height, wall.thickness + 5);
+      const geometry = new THREE.BoxGeometry(op.width, op.height, wall.thickness + 20);
       const material = new THREE.MeshBasicMaterial({ color: this.colors.openingHover, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geometry, material);
       

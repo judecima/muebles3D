@@ -29,15 +29,24 @@ import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const INITIAL_WALLS: SteelWall[] = [
-  { id: 'w1', length: 6000, height: 2600, thickness: 100, x: -3000, z: -3000, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: 2500 }] },
-  { id: 'w2', length: 6000, height: 2600, thickness: 100, x: 3000, z: -3000, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: 2400, sillHeight: 900 }] },
-  { id: 'w3', length: 6000, height: 2600, thickness: 100, x: 3000, z: 3000, rotation: 180, openings: [] },
-  { id: 'w4', length: 6000, height: 2600, thickness: 100, x: -3000, z: 3000, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: 2250, sillHeight: 900 }] },
+  { id: 'w1', length: 6000, height: 2600, thickness: 100, x: -3000, z: -3000, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: 2500 }], studSpacing: 400 },
+  { id: 'w2', length: 6000, height: 2600, thickness: 100, x: 3000, z: -3000, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: 2400, sillHeight: 900 }], studSpacing: 400 },
+  { id: 'w3', length: 6000, height: 2600, thickness: 100, x: 3000, z: 3000, rotation: 180, openings: [], studSpacing: 400 },
+  { id: 'w4', length: 6000, height: 2600, thickness: 100, x: -3000, z: 3000, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: 2250, sillHeight: 900 }], studSpacing: 400 },
 ];
 
 const INITIAL_CONFIG: SteelHouseConfig = {
   globalWallHeight: 2600,
-  walls: INITIAL_WALLS
+  walls: INITIAL_WALLS,
+  layers: {
+    exteriorPanels: true,
+    interiorPanels: false,
+    steelProfiles: true,
+    crossBracing: true,
+    lintels: true,
+    reinforcements: true
+  },
+  structuralMode: false
 };
 
 export default function SteelFramingPage() {
@@ -192,7 +201,7 @@ export default function SteelFramingPage() {
             )}
           </div>
 
-          {isWalkModeActive && (isMobile || true) && ( // Mostramos joysticks siempre como fallback si el API falla
+          {isWalkModeActive && (isMobile || true) && ( 
             <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
               <div className="absolute bottom-16 left-16 pointer-events-auto">
                 <SteelJoystick 
