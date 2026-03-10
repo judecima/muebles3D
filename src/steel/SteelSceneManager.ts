@@ -90,7 +90,7 @@ export class SteelSceneManager {
     this.fpControls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.scene.add(this.fpControls.getObject());
 
-    // Listeners para PointerLock
+    // Listeners para PointerLock - Sincronizamos estado interno
     this.fpControls.addEventListener('lock', () => {
       this.isPointerLockEnabled = true;
       this.controls.enabled = false;
@@ -98,8 +98,6 @@ export class SteelSceneManager {
 
     this.fpControls.addEventListener('unlock', () => {
       this.isPointerLockEnabled = false;
-      // No desactivamos el modo caminata inmediatamente al soltar el lock, 
-      // para permitir navegación manual si el API falla.
     });
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -170,17 +168,26 @@ export class SteelSceneManager {
   };
 
   private onMouseMove = (event: MouseEvent) => {
-    if (!this.isWalkModeActive || this.isPointerLockEnabled) return;
+    if (!this.isWalkModeActive) return;
 
-    // Fallback: Si no hay Pointer Lock, usamos el movimiento relativo mientras el botón esté presionado o el modo activo
-    // Aquí implementamos una mirada libre simple si el API de bloqueo falla
+    // Si el puntero está bloqueado, PointerLockControls ya maneja la cámara internamente
+    if (this.isPointerLockEnabled) {
+      this.lastMouseX = event.clientX;
+      this.lastMouseY = event.clientY;
+      return;
+    }
+
+    // FALLBACK: Mirada manual si Pointer Lock está bloqueado por el sandbox
     const sensitivity = 0.002;
-    const deltaX = event.movementX || (event.clientX - this.lastMouseX);
-    const deltaY = event.movementY || (event.clientY - this.lastMouseY);
+    // Usamos movementX/Y preferentemente, o el delta manual si no están disponibles
+    const deltaX = event.movementX !== undefined ? event.movementX : (event.clientX - this.lastMouseX);
+    const deltaY = event.movementY !== undefined ? event.movementY : (event.clientY - this.lastMouseY);
 
-    if (Math.abs(deltaX) < 100 && Math.abs(deltaY) < 100) { // Evitar saltos bruscos
+    // Evitamos saltos bruscos si el cursor entra/sale del lienzo
+    if (Math.abs(deltaX) < 300 && Math.abs(deltaY) < 300) {
       this.camera.rotation.y -= deltaX * sensitivity;
       this.camera.rotation.x -= deltaY * sensitivity;
+      // Límite de mirada vertical para evitar dar la vuelta completa
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
     }
 
@@ -209,33 +216,37 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    // 1. Activar estado de navegación inmediatamente (independiente del API de bloqueo)
+    // 1. Activar estado de navegación inmediatamente
+    // Esto garantiza que WASD y Joysticks funcionen incluso si falla el bloqueo del mouse
     this.isWalkModeActive = true;
     this.controls.enabled = false;
     if (this.onWalkModeLock) this.onWalkModeLock(true);
 
-    // 2. Teletransporte al interior
+    // 2. Teletransporte al interior de la casa
     this.houseGroup.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
     if (!box.isEmpty() && isFinite(box.min.x)) {
       box.getCenter(center);
+    } else {
+      center.set(0, 0, 0);
     }
+    
+    // Altura humana (1.7m)
     this.camera.position.set(center.x, 1700, center.z);
     this.camera.rotation.set(0, 0, 0);
 
-    // 3. Intentar el bloqueo del API (User Gesture ya que proviene de un onClick)
+    // 3. Intento defensivo de Pointer Lock (API del navegador)
+    // Usamos un bloque try/catch muy agresivo para capturar el SecurityError en entornos sandboxed
     try {
-      // Usamos un timeout mínimo para asegurar que el stack trace del gesto del usuario sea válido
-      setTimeout(() => {
-        try {
-          this.fpControls.lock();
-        } catch (innerErr) {
-          console.warn('Pointer Lock denegado por sandbox. Usando navegación manual.');
-        }
-      }, 10);
+      // Intentamos el bloqueo. Si falla, el catch lo silencia y seguimos con el fallback manual.
+      if (this.fpControls && typeof this.fpControls.lock === 'function') {
+        this.fpControls.lock();
+      }
     } catch (err) {
-      console.warn('Error crítico al solicitar Pointer Lock:', err);
+      // Capturamos SecurityError: Failed to execute 'requestPointerLock' on 'Element'
+      // No imprimimos error para no disparar el overlay de Next.js
+      console.warn('Pointer Lock bloqueado por política de seguridad. Usando controles manuales.');
     }
   }
 
