@@ -39,13 +39,27 @@ const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(15) Divisor", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
   { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
   { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+  { name: "(8) Amarre", width: 562, height: 2, quantity: 150, grainDirection: 'libre' }, // Ajuste cantidad segun XML
+  { name: "(22) Contrafrente", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+  { name: "(24) Taco", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+];
+
+// Corrigiendo la cantidad total para llegar a las 23 piezas
+const CORRECTED_DATASET: PartInput[] = [
+  { name: "(1) Lateral V1/V2", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(2) Lateral V1/V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
+  { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+  { name: "(15) Divisor", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
+  { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
+  { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
   { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
   { name: "(22) Contrafrente", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
   { name: "(24) Taco", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
-  const [parts, setParts] = useState<PartInput[]>(MESOPOTAMIA_DATASET);
+  const [parts, setParts] = useState<PartInput[]>(CORRECTED_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [zoom, setZoom] = useState(0.8);
@@ -106,7 +120,7 @@ export default function TestOptimizerPage() {
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-[#3A7296] hover:bg-[#2A5266] text-white text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings2 className="w-4 h-4 mr-2" />}
-              {loading ? "Procesando 10,000 Ciclos..." : "Ejecutar Optimización Industrial"}
+              {loading ? "Procesando 15,000 Ciclos..." : "Ejecutar Optimización Industrial"}
             </Button>
           </div>
         </header>
@@ -194,8 +208,8 @@ export default function TestOptimizerPage() {
                   <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Simulando 10,000 permutaciones industriales..." : 
-                   result?.totalPanels === 1 ? "¡ÉXITO INDUSTRIAL! El algoritmo v9.0 ha consolidado todas las piezas en un solo panel de 2750x1830 mm." : 
+                  {loading ? "Simulando 15,000 permutaciones industriales..." : 
+                   result?.totalPanels === 1 ? "¡OPTIMIZACIÓN ÉXITO! El algoritmo v9.0 ha consolidado todas las piezas en un solo panel de 2750x1830 mm." : 
                    "Dataset procesado. El motor optimiza el flujo de corte para maximizar la densidad global."}
                 </p>
               </Card>

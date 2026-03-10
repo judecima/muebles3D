@@ -30,7 +30,6 @@ export function runOptimization(
 ): OptimizationResult {
   const filteredParts = parts.filter(p => p.thickness === selectedThickness);
   
-  // 1. Preprocesamiento: Expandir cantidades
   const flatParts: PartToCut[] = filteredParts.flatMap(p => 
     Array.from({ length: p.quantity }, () => ({
       name: p.name,
@@ -41,7 +40,7 @@ export function runOptimization(
     }))
   );
 
-  // Orden inicial Industrial: Área -> Lado Mayor -> Lado Menor
+  // Orden inicial Industrial
   flatParts.sort((a, b) => {
     const areaA = a.width * a.height;
     const areaB = b.width * b.height;
@@ -57,20 +56,18 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
 
-  // META-HEURÍSTICA: Búsqueda Industrial
-  const ITERATIONS = 10000; 
+  const ITERATIONS = 15000; 
   let bestScore = Infinity;
   let bestLayouts: OptimizedPanel[] = [];
 
   for (let i = 0; i < ITERATIONS; i++) {
     const currentPartsOrder = [...flatParts];
     
-    // Mutaciones industriales para exploración del espacio de soluciones
     if (i > 0) {
-      if (i % 10 === 0) {
-        shuffle(currentPartsOrder); // Reordenamiento total
+      if (i % 20 === 0) {
+        shuffle(currentPartsOrder);
       } else {
-        mutateOrder(currentPartsOrder); // Pequeño ajuste
+        mutateOrder(currentPartsOrder);
       }
     }
 
@@ -82,8 +79,7 @@ export function runOptimization(
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
     
-    // Si logramos consolidar todo en un solo panel con eficiencia extrema, terminamos
-    if (bestLayouts.length === 1 && (calculateTotalEfficiency(bestLayouts) > 96.0)) break;
+    if (bestLayouts.length === 1 && (calculateTotalEfficiency(bestLayouts) > 96.5)) break;
   }
 
   const finalEfficiency = calculateTotalEfficiency(bestLayouts);
@@ -92,16 +88,13 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: finalEfficiency,
-    summary: `ArquiMax v9.0: Consolidación Industrial completada. Eficiencia: ${finalEfficiency.toFixed(2)}%. Todas las piezas agrupadas según lógica de Guillotina en ${bestLayouts.length} panel(es).`,
+    summary: `ArquiMax v9.0: Eficiencia Industrial ${finalEfficiency.toFixed(2)}%. Consolidación en ${bestLayouts.length} panel(es).`,
     kerf,
     trim,
     selectedThickness
   };
 }
 
-/**
- * Construcción de Layout Jerárquico: Filas (Shelves) -> Columnas (Stacks) -> Pilas (V-Stacks)
- */
 function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: number, partColors: Record<string, string>): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
   let remainingParts = [...parts];
@@ -113,26 +106,21 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
     
     let currentY = 0;
     
-    // 1. Crear Filas (Shelves)
     while (currentY < h && usedIndices.size < remainingParts.length) {
       let leaderIdx = -1;
       let shelfH = 0;
 
-      // Buscar pieza más alta para liderar la fila (estilo Lepton)
       for (let i = 0; i < remainingParts.length; i++) {
         if (usedIndices.has(i)) continue;
         const p = remainingParts[i];
         
-        // Intentar orientaciones para el líder
         const canNormal = p.height <= (h - currentY) && p.width <= w;
         const canRotated = p.grainDirection === 'libre' && p.width <= (h - currentY) && p.height <= w;
 
         if (canNormal || canRotated) {
           leaderIdx = i;
-          // Decidir orientación del líder para maximizar espacio
           if (canNormal && canRotated) {
-            // Preferir que el lado más corto sea la altura de la franja para ahorrar vertical
-            if (p.width < p.height) {
+            if (p.width > p.height) {
                [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
             }
           } else if (canRotated) {
@@ -146,7 +134,6 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
       if (leaderIdx === -1) break;
 
       let currentX = 0;
-      // 2. Rellenar Fila con Columnas (Stacks)
       while (currentX < w) {
         let bestColumnIndices: number[] = [];
         let colW = 0;
@@ -159,7 +146,6 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
           const fitsRotated = p.grainDirection === 'libre' && p.height <= (w - currentX) && p.width <= shelfH;
 
           if (fitsNormal || fitsRotated) {
-            // Orientación: minimizar ancho de columna
             if (fitsNormal && fitsRotated) {
               if (p.width > p.height) {
                 [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
@@ -172,10 +158,7 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
             colW = remainingParts[i].width;
             usedIndices.add(i);
 
-            // 3. APILAMIENTO VERTICAL (V-Stacking)
             let remH = shelfH - remainingParts[i].height - kerf;
-            let currentStackY = remainingParts[i].height + kerf;
-
             while (remH > 0) {
               let subIdx = -1;
               for (let j = 0; j < remainingParts.length; j++) {
@@ -200,19 +183,12 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
                 remH -= (remainingParts[subIdx].height + kerf);
               } else break;
             }
-            
-            // Registrar hueco al final del stack si sobra altura
-            if (remH > kerf) {
-              holes.push({ x: currentX, y: currentY + (shelfH - remH), w: colW, h: remH });
-            }
-
             break;
           }
         }
 
         if (bestColumnIndices.length === 0) break;
 
-        // Posicionar piezas
         let yOffset = 0;
         bestColumnIndices.forEach(idx => {
           const p = remainingParts[idx];
@@ -230,53 +206,7 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
 
         currentX += colW + kerf;
       }
-      
-      // Hueco al final de la fila (Derecha)
-      if (currentX < w) {
-        holes.push({ x: currentX, y: currentY, w: w - currentX, h: shelfH });
-      }
-
       currentY += shelfH + kerf;
-    }
-
-    // 4. RELLENO DE HUECOS (Hole Filling)
-    const unplacedIndices = Array.from({ length: remainingParts.length }, (_, k) => k).filter(k => !usedIndices.has(k));
-    
-    for (const hole of holes) {
-      if (hole.w < 50 || hole.h < 50) continue; 
-      
-      for (let i = 0; i < unplacedIndices.length; i++) {
-        const idx = unplacedIndices[i];
-        if (usedIndices.has(idx)) continue;
-        const p = remainingParts[idx];
-
-        const canHoleNormal = p.width <= hole.w && p.height <= hole.h;
-        const canHoleRotated = p.grainDirection === 'libre' && p.height <= hole.w && p.width <= hole.h;
-
-        if (canHoleNormal || canHoleRotated) {
-          let finalW = p.width;
-          let finalH = p.height;
-          if (canHoleRotated && !canHoleNormal) {
-            finalW = p.height;
-            finalH = p.width;
-          }
-
-          placedParts.push({
-            name: p.name,
-            x: hole.x,
-            y: hole.y,
-            width: finalW,
-            height: finalH,
-            rotated: canHoleRotated && !canHoleNormal,
-            color: partColors[p.name]
-          });
-          
-          usedIndices.add(idx);
-          hole.y += finalH + kerf;
-          hole.h -= (finalH + kerf);
-          if (hole.h < 0) break;
-        }
-      }
     }
 
     if (placedParts.length === 0) break;
@@ -291,32 +221,19 @@ function executeLayoutBuilding(parts: PartToCut[], w: number, h: number, kerf: n
     });
     
     remainingParts = remainingParts.filter((_, idx) => !usedIndices.has(idx));
-    
-    if (panels.length > 20) break; // Límite de seguridad
+    if (panels.length > 15) break;
   }
   return panels;
 }
 
-/**
- * Score Industrial: penaliza desperdicio, fragmentación y número de paneles.
- */
 function calculateIndustrialScore(layouts: OptimizedPanel[], w: number, h: number): number {
   if (layouts.length === 0) return Infinity;
-
   const totalUsedArea = layouts.reduce((acc, l) => acc + l.usedArea, 0);
   const totalAvailableArea = layouts.length * w * h;
   const waste = totalAvailableArea - totalUsedArea;
-  
-  // Penalizar fuertemente tener más de un panel si el área total de piezas cabe en uno
-  const panelPenalty = (layouts.length - 1) * 1000000;
-
-  // Fragmentación: penalizar layouts que dejan piezas muy esparcidas
-  const fragmentation = layouts.length * 500; 
-
-  const totalParts = layouts.reduce((acc, l) => acc + l.parts.length, 0);
-  const cutComplexity = totalParts * 10;
-
-  return waste + panelPenalty + fragmentation + cutComplexity;
+  const panelPenalty = (layouts.length - 1) * 5000000;
+  const fragmentation = layouts.length * 1000; 
+  return waste + panelPenalty + fragmentation;
 }
 
 function calculateTotalEfficiency(layouts: OptimizedPanel[]): number {
@@ -344,7 +261,7 @@ function generateColors(parts: PartToCut[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 75%, 55%, 0.35)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 50%, 0.3)`;
   });
   return colors;
 }
