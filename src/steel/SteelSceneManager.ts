@@ -26,7 +26,7 @@ export class SteelSceneManager {
   private moveDown = false;
   private isShiftPressed = false;
   
-  // Rotación por Teclado (Mirar)
+  // Rotación (Mirar)
   private lookUp = false;
   private lookDown = false;
   private lookLeft = false;
@@ -100,9 +100,10 @@ export class SteelSceneManager {
       if (this.onWalkModeLock) this.onWalkModeLock(false);
     });
 
-    // Manejar errores de PointerLock (común en Studio o Móvil)
+    // Manejar errores de bloqueo sin colapsar el sistema
     document.addEventListener('pointerlockerror', () => {
-      console.warn('Pointer Lock API no disponible o rechazada. Continuando en modo navegación libre.');
+      console.warn('Pointer Lock API no pudo activarse. Continuando en modo navegación libre.');
+      // Aseguramos que el estado sea coherente para permitir navegación con joysticks/teclado
       this.isWalkModeActive = true;
       if (this.onWalkModeLock) this.onWalkModeLock(true);
     });
@@ -144,7 +145,6 @@ export class SteelSceneManager {
       case 'ShiftLeft':
       case 'ShiftRight': this.isShiftPressed = true; break;
       
-      // Rotación por Teclado (Mirar)
       case 'ArrowUp': this.lookUp = true; break;
       case 'ArrowDown': this.lookDown = true; break;
       case 'ArrowLeft': this.lookLeft = true; break;
@@ -165,7 +165,6 @@ export class SteelSceneManager {
       case 'ShiftLeft':
       case 'ShiftRight': this.isShiftPressed = false; break;
       
-      // Rotación por Teclado
       case 'ArrowUp': this.lookUp = false; break;
       case 'ArrowDown': this.lookDown = false; break;
       case 'ArrowLeft': this.lookLeft = false; break;
@@ -175,7 +174,7 @@ export class SteelSceneManager {
     }
   };
 
-  public setMovement(direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down' | 'sprint', active: boolean) {
+  public setMovement(direction: string, active: boolean) {
     switch (direction) {
       case 'forward': this.moveForward = active; break;
       case 'backward': this.moveBackward = active; break;
@@ -196,7 +195,6 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    // 1. Encontrar el centro real de la casa
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
     if (!box.isEmpty()) {
@@ -205,21 +203,20 @@ export class SteelSceneManager {
       center.set(0, 0, 0);
     }
     
-    // 2. Posicionar cámara directamente para evitar saltos
-    this.camera.position.set(center.x, 1700, center.z + 1000);
+    // Posicionar cámara en el centro de la casa a altura humana
+    this.camera.position.set(center.x, 1700, center.z);
     this.camera.rotation.set(0, 0, 0);
-    this.camera.lookAt(center.x, 1700, center.z);
     
-    // 3. Forzar activación de estado incluso si lock falla
+    // Forzar activación de estado incluso si el bloqueo de ratón falla
     this.isWalkModeActive = true;
     if (this.onWalkModeLock) this.onWalkModeLock(true);
     this.controls.enabled = false;
 
-    // 4. Intentar bloqueo de ratón (opcional)
+    // Intentar bloqueo de ratón silenciosamente
     try {
       this.fpControls.lock();
-    } catch (e) {
-      // Ignorar excepción de API PointerLock
+    } catch (err) {
+      console.warn('Bloqueo de ratón rechazado por el navegador.');
     }
   }
 
@@ -254,12 +251,11 @@ export class SteelSceneManager {
     requestAnimationFrame(this.animate);
 
     const time = performance.now();
-    const delta = (time - this.prevTime) / 1000;
+    const delta = Math.min((time - this.prevTime) / 1000, 0.1);
 
     if (this.isWalkModeActive) {
-      // 1. Manejo de Rotación (Teclado + Joystick Look)
+      // Manejo de Rotación
       const rotationSpeed = 1.8 * delta;
-      
       if (this.lookLeft || this.rotateQ) this.camera.rotation.y += rotationSpeed;
       if (this.lookRight || this.rotateE) this.camera.rotation.y -= rotationSpeed;
       if (this.lookUp) this.camera.rotation.x += rotationSpeed;
@@ -272,7 +268,7 @@ export class SteelSceneManager {
       
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
 
-      // 2. Manejo de Velocidad
+      // Manejo de Movimiento
       this.velocity.x -= this.velocity.x * 10.0 * delta;
       this.velocity.z -= this.velocity.z * 10.0 * delta;
       this.velocity.y -= this.velocity.y * 10.0 * delta;
@@ -291,14 +287,12 @@ export class SteelSceneManager {
       
       if (this.direction.lengthSq() > 0) this.direction.normalize();
 
-      const targetVelocity = this.isShiftPressed ? 2200.0 : 1400.0;
-      const speed = targetVelocity * 10.0; 
+      const speed = (this.isShiftPressed ? 2200.0 : 1400.0) * 10.0; 
 
       if (this.direction.z !== 0) this.velocity.z -= this.direction.z * speed * delta;
       if (this.direction.x !== 0) this.velocity.x -= this.direction.x * speed * delta;
       if (this.direction.y !== 0) this.velocity.y += this.direction.y * speed * delta;
 
-      // 3. Aplicar Movimiento
       const worldDir = new THREE.Vector3();
       this.camera.getWorldDirection(worldDir);
       worldDir.y = 0; 
@@ -339,15 +333,11 @@ export class SteelSceneManager {
     config.walls.forEach(wall => {
       const wallMesh = this.createWallMesh(wall);
       this.houseGroup.add(wallMesh);
-      
-      // Expandir caja de colisión/centro basándose en los puntos del muro
-      const p1 = new THREE.Vector3(wall.x, 0, wall.z);
-      wallsBox.expandByPoint(p1);
-      
+      wallsBox.expandByObject(wallMesh);
       this.createOpeningTriggers(wall);
     });
 
-    if (!wallsBox.isEmpty()) {
+    if (!wallsBox.isEmpty() && isFinite(wallsBox.min.x)) {
       const size = new THREE.Vector3();
       wallsBox.getSize(size);
       const center = new THREE.Vector3();
@@ -378,7 +368,6 @@ export class SteelSceneManager {
     wall.openings.forEach(op => {
       const hole = new THREE.Path();
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      
       hole.moveTo(op.position, sill);
       hole.lineTo(op.position + op.width, sill);
       hole.lineTo(op.position + op.width, sill + op.height);
@@ -387,25 +376,13 @@ export class SteelSceneManager {
       shape.holes.push(hole);
     });
 
-    const extrudeSettings = {
-      steps: 1,
-      depth: wall.thickness,
-      beveled: false
-    };
-
-    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    const material = new THREE.MeshStandardMaterial({ 
-      color: this.colors.wall, 
-      side: THREE.DoubleSide,
-      roughness: 0.8,
-      metalness: 0.1
-    });
-
+    const geometry = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: wall.thickness, beveled: false });
+    const material = new THREE.MeshStandardMaterial({ color: this.colors.wall, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geometry, material);
+    
     mesh.position.set(wall.x, 0, wall.z);
     mesh.rotation.y = (wall.rotation * Math.PI) / 180;
     mesh.translateZ(-wall.thickness / 2);
-
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
@@ -416,13 +393,7 @@ export class SteelSceneManager {
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const geometry = new THREE.BoxGeometry(op.width, op.height, wall.thickness + 5);
-      const material = new THREE.MeshBasicMaterial({ 
-        color: this.colors.openingHover, 
-        transparent: true, 
-        opacity: 0,
-        depthWrite: false
-      });
-
+      const material = new THREE.MeshBasicMaterial({ color: this.colors.openingHover, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(geometry, material);
       
       const wallMatrix = new THREE.Matrix4();
@@ -434,17 +405,14 @@ export class SteelSceneManager {
       
       mesh.position.copy(localPos);
       mesh.rotation.y = (wall.rotation * Math.PI) / 180;
-      
-      mesh.userData.wallId = wall.id;
-      mesh.userData.opening = op;
-
+      mesh.userData = { wallId: wall.id, opening: op };
       this.openingsGroup.add(mesh);
     });
   }
 
   private fitCamera() {
     const box = new THREE.Box3().setFromObject(this.houseGroup);
-    if (box.isEmpty()) return;
+    if (box.isEmpty() || !isFinite(box.min.x)) return;
 
     const center = new THREE.Vector3();
     box.getCenter(center);
@@ -453,7 +421,7 @@ export class SteelSceneManager {
 
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = this.camera.fov * (Math.PI / 180);
-    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.8;
+    const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.8;
 
     this.camera.position.set(center.x + cameraDistance, center.y + cameraDistance, center.z + cameraDistance);
     this.controls.target.copy(center);
@@ -472,9 +440,6 @@ export class SteelSceneManager {
 
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
-    this.renderer.domElement.removeEventListener('dblclick', this.onDoubleClick);
-    document.removeEventListener('keydown', this.onKeyDown);
-    document.removeEventListener('keyup', this.onKeyUp);
     if (this.renderer) this.renderer.dispose();
     this.controls.dispose();
     this.fpControls.dispose();

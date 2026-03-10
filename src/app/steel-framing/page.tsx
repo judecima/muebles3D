@@ -49,7 +49,7 @@ export default function SteelFramingPage() {
   
   const viewerRef = useRef<{ 
     enterWalkMode: () => void, 
-    setMovement: (dir: any, active: boolean) => void,
+    setMovement: (dir: string, active: boolean) => void,
     updateJoystickMove: (x: number, y: number) => void,
     updateJoystickLook: (x: number, y: number) => void
   }>(null);
@@ -180,23 +180,22 @@ export default function SteelFramingPage() {
                 <div className="grid grid-cols-1 gap-y-2">
                   <div className="flex items-center gap-2">
                     <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">WASD / Flechas: Mover y Mirar</span>
+                    <span className="text-[10px] font-medium uppercase">WASD / Flechas / Joy: Mover</span>
                   </div>
                   {!isMobile && (
                     <div className="flex items-center gap-2">
                       <MousePointer className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] font-medium uppercase">Click en pantalla para mirada libre</span>
+                      <span className="text-[10px] font-medium uppercase">Ratón: Mirada libre</span>
                     </div>
                   )}
                 </div>
-                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">Presiona ESC o el botón para salir</div>
+                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">ESC o botón para salir</div>
               </div>
             )}
           </div>
 
           {isWalkModeActive && isMobile && (
             <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
-              {/* Joystick de Movimiento (Izquierda Inferior) */}
               <div className="absolute bottom-16 left-16 pointer-events-auto">
                 <SteelJoystick 
                   label="Movimiento" 
@@ -204,7 +203,6 @@ export default function SteelFramingPage() {
                 />
               </div>
               
-              {/* Joystick de Mirada (Derecha Inferior) */}
               <div className="absolute bottom-16 right-16 pointer-events-auto">
                 <SteelJoystick 
                   label="Cámara" 
@@ -212,7 +210,6 @@ export default function SteelFramingPage() {
                 />
               </div>
 
-              {/* Controles de Altura Centrales (Opcional pero útil) */}
               <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-auto scale-90">
                 <Button 
                   variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
