@@ -100,12 +100,25 @@ export class SceneManager {
       const groupId = object.userData.groupId || id;
       const type = object.userData.type;
 
+      // Buscar si el grupo al que pertenece el objeto es un cajón o puerta
+      let isDrawer = type === 'drawer';
+      let isDoor = type?.includes('door');
+
+      if (!isDrawer && !isDoor && groupId) {
+        this.partsMap.forEach((p) => {
+          if (p.userData.groupId === groupId) {
+            if (p.userData.type === 'drawer') isDrawer = true;
+            if (p.userData.type?.includes('door')) isDoor = true;
+          }
+        });
+      }
+
       this.highlightGroup(groupId);
 
-      if (type?.includes('door')) {
+      if (isDoor) {
         const isOpen = !this.itemStates.get(groupId);
         this.toggleSingleDoor(groupId, isOpen);
-      } else if (type === 'drawer') {
+      } else if (isDrawer) {
         const isOpen = !this.itemStates.get(groupId);
         this.toggleSingleDrawer(groupId, isOpen);
       }

@@ -1,10 +1,11 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Escritorio Red Arquimax v15.4 Industrial
+ * Motor para Escritorio Red Arquimax v15.5 Industrial
  * - Estructura Híbrida: Tapa de ancho completo (W).
  * - Sección Cajonera: Posee base propia (Sandwich).
  * - Sección Legroom: Abierta para ergonomía.
+ * - Huelgo superior de 3mm estricto.
  */
 export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, depth: D, thickness: T } = dim;
@@ -34,22 +35,24 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
     { id: 'mod-back', name: 'Respaldo Estructural', width: W - cabW - T, height: H * 0.4, depth: T, x: (W - cabW) / 2, y: H - T - (H * 0.2), z: -D/4, type: 'static', cutLargo: W - cabW - T, cutAncho: H * 0.4, cutEspesor: T, grainDirection: 'horizontal' },
   ];
 
-  // Configuración de Cajones Sincronizados
+  // Configuración de Cajones Sincronizados con Huelgo Superior de 3mm
   const railCl = 13; // Espacio para riel telescópico
   const drawerBoxW = innerW - (railCl * 2);
   const drD = D - 40;
-  const frontH = (H - T - T - 10) / 3; // Ajustado para 3 cajones o según diseño
-  const gap = 3; // Huelgo entre cajones v15.1
-  const startY = H - T - 10;
+  const numDrawers = 3;
+  const gap = 3; 
+  const availH = H - 2 * T; // Altura libre interna
+  const frontH = (availH - (numDrawers * gap)) / numDrawers;
 
-  for (let i = 0; i < 3; i++) {
-    const pY = startY - (frontH / 2) - (i * (frontH + gap));
+  for (let i = 0; i < numDrawers; i++) {
+    // pY centrando el frente considerando el huelgo superior de 3mm
+    const pY = (H - T) - gap - (frontH / 2) - (i * (frontH + gap));
     const prefix = `desk-dr-${i}`;
     const boxH = frontH * 0.7;
     const boxInnerW = drawerBoxW - 2 * T;
     
     // 1. Frente Estético Overlay
-    parts.push({ id: `${prefix}-f`, groupId: prefix, name: `Frente Cajón`, width: cabW - 4, height: frontH - 2, depth: T, x: cabCenterX, y: pY, z: D / 2 + T / 2, type: 'drawer', cutLargo: frontH - 2, cutAncho: cabW - 4, cutEspesor: T, grainDirection: 'horizontal' });
+    parts.push({ id: `${prefix}-f`, groupId: prefix, name: `Frente Cajón`, width: cabW - 4, height: frontH, depth: T, x: cabCenterX, y: pY, z: D / 2 + T / 2, type: 'drawer', cutLargo: frontH, cutAncho: cabW - 4, cutEspesor: T, grainDirection: 'horizontal' });
     
     // 2. Caja Estructural (6 piezas sincronizadas)
     parts.push({ id: `${prefix}-box-F`, groupId: prefix, name: `Frente Estruct. Caja`, width: boxInnerW, height: boxH, depth: T, x: cabCenterX, y: pY, z: D/2 - T/2, type: 'drawer', cutLargo: boxInnerW, cutAncho: boxH, cutEspesor: T, grainDirection: 'horizontal' });
@@ -63,5 +66,5 @@ export function deskEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico (Juego)`, width: 13, height: 35, depth: drD, x: cabCenterX + drawerBoxW/2 + 6.5, y: pY, z: D/2 - drD/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   }
 
-  return { parts, summary: 'Escritorio v15.4 Industrial: Base solo en cajonera y laterales con apoyo real.', hasDoors: false, hasDrawers: true };
+  return { parts, summary: 'Escritorio v15.5 Industrial: Cajones sincronizados con luz superior de 3mm.', hasDoors: false, hasDrawers: true };
 }
