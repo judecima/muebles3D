@@ -137,7 +137,7 @@ export default function SteelFramingPage() {
               }}
             >
               <Compass className="w-3.5 h-3.5 mr-2" /> 
-              {isWalkModeActive ? "Salir Caminata" : "Entrar Modo Caminata"}
+              {isWalkModeActive ? "Navegación Manual Activa" : "Entrar Modo Caminata"}
             </Button>
             <Button variant="outline" size="sm" className="h-8 px-3 text-[10px] font-bold">
               <Download className="w-3.5 h-3.5 mr-2" /> 
@@ -175,26 +175,24 @@ export default function SteelFramingPage() {
               <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300 pointer-events-auto">
                 <div className="flex items-center gap-2 mb-2">
                   <Gamepad2 className="w-4 h-4 text-blue-400" />
-                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NAVEGACIÓN ACTIVA</span>
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">EXPLORACIÓN ACTIVA</span>
                 </div>
                 <div className="grid grid-cols-1 gap-y-2">
                   <div className="flex items-center gap-2">
                     <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">WASD / Flechas / Joy: Mover</span>
+                    <span className="text-[10px] font-medium uppercase">WASD / Flechas: Mover y Mirar</span>
                   </div>
-                  {!isMobile && (
-                    <div className="flex items-center gap-2">
-                      <MousePointer className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] font-medium uppercase">Ratón: Mirada libre</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <MousePointer className="w-3 h-3 text-slate-400" />
+                    <span className="text-[10px] font-medium uppercase">Mouse: Mirada Libre (si permitido)</span>
+                  </div>
                 </div>
-                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">ESC o botón para salir</div>
+                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">Presiona el botón de la cabecera para salir</div>
               </div>
             )}
           </div>
 
-          {isWalkModeActive && isMobile && (
+          {isWalkModeActive && (isMobile || true) && ( // Mostramos joysticks siempre como fallback si el API falla
             <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
               <div className="absolute bottom-16 left-16 pointer-events-auto">
                 <SteelJoystick 
@@ -213,18 +211,21 @@ export default function SteelFramingPage() {
               <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-auto scale-90">
                 <Button 
                   variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
+                  onMouseDown={() => viewerRef.current?.setMovement('up', true)} onMouseUp={() => viewerRef.current?.setMovement('up', false)}
                   onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
                 >
                   <ArrowUp className="w-6 h-6 text-white" />
                 </Button>
                 <Button 
                   variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600/60 backdrop-blur border border-white/20 shadow-lg" 
+                  onMouseDown={() => viewerRef.current?.setMovement('sprint', true)} onMouseUp={() => viewerRef.current?.setMovement('sprint', false)}
                   onTouchStart={() => viewerRef.current?.setMovement('sprint', true)} onTouchEnd={() => viewerRef.current?.setMovement('sprint', false)}
                 >
                   <Zap className="w-6 h-6 text-white" />
                 </Button>
                 <Button 
                   variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
+                  onMouseDown={() => viewerRef.current?.setMovement('down', true)} onMouseUp={() => viewerRef.current?.setMovement('down', false)}
                   onTouchStart={() => viewerRef.current?.setMovement('down', true)} onTouchEnd={() => viewerRef.current?.setMovement('down', false)}
                 >
                   <ArrowDown className="w-6 h-6 text-white" />

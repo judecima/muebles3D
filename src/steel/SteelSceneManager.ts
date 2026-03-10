@@ -34,15 +34,18 @@ export class SteelSceneManager {
   private rotateQ = false;
   private rotateE = false;
 
-  // Vectores de Joystick (Móvil)
+  // Vectores de Joystick / Mouse Delta
   private joystickMove = new THREE.Vector2(0, 0);
   private joystickLook = new THREE.Vector2(0, 0);
+  private lastMouseX = 0;
+  private lastMouseY = 0;
 
   private velocity = new THREE.Vector3();
   private direction = new THREE.Vector3();
   private prevTime = performance.now();
 
   private isWalkModeActive = false;
+  private isPointerLockEnabled = false;
 
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
   private onWalkModeLock?: (locked: boolean) => void;
@@ -89,21 +92,14 @@ export class SteelSceneManager {
 
     // Listeners para PointerLock
     this.fpControls.addEventListener('lock', () => {
+      this.isPointerLockEnabled = true;
       this.controls.enabled = false;
-      this.isWalkModeActive = true;
-      if (this.onWalkModeLock) this.onWalkModeLock(true);
     });
 
     this.fpControls.addEventListener('unlock', () => {
-      if (this.isWalkModeActive) {
-        this.controls.enabled = true;
-        this.isWalkModeActive = false;
-        if (this.onWalkModeLock) this.onWalkModeLock(false);
-      }
-    });
-
-    document.addEventListener('pointerlockerror', () => {
-      console.warn('Pointer Lock API no pudo activarse. Continuando en modo navegación libre.');
+      this.isPointerLockEnabled = false;
+      // No desactivamos el modo caminata inmediatamente al soltar el lock, 
+      // para permitir navegación manual si el API falla.
     });
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -127,6 +123,7 @@ export class SteelSceneManager {
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
+    this.renderer.domElement.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
   }
@@ -172,6 +169,25 @@ export class SteelSceneManager {
     }
   };
 
+  private onMouseMove = (event: MouseEvent) => {
+    if (!this.isWalkModeActive || this.isPointerLockEnabled) return;
+
+    // Fallback: Si no hay Pointer Lock, usamos el movimiento relativo mientras el botón esté presionado o el modo activo
+    // Aquí implementamos una mirada libre simple si el API de bloqueo falla
+    const sensitivity = 0.002;
+    const deltaX = event.movementX || (event.clientX - this.lastMouseX);
+    const deltaY = event.movementY || (event.clientY - this.lastMouseY);
+
+    if (Math.abs(deltaX) < 100 && Math.abs(deltaY) < 100) { // Evitar saltos bruscos
+      this.camera.rotation.y -= deltaX * sensitivity;
+      this.camera.rotation.x -= deltaY * sensitivity;
+      this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
+    }
+
+    this.lastMouseX = event.clientX;
+    this.lastMouseY = event.clientY;
+  };
+
   public setMovement(direction: string, active: boolean) {
     switch (direction) {
       case 'forward': this.moveForward = active; break;
@@ -193,35 +209,43 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    // 1. Calcular centro de la casa de forma segura
-    this.houseGroup.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(this.houseGroup);
-    const center = new THREE.Vector3();
-    
-    if (!box.isEmpty() && isFinite(box.min.x)) {
-      box.getCenter(center);
-    } else {
-      center.set(0, 0, 0);
-    }
-    
-    // 2. Posicionar cámara dentro de la vivienda a altura humana (1700mm)
-    this.camera.position.set(center.x, 1700, center.z);
-    this.camera.rotation.set(0, 0, 0);
-    this.camera.lookAt(center.x, 1700, center.z - 1000);
-    
-    // 3. Activar lógica de navegación
+    // 1. Activar estado de navegación inmediatamente (independiente del API de bloqueo)
     this.isWalkModeActive = true;
     this.controls.enabled = false;
     if (this.onWalkModeLock) this.onWalkModeLock(true);
 
-    // 4. Intentar bloqueo de ratón (defensivo ante SecurityError)
-    try {
-      if (this.fpControls && typeof this.fpControls.lock === 'function') {
-        this.fpControls.lock();
-      }
-    } catch (err) {
-      console.warn('Pointer Lock bloqueado por sandbox. Navegación manual activa.');
+    // 2. Teletransporte al interior
+    this.houseGroup.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(this.houseGroup);
+    const center = new THREE.Vector3();
+    if (!box.isEmpty() && isFinite(box.min.x)) {
+      box.getCenter(center);
     }
+    this.camera.position.set(center.x, 1700, center.z);
+    this.camera.rotation.set(0, 0, 0);
+
+    // 3. Intentar el bloqueo del API (User Gesture ya que proviene de un onClick)
+    try {
+      // Usamos un timeout mínimo para asegurar que el stack trace del gesto del usuario sea válido
+      setTimeout(() => {
+        try {
+          this.fpControls.lock();
+        } catch (innerErr) {
+          console.warn('Pointer Lock denegado por sandbox. Usando navegación manual.');
+        }
+      }, 10);
+    } catch (err) {
+      console.warn('Error crítico al solicitar Pointer Lock:', err);
+    }
+  }
+
+  public exitWalkMode() {
+    this.isWalkModeActive = false;
+    this.controls.enabled = true;
+    if (this.onWalkModeLock) this.onWalkModeLock(false);
+    try {
+      this.fpControls.unlock();
+    } catch (e) {}
   }
 
   private onWindowResize = () => {
@@ -258,7 +282,7 @@ export class SteelSceneManager {
     const delta = Math.min((time - this.prevTime) / 1000, 0.1);
 
     if (this.isWalkModeActive) {
-      // Manejo de Rotación
+      // Manejo de Rotación (Teclado/Joystick)
       const rotationSpeed = 1.8 * delta;
       if (this.lookLeft || this.rotateQ) this.camera.rotation.y += rotationSpeed;
       if (this.lookRight || this.rotateE) this.camera.rotation.y -= rotationSpeed;
