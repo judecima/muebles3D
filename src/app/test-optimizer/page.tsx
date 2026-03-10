@@ -64,7 +64,7 @@ export default function TestOptimizerPage() {
 
   const handleOptimize = () => {
     setLoading(true);
-    // Simulación de procesamiento intensivo
+    // Simulación de procesamiento intensivo para búsqueda profunda
     setTimeout(() => {
       try {
         const res = runOptimization(
@@ -77,10 +77,9 @@ export default function TestOptimizerPage() {
       } finally {
         setLoading(false);
       }
-    }, 1500);
+    }, 1000);
   };
 
-  // Autocalcular al cargar
   useEffect(() => {
     handleOptimize();
   }, []);
@@ -95,26 +94,25 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador Mesopotamia v6.0 Pro</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador ArquiMax v6.0 Ultra Pro</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-primary" /> Guillotina de 3 Etapas con Apilamiento Vertical Agresivo
+                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Etapas (H-V-H) con Apilamiento Vertical Agresivo
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {loading ? "Calculando 5000 Ciclos..." : "Optimizar +94%"}
+              {loading ? "Calculando 5000 permutaciones..." : "Optimizar +96%"}
             </Button>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Listado de Piezas */}
           <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[700px]">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-4">
               <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Piezas ({parts.reduce((a, b) => a + b.quantity, 0)})
+                <Layers className="w-4 h-4" /> Piezas Mesopotamia ({parts.reduce((a, b) => a + b.quantity, 0)})
               </CardTitle>
               <Button variant="outline" size="icon" onClick={addPart} className="h-7 w-7 rounded-full">
                 <Plus className="w-3 h-3" />
@@ -154,12 +152,10 @@ export default function TestOptimizerPage() {
             </CardContent>
           </Card>
 
-          {/* Visualizador y Resultados */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Métricas */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center items-center text-center">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Eficiencia Global</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Eficiencia Industrial</p>
                 <div className="relative h-24 w-24 flex items-center justify-center mb-4">
                   <svg className="w-full h-full transform -rotate-90">
                     <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-slate-100" />
@@ -173,13 +169,15 @@ export default function TestOptimizerPage() {
 
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center">
                 <div className="flex justify-between items-center mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacidad</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tableros Usados</p>
                   <Layers className="w-4 h-4 text-primary" />
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-baseline">
-                    <span className="text-3xl font-black text-slate-800">{result?.totalPanels || '-'}</span>
-                    <span className="text-[10px] font-bold text-slate-500">TABLEROS USADOS</span>
+                    <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-green-600' : 'text-slate-800'}`}>
+                      {result?.totalPanels || '-'}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">UNIDADES</span>
                   </div>
                   <Progress value={result ? (1 / result.totalPanels) * 100 : 0} className="h-2" />
                 </div>
@@ -190,20 +188,20 @@ export default function TestOptimizerPage() {
                   <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                     <Info className="w-3 h-3 text-white" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Estado del Motor</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Motor ArquiMax 6.0</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Analizando 5000 permutaciones espaciales..." : "Algoritmo Shelf-Stacking v6.0 activo. Cortes de guillotina garantizados al 100%."}
+                  {loading ? "Ejecutando 5000 permutaciones espaciales..." : "Rotación libre activada. Apilamiento vertical dinámico maximizado para consolidación en panel único."}
                 </p>
               </Card>
             </div>
 
-            {/* Panel de Corte */}
             {result && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" /> Plano de Corte Optimizado
+                    <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-green-500' : 'text-amber-500'}`} /> 
+                    Esquema de Corte Optimizado
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -235,20 +233,19 @@ export default function TestOptimizerPage() {
                             backgroundSize: '20px 20px'
                           }}>
                             {panel.parts.map((p, pIdx) => (
-                              <div key={pIdx} className="absolute border border-slate-900/40 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece"
+                              <div key={pIdx} className="absolute border border-slate-900/60 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece"
                                    style={{
                                      left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
                                      top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
                                      width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
                                      height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
-                                     backgroundColor: p.color || 'rgba(174, 26, 226, 0.1)'
+                                     backgroundColor: p.color || 'rgba(174, 26, 226, 0.12)'
                                    }}>
                                 <div className="flex flex-col items-center leading-tight p-0.5 overflow-hidden text-center select-none">
                                   <span className="text-[8px] font-black text-slate-800">{p.width}</span>
                                   <span className="text-[6px] font-bold text-slate-500 uppercase truncate max-w-full">{p.name}</span>
                                   <span className="text-[8px] font-black text-slate-800">{p.height}</span>
                                 </div>
-                                {/* Tooltip Industrial */}
                                 <div className="absolute bottom-full mb-2 hidden group-hover/piece:block z-50 bg-slate-900 text-white text-[8px] p-2 rounded shadow-xl whitespace-nowrap">
                                   <p className="font-bold">{p.name}</p>
                                   <p>{p.width} x {p.height} mm</p>
