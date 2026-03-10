@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import * as React from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { SteelSceneManager } from '@/steel/SteelSceneManager';
 import { SteelHouseConfig, SteelOpening } from '@/lib/steel/types';
 
@@ -20,7 +21,7 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
         managerRef.current.enterWalkMode();
       }
     },
-    setMovement: (direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down', active: boolean) => {
+    setMovement: (direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down' | 'sprint', active: boolean) => {
       if (managerRef.current) {
         managerRef.current.setMovement(direction, active);
       }

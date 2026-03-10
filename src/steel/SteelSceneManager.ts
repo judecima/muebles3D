@@ -24,6 +24,7 @@ export class SteelSceneManager {
   private moveRight = false;
   private moveUp = false;
   private moveDown = false;
+  private isShiftPressed = false; // Estado de carrera rápida
   private velocity = new THREE.Vector3();
   private direction = new THREE.Vector3();
   private prevTime = performance.now();
@@ -132,8 +133,9 @@ export class SteelSceneManager {
       case 'ArrowRight':
       case 'KeyD': this.moveRight = true; break;
       case 'Space': this.moveUp = true; break;
+      case 'KeyC': this.moveDown = true; break; // C para bajar
       case 'ShiftLeft':
-      case 'ShiftRight': this.moveDown = true; break;
+      case 'ShiftRight': this.isShiftPressed = true; break; // Shift para correr
     }
   };
 
@@ -148,8 +150,9 @@ export class SteelSceneManager {
       case 'ArrowRight':
       case 'KeyD': this.moveRight = false; break;
       case 'Space': this.moveUp = false; break;
+      case 'KeyC': this.moveDown = false; break;
       case 'ShiftLeft':
-      case 'ShiftRight': this.moveDown = false; break;
+      case 'ShiftRight': this.isShiftPressed = false; break;
     }
   };
 
@@ -174,7 +177,7 @@ export class SteelSceneManager {
     this.touchStart.set(touch.clientX, touch.clientY);
   };
 
-  public setMovement(direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down', active: boolean) {
+  public setMovement(direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down' | 'sprint', active: boolean) {
     switch (direction) {
       case 'forward': this.moveForward = active; break;
       case 'backward': this.moveBackward = active; break;
@@ -182,6 +185,7 @@ export class SteelSceneManager {
       case 'right': this.moveRight = active; break;
       case 'up': this.moveUp = active; break;
       case 'down': this.moveDown = active; break;
+      case 'sprint': this.isShiftPressed = active; break;
     }
   }
 
@@ -238,7 +242,11 @@ export class SteelSceneManager {
       this.direction.y = Number(this.moveUp) - Number(this.moveDown);
       this.direction.normalize();
 
-      const speed = 5000.0; // Velocidad ajustada a 5m/s para mm
+      // NORMAL WALK: 1.4 m/s (1400 mm/s)
+      // FAST WALK (SHIFT): 2.2 m/s (2200 mm/s)
+      // Usamos un factor x10 para compensar la fricción y alcanzar la velocidad deseada en estado estacionario
+      const targetVelocity = this.isShiftPressed ? 2200.0 : 1400.0;
+      const speed = targetVelocity * 10.0; 
 
       if (this.moveForward || this.moveBackward) this.velocity.z -= this.direction.z * speed * delta;
       if (this.moveLeft || this.moveRight) this.velocity.x -= this.direction.x * speed * delta;

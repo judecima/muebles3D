@@ -20,7 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Zap
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -169,10 +170,10 @@ export default function SteelFramingPage() {
             {isWalkModeActive && (
               <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300 pointer-events-auto">
                 <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-2">NAVEGACIÓN ACTIVA</span>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <div className="grid grid-cols-1 gap-y-2">
                   <div className="flex items-center gap-2">
                     <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">WASD / Flechas: Mover</span>
+                    <span className="text-[10px] font-medium uppercase">WASD: Mover | SHIFT: Correr | ESPACIO/C: Altura</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <MousePointer2 className="w-3 h-3 text-slate-400" />
@@ -192,6 +193,12 @@ export default function SteelFramingPage() {
                   onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
                 >
                   <ArrowUp className="w-6 h-6" />
+                </Button>
+                <Button 
+                  variant="secondary" size="icon" className="w-12 h-12 rounded-full bg-orange-500 text-white shadow-lg" 
+                  onTouchStart={() => viewerRef.current?.setMovement('sprint', true)} onTouchEnd={() => viewerRef.current?.setMovement('sprint', false)}
+                >
+                  <Zap className="w-6 h-6" />
                 </Button>
               </div>
               <div className="flex flex-col items-center gap-1">
