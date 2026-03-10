@@ -17,7 +17,9 @@ export type FurnitureType =
   | 'cabinet_microwave_60'
   | 'cabinet_hood_60'
   | 'cabinet_base_single_60_1p'
-  | 'cabinet_base_double_80_2p';
+  | 'cabinet_base_double_80_2p'
+  | 'cabinet_base_3p'
+  | 'cabinet_wall_3p';
 
 export type FurnitureColor = 'blanco' | 'gris_claro' | 'grafito' | 'roble_claro' | 'nogal' | 'negro';
 export type GrainDirection = 'vertical' | 'horizontal' | 'libre';
