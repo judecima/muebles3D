@@ -18,8 +18,7 @@ import {
   Undo2,
   FileDown,
   Layout,
-  Layers,
-  ChevronRight
+  Layers
 } from 'lucide-react';
 
 interface ControlPanelProps {
@@ -85,7 +84,7 @@ export function ControlPanel({
             <Settings2 className="w-5 h-5" /> 
             <span>Red Arquimax</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal">DISEÑADOR TÉCNICO V1.0</span>
+          <span className="text-[10px] opacity-70 font-normal">DISEÑADOR TÉCNICO V15.1</span>
         </CardTitle>
       </CardHeader>
       
@@ -96,14 +95,19 @@ export function ControlPanel({
             <SelectTrigger className="w-full bg-slate-50 border-slate-200 h-11">
               <SelectValue placeholder="Seleccionar mueble" />
             </SelectTrigger>
-            <SelectContent className="max-h-[400px]">
+            <SelectContent className="max-h-[500px]">
               <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mb-1">Modelos Paramétricos</div>
               <SelectItem value="placard">Placard Vestidor</SelectItem>
               <SelectItem value="escritorio">Escritorio Industrial</SelectItem>
               <SelectItem value="bajoMesada">Bajo Mesada (Paramétrico)</SelectItem>
               <SelectItem value="rackTV">Rack TV</SelectItem>
+              <SelectItem value="alacena">Alacena (Paramétrica)</SelectItem>
+              <SelectItem value="biblioteca">Biblioteca</SelectItem>
+              <SelectItem value="alacenaFlip">Alacena Rebatible</SelectItem>
+              <SelectItem value="bajomesada-cajonera">Bajo Mesada Cajonera</SelectItem>
+              <SelectItem value="porta-anafe">Porta-Anafe</SelectItem>
               
-              <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mt-2 mb-1">Catálogo Dielfe (Estándar)</div>
+              <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mt-2 mb-1">Catálogo Dielfe (Industrial)</div>
               <SelectItem value="cabinet_base_120_2p3c">Bajo 1.20m (2P+3C)</SelectItem>
               <SelectItem value="cabinet_base_140_3p3c">Bajo 1.40m (2P+3C)</SelectItem>
               <SelectItem value="cabinet_base_single_60_1p">Bajo 0.60m (1P)</SelectItem>

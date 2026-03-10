@@ -1,10 +1,11 @@
 import { Part, FurnitureDimensions, FurnitureModel, FurnitureType } from '@/lib/types';
 
 /**
- * Motor de Catálogo Red Arquimax v15.0 Industrial
- * - Estructura Sándwich para módulos cerrados (Tapas W).
+ * Motor de Catálogo Red Arquimax v15.1 Industrial
+ * - Estructura Sándwich: Tapas W, Laterales H-2T.
  * - Lógica de Bisagras de Copa 35mm según altura/ancho.
- * - Rieles Telescópicos simétricos (13mm/13mm) contabilizados por Par.
+ * - Rieles Telescópicos simétricos (13mm/13mm) contabilizados por Juego.
+ * - Separación de frentes: 2mm lateral, 3mm superior.
  */
 export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensions): FurnitureModel {
   const T = dim.thickness || 18;
@@ -27,14 +28,16 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
 
   // 2. Estructura Superior
   if (isBase) {
+    // Amarres internos para bajo mesada v15.1
     parts.push({ id: 'amarre-F', name: 'Amarre Frontal', width: innerW, height: T, depth: 60, x: W / 2, y: H - T / 2, z: D / 2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' });
     parts.push({ id: 'amarre-B', name: 'Amarre Trasero', width: innerW, height: 60, depth: T, x: W / 2, y: H - 30, z: -D / 2 + T / 2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' });
   } else {
+    // Tapa completa para alacenas y torres
     parts.push({ id: 'tapa', name: 'Tapa Superior', width: W, height: T, depth: D, x: W / 2, y: H - T / 2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
   }
 
-  // 3. Laterales
-  const lateralY = T + sideH / 2;
+  // 3. Laterales (Apoyados entre tapas)
+  const lateralY = isBase ? (T + sideH / 2) : H/2;
   parts.push({ id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T / 2, y: lateralY, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' });
   parts.push({ id: 'lat-R', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T / 2, y: lateralY, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' });
 
@@ -45,12 +48,8 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
   let hasDoors = false;
   let hasDrawers = false;
 
-  // Lógica de Bisagras Red Arquimax v15.0
   const addHinges = (doorId: string, doorH: number, doorW: number, pivotX: number, doorY: number) => {
-    let hingeCount = 2;
-    if (doorH > 900 && doorH <= 1500) hingeCount = 3;
-    else if (doorH > 1500 && doorH <= 2000) hingeCount = 4;
-    else if (doorH > 2000 && doorH <= 2400) hingeCount = 5;
+    let hingeCount = doorH <= 900 ? 2 : doorH <= 1500 ? 3 : doorH <= 2000 ? 4 : 5;
     if (doorW > 600) hingeCount += 1;
 
     for (let i = 0; i < hingeCount; i++) {
@@ -81,7 +80,6 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     parts.push({ id: `${prefix}-box-SR`, groupId: prefix, name: `Lateral Der. Cajón`, width: T, height: boxH, depth: drawerDepth, x: x + drawerBoxW/2 - T/2, y: y, z: D/2 - drawerDepth/2, type: 'drawer', cutLargo: drawerDepth, cutAncho: boxH, cutEspesor: T, grainDirection: 'libre' });
     parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Piso Cajón 3mm`, width: drawerBoxW - 2*T, height: 3, depth: drawerDepth, x: x, y: y - boxH/2 + 1.5, z: D/2 - drawerDepth/2, type: 'drawer', cutLargo: drawerDepth, cutAncho: drawerBoxW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
 
-    // Rieles (Contabilizados por juego en el CutlistTable)
     parts.push({ id: `${prefix}-rail-L`, groupId: prefix, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drawerDepth, x: x - drawerBoxW/2 - 6.5, y: y, z: D/2 - drawerDepth/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
     parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Rieles Telescópicos (Juego)`, width: 13, height: 35, depth: drawerDepth, x: x + drawerBoxW/2 + 6.5, y: y, z: D/2 - drawerDepth/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   };
@@ -93,7 +91,7 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
       const drawerSectW = 400;
       const doorAreaW = W - drawerSectW;
       const divX = doorAreaW;
-      const divH = H - 2 * T;
+      const divH = H - T - 4; // Canal para amarre
       parts.push({ id: 'div-drawer', name: 'Divisor Cajonera', width: T, height: divH, depth: D * 0.9, x: divX - T / 2, y: T + divH / 2, z: 0, type: 'static', cutLargo: divH, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' });
       const drH = (H - T - 10) / 3;
       for (let i = 0; i < 3; i++) createDrawer(`dr-${i}`, W - drawerSectW / 2, T + 5 + (i * drH) + drH / 2, drawerSectW, drH, D - 50);
@@ -115,7 +113,7 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
       const doorY = H / 2;
       const divX = (W / 3) * 2; 
       const divH = H - 2 * T;
-      parts.push({ id: 'div-structural', name: 'Divisor Estructural', width: T, height: divH, depth: D * 0.9, x: divX, y: T + divH / 2, z: 0, type: 'static', cutLargo: divH, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' });
+      parts.push({ id: 'div-structural', name: 'Divisor Estructural', width: T, height: divH, depth: D * 0.9, x: divX, y: H / 2, z: 0, type: 'static', cutLargo: divH, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' });
       parts.push({ id: 'door-1', name: 'Puerta 1', width: doorW, height: doorH, depth: T, x: sideGap + doorW/2, y: doorY, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
       addHinges('door-1', doorH, doorW, 0, doorY);
       parts.push({ id: 'door-2', name: 'Puerta 2', width: doorW, height: doorH, depth: T, x: sideGap + doorW*1.5 + midGap, y: doorY, z: D/2 + T/2, type: 'door-right', pivot: { x: divX, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
@@ -126,56 +124,21 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
       if (hasShelf2) parts.push({ id: 'shelf-sm', name: 'Estante Pequeño', width: (W - divX) - T, height: T, depth: D*0.9, x: (divX + W)/2, y: H/2, z: 0, type: 'static', cutLargo: (W - divX) - T, cutAncho: D*0.9, cutEspesor: T, grainDirection: 'horizontal' });
       break;
     }
-    case 'cabinet_base_single_60_1p':
-    case 'cabinet_wall_60_1p': {
-      hasDoors = true;
-      const doorW = W - sideGap*2;
-      const doorH = H - topGap;
-      const doorY = H / 2;
-      parts.push({ id: 'door', name: 'Puerta', width: doorW, height: doorH, depth: T, x: W / 2, y: doorY, z: D / 2 + T / 2, type: 'door-left', pivot: { x: 0, y: doorY, z: D / 2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door', doorH, doorW, 0, doorY);
-      if (hasShelf) parts.push({ id: 'shelf', name: 'Estante Interno', width: innerW, height: T, depth: D * 0.9, x: W / 2, y: H / 2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
-      break;
-    }
-    case 'cabinet_pantry_60_2p': {
-      hasDoors = true;
-      const doorAreaH = H - topGap;
-      const doorH = (doorAreaH - midGap) / 2;
-      const doorW = W - sideGap*2;
-      const doorY_U = H - doorH/2 - topGap;
-      const doorY_D = doorH/2;
-      parts.push({ id: 'door-U', name: 'Puerta Superior', width: doorW, height: doorH, depth: T, x: W/2, y: doorY_U, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: doorY_U, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door-U', doorH, doorW, 0, doorY_U);
-      parts.push({ id: 'door-D', name: 'Puerta Inferior', width: doorW, height: doorH, depth: T, x: W/2, y: doorY_D, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: doorY_D, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door-D', doorH, doorW, 0, doorY_D);
-      for (let i = 1; i <= 4; i++) parts.push({ id: `fixed-shelf-${i}`, name: `Estante Fijo ${i}`, width: innerW, height: T, depth: D * 0.95, x: W / 2, y: (H / 5) * i, z: 0, type: 'static', cutLargo: innerW, cutAncho: D * 0.95, cutEspesor: T, grainDirection: 'horizontal' });
-      break;
-    }
-    case 'cabinet_microwave_60': {
-      hasDoors = true;
-      const lowerSectH = H * 0.4;
-      const doorW = W - sideGap*2;
-      const doorH = lowerSectH - topGap;
-      const doorY = lowerSectH / 2;
-      parts.push({ id: 'door-low', name: 'Puerta Inferior', width: doorW, height: doorH, depth: T, x: W/2, y: doorY, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: doorY, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door-low', doorH, doorW, 0, doorY);
-      parts.push({ id: 'shelf-micro', name: 'Base Microondas', width: innerW, height: T, depth: D, x: W/2, y: lowerSectH, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
-      parts.push({ id: 'shelf-top', name: 'Techo Microondas', width: innerW, height: T, depth: D, x: W/2, y: lowerSectH + 500, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' });
-      break;
-    }
-    case 'cabinet_base_double_80_2p': {
-      hasDoors = true;
-      const doorW = (W - sideGap*2 - midGap) / 2;
-      const doorH = H - topGap;
-      const doorY = H / 2;
-      parts.push({ id: 'door-L', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, x: sideGap + doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-left', pivot: { x: 0, y: doorY, z: D / 2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door-L', doorH, doorW, 0, doorY);
-      parts.push({ id: 'door-R', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, x: W - sideGap - doorW / 2, y: doorY, z: D / 2 + T / 2, type: 'door-right', pivot: { x: W, y: doorY, z: D / 2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-      addHinges('door-R', doorH, doorW, W, doorY);
-      if (hasShelf) parts.push({ id: 'shelf', name: 'Estante Interno', width: innerW, height: T, depth: D * 0.9, x: W / 2, y: H / 2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
-      break;
+    default: {
+      // Otros modelos del catálogo v15.1
+      hasDoors = isWall || type.includes('pantry') || type.includes('microwave');
+      if (hasDoors) {
+        const doorW = W - sideGap*2;
+        const doorH = H - topGap;
+        const doorY = H / 2;
+        parts.push({ id: 'door', name: 'Puerta', width: doorW, height: doorH, depth: T, x: W / 2, y: doorY, z: D / 2 + T / 2, type: 'door-left', pivot: { x: 0, y: doorY, z: D / 2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
+        addHinges('door', doorH, doorW, 0, doorY);
+      }
+      if (hasShelf && !isTower) {
+        parts.push({ id: 'shelf', name: 'Estante Interno', width: innerW, height: T, depth: D * 0.9, x: W / 2, y: H / 2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
+      }
     }
   }
 
-  return { parts, summary: `Catálogo v15.0 Industrial. Bisagras y rieles calculados automáticamente.`, hasDoors, hasDrawers };
+  return { parts, summary: `Catálogo v15.1 Industrial. Sándwich de tapas W.`, hasDoors, hasDrawers };
 }
