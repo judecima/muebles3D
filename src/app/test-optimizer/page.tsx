@@ -61,7 +61,6 @@ export default function TestOptimizerPage() {
 
   const handleOptimize = () => {
     setLoading(true);
-    // Simulamos carga para UX industrial
     setTimeout(() => {
       const res = runOptimization(
         parts.map(p => ({ ...p, thickness: 18 })),
@@ -82,19 +81,19 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Laboratorio ArquiMax v7.5</h1>
-              <p className="text-slate-500 text-sm font-medium">Optimizador Industrial: Unidad de Venta 1375mm</p>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Laboratorio ArquiMax v6.0</h1>
+              <p className="text-slate-500 text-sm font-medium">Validador de Eficiencia Industrial</p>
             </div>
           </div>
           <Button size="lg" onClick={handleOptimize} disabled={loading} className="font-black uppercase px-10 h-14 bg-slate-900 hover:bg-black">
-            {loading ? "ANALIZANDO 3000 CICLOS..." : "OPTIMIZAR AHORA"}
+            {loading ? "OPTIMIZANDO..." : "OPTIMIZAR AHORA"}
           </Button>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 shadow-sm border-slate-200">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Listado de Piezas Personalizado</CardTitle>
+              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Listado de Piezas</CardTitle>
               <Button variant="outline" size="sm" onClick={addPart} className="h-8 text-[10px] font-bold">
                 <Plus className="w-3.5 h-3.5 mr-1" /> AGREGAR PIEZA
               </Button>
@@ -108,7 +107,6 @@ export default function TestOptimizerPage() {
                       <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Largo (mm)</th>
                       <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Ancho (mm)</th>
                       <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Cant.</th>
-                      <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Veta</th>
                       <th className="p-4"></th>
                     </tr>
                   </thead>
@@ -127,18 +125,6 @@ export default function TestOptimizerPage() {
                         <td className="p-3">
                           <Input type="number" value={part.quantity} onChange={(e) => updatePart(i, 'quantity', parseInt(e.target.value))} className="h-8 text-xs text-center" />
                         </td>
-                        <td className="p-3">
-                          <Select value={part.grainDirection} onValueChange={(v) => updatePart(i, 'grainDirection', v)}>
-                            <SelectTrigger className="h-8 text-[10px] w-28 mx-auto">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="vertical">Vertical</SelectItem>
-                              <SelectItem value="horizontal">Horizontal</SelectItem>
-                              <SelectItem value="libre">Libre</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </td>
                         <td className="p-3 text-right">
                           <Button variant="ghost" size="icon" onClick={() => removePart(i)} className="text-slate-300 hover:text-red-500">
                             <Trash2 className="w-4 h-4" />
@@ -156,13 +142,13 @@ export default function TestOptimizerPage() {
             <Card className="shadow-sm border-slate-200">
               <CardHeader className="pb-2 border-b">
                 <CardTitle className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" /> Métricas de Aprovechamiento
+                  <BarChart3 className="w-4 h-4" /> Rendimiento Global
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6 space-y-4">
                 <div className="flex justify-between items-baseline">
                   <span className="text-4xl font-black text-slate-900">{result ? `${result.totalEfficiency.toFixed(2)}%` : '--.--%'}</span>
-                  <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-primary/10 text-primary">Eficiencia Global</span>
+                  <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-primary/10 text-primary">Aprovechamiento</span>
                 </div>
                 <Progress value={result?.totalEfficiency || 0} className="h-2.5 bg-slate-100" />
                 <div className="grid grid-cols-2 gap-3">
@@ -171,8 +157,8 @@ export default function TestOptimizerPage() {
                     <p className="text-lg font-black text-slate-800">{result?.totalPanels || '-'}</p>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-xl border text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Unidad Venta</p>
-                    <p className="text-lg font-black text-slate-800">1375mm</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase">Kerf</p>
+                    <p className="text-lg font-black text-slate-800">4.5mm</p>
                   </div>
                 </div>
               </CardContent>
@@ -181,10 +167,10 @@ export default function TestOptimizerPage() {
             <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-4">
               <div className="flex items-center gap-3">
                 <Info className="w-5 h-5 text-primary" />
-                <p className="text-xs font-bold uppercase tracking-widest">Compromiso Industrial</p>
+                <p className="text-xs font-bold uppercase tracking-widest">Análisis de Corte</p>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                El motor prioriza el <span className="text-white font-bold">Medio Panel Vertical</span>. El límite es de <span className="text-primary font-bold">1375mm</span> de ancho. El algoritmo compacta las piezas hacia la izquierda para maximizar el área libre sobrante.
+                El motor prioriza el empaquetado por franjas horizontales. Este algoritmo garantiza que cada pieza pueda ser liberada mediante cortes de guillotina de lado a lado.
               </p>
             </div>
           </div>
@@ -193,18 +179,15 @@ export default function TestOptimizerPage() {
         {result && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-green-500" /> Plano de Corte Optimizado
+              <CheckCircle2 className="w-6 h-6 text-green-500" /> Esquema de Corte Optimizado
             </h2>
             
             {result.optimizedLayout.map((panel, idx) => (
               <div key={idx} className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex gap-4 items-center">
-                    <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
-                    <span className="text-sm font-black text-slate-800">2750 x 1830 mm (Útil: {2750 - result.trim*2}x{1830 - result.trim*2}mm)</span>
-                  </div>
+                  <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Uso Tablero</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Eficiencia</p>
                     <p className="text-xl font-black text-primary">{panel.efficiency.toFixed(2)}%</p>
                   </div>
                 </div>
@@ -212,43 +195,29 @@ export default function TestOptimizerPage() {
                 <div className="relative bg-slate-100 rounded-lg mx-auto overflow-hidden shadow-inner border border-slate-300" 
                      style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
                   
-                  {/* Línea de Medio Panel (División Vertical a 1375mm) */}
-                  <div className="absolute top-0 bottom-0 left-1/2 w-0 border-l-2 border-dashed border-red-500/50 z-30 pointer-events-none">
-                    <span className="absolute top-4 left-2 bg-red-500 text-white px-3 py-1 rounded text-[8px] font-black uppercase shadow-lg">Límite Medio Panel (1375mm)</span>
-                  </div>
-
-                  {/* Área Útil (Descontando Trim) */}
+                  {/* Área Útil */}
                   <div className="absolute bg-white" style={{ 
                     left: `${(result.trim / 2750) * 100}%`, 
                     top: `${(result.trim / 1830) * 100}%`, 
                     width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
-                    height: `${((1830 - result.trim * 2) / 1830) * 100}%`,
-                    backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
-                    backgroundSize: '24px 24px'
+                    height: `${((1830 - result.trim * 2) / 1830) * 100}%`
                   }}>
                     {panel.parts.map((p, pIdx) => (
-                      <div key={pIdx} className="absolute border border-slate-900/60 flex items-center justify-center transition-all hover:brightness-90 group"
+                      <div key={pIdx} className="absolute border border-slate-900/60 flex items-center justify-center transition-all hover:brightness-95"
                            style={{
                              left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
                              top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
                              width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
                              height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
-                             backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
+                             backgroundColor: p.color || 'rgba(174, 26, 226, 0.1)'
                            }}>
                         <div className="flex flex-col items-center leading-none p-1 pointer-events-none overflow-hidden text-center">
-                          <span className="text-[min(1.5vw,10px)] font-black text-slate-900">{p.width}x{p.height}</span>
-                          <span className="text-[min(1vw,7px)] font-bold text-slate-700 uppercase truncate w-full mt-0.5">{p.name}</span>
+                          <span className="text-[min(1.5vw,9px)] font-black text-slate-900">{p.width}x{p.height}</span>
+                          <span className="text-[min(1vw,6px)] font-bold text-slate-600 uppercase truncate w-full mt-0.5">{p.name}</span>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-                
-                <div className="flex gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 items-center">
-                  <ArrowRightToLine className="w-5 h-5 text-primary" />
-                  <p className="text-[10px] text-slate-500 font-medium italic">
-                    El motor ArquiMax v7.5 ha compactado las piezas hacia la izquierda. Si el bloque total no supera los 1375mm, el operario puede realizar un único corte vertical para liberar el medio panel restante para reventa.
-                  </p>
                 </div>
               </div>
             ))}
