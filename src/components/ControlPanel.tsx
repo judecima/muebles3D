@@ -67,7 +67,7 @@ export function ControlPanel({
   };
 
   const isCatalog = type.startsWith('cabinet_');
-  const is3Doors = type.includes('3p') || type.includes('140');
+  const is3Doors = type.includes('3p') && !type.includes('base_140');
   const isHeightFixed = isCatalog || type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
   const isWidthSlider = type === 'escritorio';
   const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip' || type === 'bajomesada-cajonera' || type === 'porta-anafe' || isCatalog;
@@ -105,7 +105,7 @@ export function ControlPanel({
               
               <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mt-2 mb-1">Catálogo Dielfe (Estándar)</div>
               <SelectItem value="cabinet_base_120_2p3c">Bajo 1.20m (2P+3C)</SelectItem>
-              <SelectItem value="cabinet_base_140_3p3c">Bajo 1.40m (3P+3C)</SelectItem>
+              <SelectItem value="cabinet_base_140_3p3c">Bajo 1.40m (2P+3C)</SelectItem>
               <SelectItem value="cabinet_base_single_60_1p">Bajo 0.60m (1P)</SelectItem>
               <SelectItem value="cabinet_base_double_80_2p">Bajo 0.80m (2P)</SelectItem>
               <SelectItem value="cabinet_wall_120_3p">Alacena 1.20m (3P)</SelectItem>

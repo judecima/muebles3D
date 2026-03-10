@@ -1,10 +1,10 @@
 import { Part, FurnitureDimensions, FurnitureModel, FurnitureType } from '@/lib/types';
 
 /**
- * Motor de Catálogo Red Arquimax v13.1 Industrial
+ * Motor de Catálogo Red Arquimax v13.2 Industrial
  * Genera módulos con huelgos de precisión: 2mm laterales y 3mm superior.
- * Lógica de Pivotaje: Izquierda-Derecha-Derecha.
- * Estantes Independientes para módulos de 3 puertas.
+ * Lógica de Pivotaje: Izquierda-Derecha-Derecha (para 3P) o Izquierda-Derecha (para 2P).
+ * Estantes Independientes para módulos divididos.
  */
 export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensions): FurnitureModel {
   const T = dim.thickness || 18;
@@ -62,7 +62,7 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     parts.push({ id: `${prefix}-box-SR`, groupId: prefix, name: `Lateral Der. Cajón`, width: T, height: boxH, depth: drawerDepth, x: x + drawerBoxW/2 - T/2, y: y, z: D/2 - drawerDepth/2, type: 'drawer', cutLargo: drawerDepth, cutAncho: boxH, cutEspesor: T, grainDirection: 'libre' });
     parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Piso Cajón 3mm`, width: drawerBoxW - 2*T, height: 3, depth: drawerDepth, x: x, y: y - boxH/2 + 1.5, z: D/2 - drawerDepth/2, type: 'drawer', cutLargo: drawerDepth, cutAncho: drawerBoxW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
 
-    // Rieles posicionado en el centro del huelgo de 13mm
+    // Rieles
     parts.push({ id: `${prefix}-rail-L`, groupId: prefix, name: `Riel Telescópico ${drawerDepth}mm`, width: 13, height: 35, depth: drawerDepth, x: x - drawerBoxW/2 - 6.5, y: y, z: D/2 - drawerDepth/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
     parts.push({ id: `${prefix}-rail-R`, groupId: prefix, name: `Riel Telescópico ${drawerDepth}mm`, width: 13, height: 35, depth: drawerDepth, x: x + drawerBoxW/2 + 6.5, y: y, z: D/2 - drawerDepth/2, type: 'hardware', isHardware: true, cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre' });
   };
@@ -72,7 +72,6 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     case 'cabinet_base_140_3p3c': {
       hasDoors = true;
       hasDrawers = true;
-      const isLarge = type.includes('140');
       const drawerSectW = 400;
       const doorAreaW = W - drawerSectW;
       
@@ -84,26 +83,15 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
         createDrawer(`dr-${i}`, W - drawerSectW / 2, T + 5 + (i * drH) + drH / 2, drawerSectW, drH, D - 50);
       }
 
-      if (isLarge) {
-        const doorW = (doorAreaW - 4 - 4) / 3;
-        const doorH = H - topGap;
-        const divHingeX = (doorAreaW / 3) * 2; // Solo 1 divisor para bisagras de P2
-
-        parts.push({ id: 'div-hinge', name: 'Divisor Estructural', width: T, height: H - T, depth: D * 0.9, x: divHingeX, y: H / 2 + T / 2, z: 0, type: 'static', cutLargo: H - T, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' });
-
-        // Pivotaje L-R-R
-        parts.push({ id: 'door-1', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, x: sideGap + doorW/2, y: H/2, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-        parts.push({ id: 'door-2', name: 'Puerta Central', width: doorW, height: doorH, depth: T, x: sideGap + doorW*1.5 + midGap, y: H/2, z: D/2 + T/2, type: 'door-right', pivot: { x: divHingeX, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-        parts.push({ id: 'door-3', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, x: sideGap + doorW*2.5 + midGap*2, y: H/2, z: D/2 + T/2, type: 'door-right', pivot: { x: divDrawerX, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-        
-        if (hasShelf) parts.push({ id: 'shelf-lg', name: 'Estante Grande', width: divHingeX - T, height: T, depth: D*0.9, x: divHingeX/2, y: H/2, z: 0, type: 'static', cutLargo: divHingeX - T, cutAncho: D*0.9, cutEspesor: T, grainDirection: 'horizontal' });
-        if (hasShelf2) parts.push({ id: 'shelf-sm', name: 'Estante Pequeño', width: (divDrawerX - divHingeX) - T, height: T, depth: D*0.9, x: (divHingeX + divDrawerX)/2, y: H/2, z: 0, type: 'static', cutLargo: (divDrawerX - divHingeX) - T, cutAncho: D*0.9, cutEspesor: T, grainDirection: 'horizontal' });
-      } else {
-        const doorW = (doorAreaW - 4 - 2) / 2;
-        const doorH = H - topGap;
-        parts.push({ id: 'door-1', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, x: sideGap + doorW/2, y: H/2, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-        parts.push({ id: 'door-2', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, x: doorAreaW - sideGap - doorW/2, y: H/2, z: D/2 + T/2, type: 'door-right', pivot: { x: divDrawerX, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
-        if (hasShelf) parts.push({ id: 'shelf', name: 'Estante Interno', width: doorAreaW - T, height: T, depth: D * 0.9, x: doorAreaW / 2, y: H / 2, z: 0, type: 'static', cutLargo: doorAreaW - T, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
+      // Ambos bajos (1.20m y 1.40m) ahora tienen 2 PUERTAS
+      const doorW = (doorAreaW - sideGap*2 - midGap) / 2;
+      const doorH = H - topGap;
+      
+      parts.push({ id: 'door-1', name: 'Puerta Izquierda', width: doorW, height: doorH, depth: T, x: sideGap + doorW/2, y: H/2, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
+      parts.push({ id: 'door-2', name: 'Puerta Derecha', width: doorW, height: doorH, depth: T, x: doorAreaW - sideGap - doorW/2, y: H/2, z: D/2 + T/2, type: 'door-right', pivot: { x: divDrawerX, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
+      
+      if (hasShelf) {
+        parts.push({ id: 'shelf', name: 'Estante Interno', width: doorAreaW - T, height: T, depth: D * 0.9, x: doorAreaW / 2, y: H / 2, z: 0, type: 'static', cutLargo: doorAreaW - T, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
       }
       break;
     }
@@ -111,11 +99,11 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     case 'cabinet_wall_120_3p':
     case 'cabinet_wall_140_3p': {
       hasDoors = true;
-      const doorW = (W - 4 - 4) / 3;
+      const doorW = (W - sideGap*2 - midGap*2) / 3;
       const doorH = H - topGap;
-      const divX = (W / 3) * 2; // Solo 1 divisor estructural para P2
+      const divX = (W / 3) * 2; 
       
-      parts.push({ id: 'div-hinge', name: 'Divisor Estructural', width: T, height: H - 2*T, depth: D * 0.9, x: divX, y: H / 2, z: 0, type: 'static', cutLargo: H - 2*T, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' });
+      parts.push({ id: 'div-structural', name: 'Divisor Estructural', width: T, height: H - 2*T, depth: D * 0.9, x: divX, y: H / 2, z: 0, type: 'static', cutLargo: H - 2*T, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'vertical' });
 
       // Pivotaje L-R-R
       parts.push({ id: 'door-1', name: 'Puerta 1', width: doorW, height: doorH, depth: T, x: sideGap + doorW/2, y: H/2, z: D/2 + T/2, type: 'door-left', pivot: { x: 0, y: H/2, z: D/2 }, cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'vertical' });
@@ -181,7 +169,7 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
 
   return { 
     parts, 
-    summary: `Módulo v13.1 Industrial. Doble control de estantes habilitado. Pivotaje L-R-R.`, 
+    summary: `Módulo v13.2 Industrial. Bajo 1.40m actualizado a 2P+3C.`, 
     hasDoors, 
     hasDrawers 
   };
