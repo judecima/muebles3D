@@ -13,9 +13,10 @@ export class SteelSceneManager {
   private container: HTMLElement;
 
   private colors = {
-    background: 0xf8fafc,
+    background: 0xf1f5f9,
     wall: 0x94a3b8,
-    grid: 0xe2e8f0,
+    grid: 0xd1d5db,
+    floor: 0xe2e8f0,
     outline: 0x475569
   };
 
@@ -24,8 +25,8 @@ export class SteelSceneManager {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(this.colors.background);
 
-    this.camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 50000);
-    this.camera.position.set(5000, 5000, 5000);
+    this.camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 10, 100000);
+    this.camera.position.set(8000, 6000, 8000);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -43,13 +44,16 @@ export class SteelSceneManager {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    dirLight.position.set(10000, 20000, 10000);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5000, 10000, 7500);
     dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
 
     // Suelo / Grid
-    const grid = new THREE.GridHelper(20000, 40, this.colors.grid, this.colors.grid);
+    const grid = new THREE.GridHelper(40000, 80, this.colors.grid, this.colors.grid);
+    grid.position.y = -0.5;
     this.scene.add(grid);
 
     this.houseGroup = new THREE.Group();
@@ -81,10 +85,30 @@ export class SteelSceneManager {
       this.houseGroup.remove(child);
     }
 
+    // Calcular límites para el suelo
+    const wallsBox = new THREE.Box3();
+    
     config.walls.forEach(wall => {
       const wallMesh = this.createWallMesh(wall);
       this.houseGroup.add(wallMesh);
+      wallsBox.expandByObject(wallMesh);
     });
+
+    // Añadir Platea (suelo de hormigón de la casa)
+    if (!wallsBox.isEmpty()) {
+      const size = new THREE.Vector3();
+      wallsBox.getSize(size);
+      const center = new THREE.Vector3();
+      wallsBox.getCenter(center);
+
+      const floorGeom = new THREE.PlaneGeometry(size.x + 1000, size.z + 1000);
+      const floorMat = new THREE.MeshStandardMaterial({ color: this.colors.floor });
+      const floor = new THREE.Mesh(floorGeom, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(center.x, -5, center.z);
+      floor.receiveShadow = true;
+      this.houseGroup.add(floor);
+    }
 
     this.fitCamera();
   }
@@ -122,8 +146,8 @@ export class SteelSceneManager {
     const material = new THREE.MeshStandardMaterial({ 
       color: this.colors.wall, 
       side: THREE.DoubleSide,
-      roughness: 0.7,
-      metalness: 0.2
+      roughness: 0.8,
+      metalness: 0.1
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -132,7 +156,6 @@ export class SteelSceneManager {
     mesh.position.set(wall.x, 0, wall.z);
     mesh.rotation.y = (wall.rotation * Math.PI) / 180;
     
-    // Corregir offset de extrusión si es necesario (por defecto extruye hacia Z positivo local)
     // Centramos el espesor del muro sobre su línea de eje
     mesh.translateZ(-wall.thickness / 2);
 
@@ -153,7 +176,7 @@ export class SteelSceneManager {
 
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = this.camera.fov * (Math.PI / 180);
-    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.8;
 
     this.camera.position.set(center.x + cameraDistance, center.y + cameraDistance, center.z + cameraDistance);
     this.controls.target.copy(center);
