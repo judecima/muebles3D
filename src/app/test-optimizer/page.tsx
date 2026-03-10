@@ -28,18 +28,18 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-// Dataset Mesopotania del XML de Lepton (23 Piezas totales)
+// Dataset Mesopotamia Gris Tapir 18mm (23 Piezas Exactas)
 const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(1) V1 ESTANTES", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "(2) V2 ESTANTES", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(2) pieza 2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(4) V1 CAJ BASE", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
   { name: "(5) V2 CAJ BASE", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
   { name: "(15) V SUP INF", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
   { name: "(6) V1 LATS", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-  { name: "(8) V1 FREFO", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-  { name: "(3) V1V2 CAJ LAT", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
-  { name: "(22) V CAJ CENT 2", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-  { name: "(24) PIEZA 24", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+  { name: "(8) V1 FREFO", width: 562, height: 150, quantity: 1, grainDirection: 'libre' },
+  { name: "v2 prefo", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+  { name: "v1 v2 caj", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
+  { name: "v caj cent2", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
@@ -64,7 +64,6 @@ export default function TestOptimizerPage() {
 
   const handleOptimize = () => {
     setLoading(true);
-    // Usamos un timeout para permitir que se muestre el estado de carga antes del cálculo pesado
     setTimeout(() => {
       try {
         const res = runOptimization(
@@ -94,7 +93,7 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador ArquiMax Ultra v6.0</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax v6.0 Ultra</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
                 <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Etapas con V-Stacking | Dataset Mesopotamia (23 Piezas)
               </p>
@@ -191,7 +190,7 @@ export default function TestOptimizerPage() {
                   <p className="text-[10px] font-black uppercase tracking-widest">Estado de Optimización</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito! Todas las piezas consolidadas en un único tablero siguiendo la lógica de Lepton." : "Buscando mejor ajuste..."}
+                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito! Todas las piezas consolidadas en un único tablero con eficiencia industrial." : "Buscando mejor ajuste..."}
                 </p>
               </Card>
             </div>
@@ -201,7 +200,7 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                     <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-green-500' : 'text-amber-500'}`} /> 
-                    Esquema de Corte (Guillotina 3-Etapas)
+                    Esquema de Corte (v6.0 V-Stacking)
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>

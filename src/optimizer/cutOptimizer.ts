@@ -76,7 +76,7 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: bestEfficiency,
-    summary: `ArquiMax v6.0 Ultra Pro: Eficiencia Industrial del ${bestEfficiency.toFixed(2)}% alcanzada (Igualando Lepton).`,
+    summary: `ArquiMax v6.0 Ultra: Eficiencia Industrial del ${bestEfficiency.toFixed(2)}% alcanzada (Igualando Lepton).`,
     kerf,
     trim,
     selectedThickness
