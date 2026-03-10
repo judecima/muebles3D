@@ -10,9 +10,7 @@ interface PartToCut {
 
 /**
  * ArquiMax Deep Engine v6.0 Ultra Pro
- * Algoritmo de Guillotina de 3 Etapas (Shelf-Packing con Apilamiento Vertical Agresivo).
- * Optimizado para maximizar la densidad en paneles industriales (2750x1830).
- * Soporta rotación libre automática para maximizar aprovechamiento.
+ * Algoritmo de Guillotina de 3 Etapas (Shelf-Packing con Apilamiento Vertical y Minimización de Ancho).
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -42,7 +40,7 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
 
-  // Aumentamos a 5000 iteraciones para búsqueda profunda de combinaciones de apilamiento y rotación
+  // Ejecutamos una búsqueda intensiva con 5000 iteraciones
   const ITERATIONS = 5000; 
   let bestEfficiency = -1;
   let bestLayouts: OptimizedPanel[] = [];
@@ -50,18 +48,15 @@ export function runOptimization(
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = JSON.parse(JSON.stringify(flatParts)) as PartToCut[];
     
-    // Variamos el ordenamiento y la rotación inicial en cada iteración
+    // Variamos criterios de ordenamiento para encontrar el layout líder
     if (i === 0) {
       currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     } else if (i === 1) {
       currentParts.sort((a, b) => b.height - a.height);
-    } else if (i === 2) {
-      currentParts.sort((a, b) => b.width - a.width);
     } else {
       shuffle(currentParts);
     }
 
-    // Ejecutamos la lógica de empaquetado industrial
     const currentLayouts = executeGuillotineShelf(currentParts, usableW, usableH, kerf, partColors);
     const efficiency = calculateTotalEfficiency(currentLayouts);
 
@@ -70,25 +65,21 @@ export function runOptimization(
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
     
-    // Si logramos meter todo en un solo tablero con alta eficiencia, paramos pronto
-    if (bestLayouts.length === 1 && bestEfficiency > 96.5) break;
+    // Si consolidamos en un solo tablero con alta eficiencia (>95%), detenemos la búsqueda
+    if (bestLayouts.length === 1 && bestEfficiency > 95) break;
   }
 
   return {
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: bestEfficiency,
-    summary: `ArquiMax v6.0 Ultra Pro: Eficiencia del ${bestEfficiency.toFixed(2)}% alcanzada mediante empaquetado por franjas dinámicas.`,
+    summary: `ArquiMax v6.0 Ultra Pro: Eficiencia Industrial del ${bestEfficiency.toFixed(2)}% alcanzada.`,
     kerf,
     trim,
     selectedThickness
   };
 }
 
-/**
- * Algoritmo de Empaquetado por Franjas (Shelf-Packing) con búsqueda de Mejor Ajuste Vertical.
- * Soporta rotación automática si la veta es 'libre'.
- */
 function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: number, partColors: Record<string, string>): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
   let remainingParts = JSON.parse(JSON.stringify(parts)) as PartToCut[];
@@ -100,7 +91,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
     let currentY = 0;
     
     while (currentY < h && usedInPanelIndices.size < remainingParts.length) {
-      // 1. Determinar el líder de la franja (la pieza que definirá la altura de esta fila de corte)
+      // 1. Determinar el líder de la franja (Shelf)
       let leaderIdx = -1;
       let shelfH = 0;
 
@@ -108,14 +99,13 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
         if (usedInPanelIndices.has(i)) continue;
         const p = remainingParts[i];
         
-        // Intentar sin rotar
+        // El líder define la altura de la tira de corte
         if (p.height <= (h - currentY) && p.width <= w) {
           leaderIdx = i;
           shelfH = p.height;
           break;
         }
         
-        // Intentar rotado (solo si es libre)
         if (p.grainDirection === 'libre' && p.width <= (h - currentY) && p.height <= w) {
           leaderIdx = i;
           shelfH = p.width;
@@ -131,30 +121,55 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
         let bestColumnIndices: number[] = [];
         let colW = 0;
 
-        // 2. Buscar piezas para llenar la columna verticalmente (Apilamiento de Guillotina)
+        // 2. Buscar piezas para llenar la columna verticalmente (V-Stack)
+        // Buscamos una pieza líder de columna que minimice el ancho consumido en la franja
+        let columnLeaderIdx = -1;
+        let colLeaderRotated = false;
+
         for (let i = 0; i < remainingParts.length; i++) {
           if (usedInPanelIndices.has(i)) continue;
           const p = remainingParts[i];
           
-          if (p.width <= (w - currentX) && p.height <= shelfH) {
-            bestColumnIndices = [i];
-            colW = p.width;
-            usedInPanelIndices.add(i);
+          let canFitNormal = p.width <= (w - currentX) && p.height <= shelfH;
+          let canFitRotated = p.grainDirection === 'libre' && p.height <= (w - currentX) && p.width <= shelfH;
+
+          if (canFitNormal && canFitRotated) {
+            // Si caben de ambas formas, elegimos la que use menos ancho (currentX)
+            if (p.width <= p.height) {
+              columnLeaderIdx = i;
+              colLeaderRotated = false;
+            } else {
+              columnLeaderIdx = i;
+              colLeaderRotated = true;
+            }
+          } else if (canFitNormal) {
+            columnLeaderIdx = i;
+            colLeaderRotated = false;
+          } else if (canFitRotated) {
+            columnLeaderIdx = i;
+            colLeaderRotated = true;
+          }
+
+          if (columnLeaderIdx !== -1) {
+            if (colLeaderRotated) {
+              [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
+            }
+            bestColumnIndices = [columnLeaderIdx];
+            colW = remainingParts[i].width;
+            usedInPanelIndices.add(columnLeaderIdx);
             
-            // INTENTO DE APILAMIENTO: Llenar el resto del alto de la franja líder
-            let remH = shelfH - p.height - kerf;
+            // INTENTO DE APILAMIENTO VERTICAL: Llenar el resto del alto de la franja (shelfH)
+            let remH = shelfH - remainingParts[i].height - kerf;
             while (remH > 0) {
               let subPieceIdx = -1;
               for (let j = 0; j < remainingParts.length; j++) {
                 if (usedInPanelIndices.has(j)) continue;
                 const p2 = remainingParts[j];
                 
-                // Debe caber en el ancho de la columna y en el alto restante
                 if (p2.width <= colW && p2.height <= remH) {
                   subPieceIdx = j;
                   break;
                 }
-                // Si es libre, intentar rotarla para que quepa en el ancho de columna
                 if (p2.grainDirection === 'libre' && p2.height <= colW && p2.width <= remH) {
                   [remainingParts[j].width, remainingParts[j].height] = [remainingParts[j].height, remainingParts[j].width];
                   subPieceIdx = j;
@@ -176,7 +191,6 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
 
         if (bestColumnIndices.length === 0) break;
 
-        // Registrar las piezas apiladas en esta columna de la franja
         let yOffset = 0;
         bestColumnIndices.forEach(idx => {
           const p = remainingParts[idx];
@@ -186,7 +200,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
             y: currentY + yOffset,
             width: p.width,
             height: p.height,
-            rotated: false, // La rotación ya se aplicó modificando width/height
+            rotated: false,
             color: partColors[p.name]
           });
           yOffset += p.height + kerf;
@@ -233,7 +247,7 @@ function generateColors(parts: PartToCut[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 75%, 50%, 0.4)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 75%, 50%, 0.45)`;
   });
   return colors;
 }

@@ -9,7 +9,6 @@ import { runOptimization } from '@/optimizer/cutOptimizer';
 import { OptimizationResult, GrainDirection } from '@/lib/types';
 import { 
   Target, 
-  BarChart3, 
   Plus, 
   Trash2, 
   CheckCircle2, 
@@ -18,7 +17,8 @@ import {
   ZoomIn,
   ZoomOut,
   Scissors,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 
 interface PartInput {
@@ -30,16 +30,16 @@ interface PartInput {
 }
 
 const LEPTON_DATASET: PartInput[] = [
-  { name: "V1 ESTANTES (629x570)", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "V1 ESTANTES (610x570)", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "V1 CAJ BASE (582x500)", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 LATS (582x150)", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-  { name: "V1 FRENTES (562x500)", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
-  { name: "V1 PUERTA (562x150)", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 COMP (178x500)", width: 178, height: 500, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 DIVISOR (578x470)", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
-  { name: "V1 ACC (382x117)", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-  { name: "V1 TAPA (177x117)", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+  { name: "(1) V1 ESTANTES", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(2) V2 ESTANTES", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(4) V1 CAJ BASE", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
+  { name: "(5) V2 CAJ BASE", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+  { name: "(15) V SUP INF", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
+  { name: "(6) V1 LATS", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+  { name: "(8) V1 FREFO", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+  { name: "(3) V1V2 CAJ LAT", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
+  { name: "(22) V CAJ CENT 2", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+  { name: "(24) PIEZA 24", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
@@ -64,7 +64,6 @@ export default function TestOptimizerPage() {
 
   const handleOptimize = () => {
     setLoading(true);
-    // Simulación de procesamiento intensivo para búsqueda profunda
     setTimeout(() => {
       try {
         const res = runOptimization(
@@ -77,7 +76,7 @@ export default function TestOptimizerPage() {
       } finally {
         setLoading(false);
       }
-    }, 1000);
+    }, 800);
   };
 
   useEffect(() => {
@@ -94,25 +93,25 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador ArquiMax v6.0 Ultra Pro</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador ArquiMax Ultra v6.0</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Etapas (H-V-H) con Apilamiento Vertical Agresivo
+                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Etapas (H-V-H) | Optimización Basada en Lepton
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {loading ? "Calculando 5000 permutaciones..." : "Optimizar +96%"}
+              {loading ? "Ejecutando Permutaciones..." : "Optimizar +95%"}
             </Button>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[700px]">
+          <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[750px]">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-4">
               <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Piezas Mesopotamia ({parts.reduce((a, b) => a + b.quantity, 0)})
+                <Layers className="w-4 h-4" /> Piezas Dataset ({parts.reduce((a, b) => a + b.quantity, 0)})
               </CardTitle>
               <Button variant="outline" size="icon" onClick={addPart} className="h-7 w-7 rounded-full">
                 <Plus className="w-3 h-3" />
@@ -130,11 +129,11 @@ export default function TestOptimizerPage() {
                       />
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase">Largo</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Ancho</p>
                           <Input type="number" value={part.width} onChange={(e) => updatePart(i, 'width', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase">Ancho</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Alto</p>
                           <Input type="number" value={part.height} onChange={(e) => updatePart(i, 'height', parseInt(e.target.value))} className="h-8 text-[10px] text-center font-bold bg-white border-slate-200" />
                         </div>
                         <div className="space-y-1">
@@ -169,7 +168,7 @@ export default function TestOptimizerPage() {
 
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center">
                 <div className="flex justify-between items-center mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tableros Usados</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tableros Necesarios</p>
                   <Layers className="w-4 h-4 text-primary" />
                 </div>
                 <div className="space-y-4">
@@ -177,7 +176,7 @@ export default function TestOptimizerPage() {
                     <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-green-600' : 'text-slate-800'}`}>
                       {result?.totalPanels || '-'}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">UNIDADES</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">PANEL</span>
                   </div>
                   <Progress value={result ? (1 / result.totalPanels) * 100 : 0} className="h-2" />
                 </div>
@@ -186,12 +185,12 @@ export default function TestOptimizerPage() {
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-slate-900 text-white flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                    <Info className="w-3 h-3 text-white" />
+                    <AlertCircle className="w-3 h-3 text-white" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Motor ArquiMax 6.0</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Estado de Optimización</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Ejecutando 5000 permutaciones espaciales..." : "Rotación libre activada. Apilamiento vertical dinámico maximizado para consolidación en panel único."}
+                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito! Todas las piezas consolidadas en un único tablero siguiendo la lógica de Lepton." : "Buscando mejor ajuste..."}
                 </p>
               </Card>
             </div>
@@ -201,7 +200,7 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                     <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-green-500' : 'text-amber-500'}`} /> 
-                    Esquema de Corte Optimizado
+                    Esquema de Corte (Dataset Lepton)
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -210,45 +209,41 @@ export default function TestOptimizerPage() {
                   </div>
                 </div>
 
-                <div className="overflow-auto bg-slate-200/50 p-8 rounded-3xl border-2 border-dashed border-slate-300 min-h-[600px] flex flex-col items-center custom-scrollbar">
+                <div className="overflow-auto bg-slate-200/50 p-8 rounded-3xl border-2 border-dashed border-slate-300 min-h-[700px] flex flex-col items-center custom-scrollbar">
                   <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }} className="transition-transform duration-300">
                     {result.optimizedLayout.map((panel, idx) => (
-                      <div key={idx} className="bg-white p-8 rounded-xl shadow-2xl mb-12 border border-slate-100" 
+                      <div key={idx} className="bg-white p-10 rounded-xl shadow-2xl mb-12 border border-slate-100" 
                            style={{ width: '1000px', aspectRatio: '2750 / 1830' }}>
                         <div className="flex items-center justify-between mb-4">
-                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
+                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL ÚNICO (2750x1830)</span>
                           <span className="text-[10px] font-black text-primary uppercase">{panel.efficiency.toFixed(2)}% EFICIENCIA</span>
                         </div>
 
                         <div className="relative bg-slate-100 rounded-sm overflow-hidden border border-slate-300" 
                              style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
                           
-                          {/* Área Útil con Trim */}
+                          {/* Área Útil con Trim de 10mm */}
                           <div className="absolute bg-white" style={{ 
                             left: `${(result.trim / 2750) * 100}%`, 
                             top: `${(result.trim / 1830) * 100}%`, 
                             width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
                             height: `${((1830 - result.trim * 2) / 1830) * 100}%`,
-                            backgroundImage: 'linear-gradient(rgba(0,0,0,.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.02) 1px, transparent 1px)',
-                            backgroundSize: '20px 20px'
+                            backgroundImage: 'linear-gradient(rgba(0,0,0,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.03) 1px, transparent 1px)',
+                            backgroundSize: '25px 25px'
                           }}>
                             {panel.parts.map((p, pIdx) => (
-                              <div key={pIdx} className="absolute border border-slate-900/60 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece"
+                              <div key={pIdx} className="absolute border border-slate-900/70 flex items-center justify-center transition-all hover:z-20 hover:brightness-95 group/piece"
                                    style={{
                                      left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
                                      top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
                                      width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
                                      height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
-                                     backgroundColor: p.color || 'rgba(174, 26, 226, 0.12)'
+                                     backgroundColor: p.color || 'rgba(174, 26, 226, 0.18)'
                                    }}>
                                 <div className="flex flex-col items-center leading-tight p-0.5 overflow-hidden text-center select-none">
-                                  <span className="text-[8px] font-black text-slate-800">{p.width}</span>
-                                  <span className="text-[6px] font-bold text-slate-500 uppercase truncate max-w-full">{p.name}</span>
-                                  <span className="text-[8px] font-black text-slate-800">{p.height}</span>
-                                </div>
-                                <div className="absolute bottom-full mb-2 hidden group-hover/piece:block z-50 bg-slate-900 text-white text-[8px] p-2 rounded shadow-xl whitespace-nowrap">
-                                  <p className="font-bold">{p.name}</p>
-                                  <p>{p.width} x {p.height} mm</p>
+                                  <span className="text-[min(1.2vw,9px)] font-black text-slate-800">{p.width}</span>
+                                  <span className="text-[min(1vw,7px)] font-bold text-slate-600 uppercase truncate max-w-full">{p.name}</span>
+                                  <span className="text-[min(1.2vw,9px)] font-black text-slate-800">{p.height}</span>
                                 </div>
                               </div>
                             ))}
