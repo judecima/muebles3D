@@ -69,6 +69,7 @@ export interface FurnitureDimensions {
   thickness: number;
   hasBack?: boolean; 
   hasShelf?: boolean;
+  hasShelf2?: boolean; // Segundo estante para módulos divididos (3 puertas)
 }
 
 export interface FurnitureModel {

@@ -62,15 +62,20 @@ export function ControlPanel({
     onDimensionsChange({ ...dimensions, hasShelf: checked });
   };
 
+  const handleShelf2Toggle = (checked: boolean) => {
+    onDimensionsChange({ ...dimensions, hasShelf2: checked });
+  };
+
   const isCatalog = type.startsWith('cabinet_');
+  const is3Doors = type.includes('3p') || type.includes('140');
   const isHeightFixed = isCatalog || type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
   const isWidthSlider = type === 'escritorio';
   const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip' || type === 'bajomesada-cajonera' || type === 'porta-anafe' || isCatalog;
   const forceBack = type === 'placard' || type === 'rackTV' || type.includes('pantry') || type.includes('wall');
   
-  // Regla: El botón de estantes solo aplica a Bajo Mesada y Alacenas. Se ignora en Pantry y Microwave.
   const isPantryOrMicrowave = type.includes('pantry') || type.includes('microwave');
-  const canHaveShelf = (type.includes('base') || type.includes('wall') || type === 'bajoMesada' || type === 'alacena' || type === 'porta-anafe') && !isPantryOrMicrowave;
+  const isBaseOrWall = type.includes('base') || type.includes('wall') || type === 'bajoMesada' || type === 'alacena' || type === 'porta-anafe';
+  const canHaveShelf = isBaseOrWall && !isPantryOrMicrowave;
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
@@ -181,15 +186,31 @@ export function ControlPanel({
             )}
 
             {canHaveShelf && (
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-slate-500" />
-                  <Label className="text-xs font-bold uppercase text-slate-600">Estante Interior</Label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-slate-500" />
+                    <Label className="text-xs font-bold uppercase text-slate-600">
+                      {is3Doors ? 'Estante Grande (Sección 1)' : 'Estante Interior'}
+                    </Label>
+                  </div>
+                  <Switch 
+                    checked={dimensions.hasShelf} 
+                    onCheckedChange={handleShelfToggle} 
+                  />
                 </div>
-                <Switch 
-                  checked={dimensions.hasShelf} 
-                  onCheckedChange={handleShelfToggle} 
-                />
+                {is3Doors && (
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-slate-500" />
+                      <Label className="text-xs font-bold uppercase text-slate-600">Estante Pequeño (Sección 2)</Label>
+                    </div>
+                    <Switch 
+                      checked={dimensions.hasShelf2} 
+                      onCheckedChange={handleShelf2Toggle} 
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
