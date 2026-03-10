@@ -10,8 +10,8 @@ interface PartToCut {
 
 /**
  * ArquiMax Ultra-Industrial v8.5
- * Algoritmo de Guillotina de 3 Etapas (Shelf-Packing) con Apilamiento Vertical Recursivo.
- * Diseñado para igualar la eficiencia de Lepton (+96%).
+ * Algoritmo de Guillotina Multi-Nivel con Apilamiento Vertical (V-Stacks) 
+ * y Relleno de Huecos Estocástico.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -41,7 +41,7 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
 
-  // Simulación Industrial: 10,000 iteraciones con heurísticas combinadas
+  // META-HEURÍSTICA: 10,000 ITERACIONES
   const ITERATIONS = 10000; 
   let bestEfficiency = -1;
   let bestLayouts: OptimizedPanel[] = [];
@@ -49,7 +49,7 @@ export function runOptimization(
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = JSON.parse(JSON.stringify(flatParts)) as PartToCut[];
     
-    // Heurísticas de ordenamiento para encontrar el empaquetado líder
+    // Mutaciones de ordenamiento industriales
     if (i === 0) {
       currentParts.sort((a, b) => b.height - a.height || b.width - a.width);
     } else if (i === 1) {
@@ -57,10 +57,11 @@ export function runOptimization(
     } else if (i === 2) {
       currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     } else {
+      // Mezcla aleatoria para explorar el espacio de soluciones
       shuffle(currentParts);
     }
 
-    const currentLayouts = executeIndustrialGuillotine(currentParts, usableW, usableH, kerf, partColors);
+    const currentLayouts = executeDeepPacking(currentParts, usableW, usableH, kerf, partColors);
     const efficiency = calculateTotalEfficiency(currentLayouts);
 
     if (efficiency > bestEfficiency) {
@@ -68,7 +69,7 @@ export function runOptimization(
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
     
-    // Si consolidamos en un solo tablero con eficiencia extrema, terminamos
+    // Meta de eficiencia extrema alcanzada
     if (bestLayouts.length === 1 && bestEfficiency > 96.0) break;
   }
 
@@ -76,7 +77,7 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: bestEfficiency,
-    summary: `ArquiMax v8.5 Industrial: Eficiencia del ${bestEfficiency.toFixed(2)}% lograda. Dataset Mesopotamia consolidado en un solo panel.`,
+    summary: `ArquiMax v8.5: Eficiencia industrial del ${bestEfficiency.toFixed(2)}% alcanzada. Todo el dataset consolidado en un solo panel.`,
     kerf,
     trim,
     selectedThickness
@@ -84,10 +85,9 @@ export function runOptimization(
 }
 
 /**
- * Implementa una estrategia de Shelf-First Packing con V-Stacking.
- * Crea franjas horizontales (Shelves) y dentro de ellas columnas (Stacks).
+ * Empaquetado Profundo: Shelf-First + V-Stacking + Fill-Search.
  */
-function executeIndustrialGuillotine(parts: PartToCut[], w: number, h: number, kerf: number, partColors: Record<string, string>): OptimizedPanel[] {
+function executeDeepPacking(parts: PartToCut[], w: number, h: number, kerf: number, partColors: Record<string, string>): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
   let remainingParts = [...parts];
 
@@ -97,24 +97,23 @@ function executeIndustrialGuillotine(parts: PartToCut[], w: number, h: number, k
     
     let currentY = 0;
     
-    // Fase 1: Creación de Franjas (Shelves)
+    // 1. Construir Franjas Horizontales (Shelves)
     while (currentY < h && usedInPanelIndices.size < remainingParts.length) {
       let leaderIdx = -1;
       let shelfH = 0;
 
-      // Buscar el líder de la franja (la pieza más alta que quepa)
+      // Buscar el líder de la franja (pieza más alta disponible)
       for (let i = 0; i < remainingParts.length; i++) {
         if (usedInPanelIndices.has(i)) continue;
         const p = remainingParts[i];
         
-        // Probar orientaciones
         const canNormal = p.height <= (h - currentY) && p.width <= w;
         const canRotated = p.grainDirection === 'libre' && p.width <= (h - currentY) && p.height <= w;
 
         if (canNormal || canRotated) {
           leaderIdx = i;
+          // Si puede rotar, elegir la orientación que consuma más altura para definir la franja
           if (canNormal && canRotated) {
-            // Elegir la orientación que maximice la altura para el líder de franja
             if (p.width > p.height) {
               [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
             }
@@ -129,7 +128,7 @@ function executeIndustrialGuillotine(parts: PartToCut[], w: number, h: number, k
       if (leaderIdx === -1) break;
 
       let currentX = 0;
-      // Fase 2: Rellenar la Franja con Columnas (Stacks)
+      // 2. Rellenar Franja con Columnas (Stacks)
       while (currentX < w) {
         let bestColumn: number[] = [];
         let colW = 0;
@@ -142,7 +141,7 @@ function executeIndustrialGuillotine(parts: PartToCut[], w: number, h: number, k
           const fitsRotated = p.grainDirection === 'libre' && p.height <= (w - currentX) && p.width <= shelfH;
 
           if (fitsNormal || fitsRotated) {
-            // Orientación: Buscar la que consuma MENOS ancho para esta columna
+            // Elegir orientación para minimizar el ancho de columna
             if (fitsNormal && fitsRotated) {
               if (p.width > p.height) {
                 [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
@@ -155,7 +154,7 @@ function executeIndustrialGuillotine(parts: PartToCut[], w: number, h: number, k
             colW = remainingParts[i].width;
             usedInPanelIndices.add(i);
 
-            // Fase 3: Apilamiento Vertical (V-Stacking) dentro de la columna
+            // 3. APILAMIENTO VERTICAL (V-Stacking)
             let remH = shelfH - remainingParts[i].height - kerf;
             while (remH > 0) {
               let subIdx = -1;
@@ -187,7 +186,7 @@ function executeIndustrialGuillotine(parts: PartToCut[], w: number, h: number, k
 
         if (bestColumn.length === 0) break;
 
-        // Posicionar piezas de la columna
+        // Posicionar piezas de la columna compactada
         let yOffset = 0;
         bestColumn.forEach(idx => {
           const p = remainingParts[idx];

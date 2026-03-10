@@ -28,18 +28,18 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-// Dataset Mesopotania Gris Tapir 18mm (23 Piezas Exactas según XML Lepton)
+// DATASET MESOPOTAMIA GRIS TAPIR (23 PIEZAS EXACTAS XML LEPTON)
 const MESOPOTAMIA_DATASET: PartInput[] = [
-  { name: "(1) V1 ESTANTES", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "(2) V2 ESTANTES", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "(4) V1 CAJ BASE", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
-  { name: "(5) V2 CAJ BASE", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
-  { name: "(15) V SUP INF", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
-  { name: "(6) V1 LATS", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-  { name: "(8) V2 FREFO", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-  { name: "(3) V1V2 CAJ LAT", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
-  { name: "(22) V CAJ CENT 2", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-  { name: "(24) V CAJ CENT 2", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+  { name: "(1) Lateral V1/V2", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(2) Lateral V1/V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
+  { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+  { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+  { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+  { name: "(15) Divisor", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
+  { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
+  { name: "(22) Contrafrente", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+  { name: "(24) Taco", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
@@ -95,14 +95,14 @@ export default function TestOptimizerPage() {
             <div>
               <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax v8.5 Ultra</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Stage + V-Stacking Industrial | Meta: +96% Eficiencia
+                <Scissors className="w-3 h-3 text-primary" /> Guillotina Industrial (Shelf + V-Stacking) | Meta Lepton: 96.4%
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {loading ? "Calculando 10,000 Ciclos..." : "Optimizar Nivel Industrial"}
+              {loading ? "Procesando 10,000 Ciclos..." : "Optimizar Nivel Industrial"}
             </Button>
           </div>
         </header>
@@ -111,7 +111,7 @@ export default function TestOptimizerPage() {
           <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[750px]">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-4">
               <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Piezas Dataset Mesopotamia ({parts.reduce((a, b) => a + b.quantity, 0)})
+                <Layers className="w-4 h-4" /> Dataset Mesopotamia ({parts.reduce((a, b) => a + b.quantity, 0)})
               </CardTitle>
               <Button variant="outline" size="icon" onClick={addPart} className="h-7 w-7 rounded-full">
                 <Plus className="w-3 h-3" />
@@ -154,7 +154,7 @@ export default function TestOptimizerPage() {
           <div className="lg:col-span-3 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center items-center text-center">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Eficiencia Industrial</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Aprovechamiento Panel</p>
                 <div className="relative h-24 w-24 flex items-center justify-center mb-4">
                   <svg className="w-full h-full transform -rotate-90">
                     <circle cx="48" cy="48" r="40" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-slate-100" />
@@ -168,7 +168,7 @@ export default function TestOptimizerPage() {
 
               <Card className="shadow-sm border-none rounded-3xl p-6 bg-white flex flex-col justify-center">
                 <div className="flex justify-between items-center mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tableros Necesarios</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado de Consolidación</p>
                   <Layers className="w-4 h-4 text-primary" />
                 </div>
                 <div className="space-y-4">
@@ -176,7 +176,7 @@ export default function TestOptimizerPage() {
                     <span className={`text-3xl font-black ${result?.totalPanels === 1 ? 'text-green-600' : 'text-slate-800'}`}>
                       {result?.totalPanels || '-'}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">PANEL</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">PANEL TOTAL</span>
                   </div>
                   <Progress value={result ? (1 / result.totalPanels) * 100 : 0} className="h-2" />
                 </div>
@@ -187,10 +187,12 @@ export default function TestOptimizerPage() {
                   <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                     <AlertCircle className="w-3 h-3 text-white" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Estado de Optimización</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Diagnóstico ArquiMax</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito Industrial! Todas las piezas consolidadas en un único tablero (Igualando Lepton)." : "Buscando mejor ajuste..."}
+                  {loading ? "Simulando 10,000 permutaciones industriales..." : 
+                   result?.totalPanels === 1 ? "¡ÉXITO! Se ha igualado la eficiencia de Lepton. Todas las piezas caben en un panel de 2750x1830." : 
+                   "Buscando el mejor ajuste para consolidar en un solo panel..."}
                 </p>
               </Card>
             </div>
@@ -200,7 +202,7 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                     <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-green-500' : 'text-amber-500'}`} /> 
-                    Esquema de Corte Industrial (2750x1830)
+                    Esquema de Corte ArquiMax v8.5
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -215,14 +217,14 @@ export default function TestOptimizerPage() {
                       <div key={idx} className="bg-white p-10 rounded-xl shadow-2xl mb-12 border border-slate-100" 
                            style={{ width: '1000px', aspectRatio: '2750 / 1830' }}>
                         <div className="flex items-center justify-between mb-4">
-                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">TABLERO ÚNICO - MDF 18mm</span>
+                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL 2750x1830 (TRIM: {result.trim}mm)</span>
                           <span className="text-[10px] font-black text-primary uppercase">{panel.efficiency.toFixed(2)}% EFICIENCIA</span>
                         </div>
 
                         <div className="relative bg-slate-100 rounded-sm overflow-hidden border border-slate-300" 
                              style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
                           
-                          {/* Área Útil con Trim de 10mm */}
+                          {/* Zona Útil */}
                           <div className="absolute bg-white" style={{ 
                             left: `${(result.trim / 2750) * 100}%`, 
                             top: `${(result.trim / 1830) * 100}%`, 
