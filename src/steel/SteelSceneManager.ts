@@ -47,6 +47,7 @@ export class SteelSceneManager {
 
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
   private onWalkModeLock?: (locked: boolean) => void;
+  private onPointerLockError?: () => void;
 
   private colors = {
     background: 0xf1f5f9,
@@ -55,15 +56,15 @@ export class SteelSceneManager {
     floor: 0xe2e8f0,
     outline: 0x475569,
     openingHover: 0x3b82f6,
-    steel: 0x9ca3af, // Gris metalizado industrial
-    bracing: 0xef4444, // Rojo para cruces
-    lintel: 0x2563eb,  // Azul fuerte para dinteles
+    steel: 0x9ca3af, 
+    bracing: 0xef4444, 
+    lintel: 0x2563eb,  
     panel_ext: 0x94a3b8,
     panel_int: 0xe2e8f0
   };
 
-  private profileWidth = 100; // Alma del perfil (ej. 100mm)
-  private profileFlange = 40;  // Ala del perfil (ej. 40mm)
+  private profileWidth = 100; 
+  private profileFlange = 40;  
 
   constructor(
     container: HTMLElement, 
@@ -132,6 +133,18 @@ export class SteelSceneManager {
     this.renderer.domElement.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
+    document.addEventListener('pointerlockerror', this.handlePointerLockError);
+  }
+
+  private handlePointerLockError = () => {
+    console.warn('Pointer Lock Error detectado por el navegador.');
+    if (this.onPointerLockError) {
+      this.onPointerLockError();
+    }
+  };
+
+  public setPointerLockErrorHandler(handler: () => void) {
+    this.onPointerLockError = handler;
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
@@ -230,7 +243,8 @@ export class SteelSceneManager {
         this.fpControls.lock();
       }
     } catch (err) {
-      console.warn('Pointer Lock blocked by security or sandbox. Falling back to manual look.');
+      console.warn('Acceso a Pointer Lock bloqueado por el sandbox. Usando navegación manual.');
+      if (this.onPointerLockError) this.onPointerLockError();
     }
   }
 
@@ -299,7 +313,6 @@ export class SteelSceneManager {
       
       if (this.direction.lengthSq() > 0) this.direction.normalize();
 
-      // Velocidades industriales reales: Caminar 1.4m/s, Correr 2.2m/s
       const speed = (this.isShiftPressed ? 2200.0 : 1400.0) * 8.0; 
 
       if (this.direction.z !== 0) this.velocity.z -= this.direction.z * speed * delta;
@@ -352,13 +365,11 @@ export class SteelSceneManager {
       wallGroup.rotation.y = (wall.rotation * Math.PI) / 180;
       this.houseGroup.add(wallGroup);
 
-      // Paneles
       if (!config.structuralMode) {
         if (config.layers.exteriorPanels) wallGroup.add(this.createPanelMesh(wall, 'exterior'));
         if (config.layers.interiorPanels) wallGroup.add(this.createPanelMesh(wall, 'interior'));
       }
 
-      // Estructura Automática Industrial
       if (config.layers.steelProfiles) {
         this.generateWallStructure(wall, wallGroup, config.layers);
       }
@@ -367,7 +378,6 @@ export class SteelSceneManager {
       this.createOpeningTriggers(wall);
     });
 
-    // Platea de Fundación
     if (!wallsBox.isEmpty() && isFinite(wallsBox.min.x)) {
       const size = new THREE.Vector3();
       wallsBox.getSize(size);
@@ -388,80 +398,56 @@ export class SteelSceneManager {
     }
   }
 
-  /**
-   * Generación de ingeniería estructural Steel Framing v2.1
-   * Incluye Soleras Superior/Inferior, Montantes dobles en esquinas y vanos reforzados.
-   */
   private generateWallStructure(wall: SteelWall, group: THREE.Group, layers: LayerVisibility) {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
-    // 1. Solera Inferior (PGU) - Ocupa todo el largo
     structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
-    
-    // 2. Solera Superior (PGU) - Cierre estructural superior
     structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
 
-    // 3. Montantes (PGC) - Espaciado estándar + Refuerzos en uniones (Corner Studs)
     const studHeight = wall.height - (this.profileFlange * 2);
     
     const addStud = (posX: number, color?: number) => {
-      // Validamos que el montante no exceda el largo del muro
       const validX = Math.min(Math.max(0, posX), wall.length - this.profileFlange);
       structuralGroup.add(this.createProfile(studHeight, validX, this.profileFlange, 90, 'PGC', color));
     };
 
-    // --- REFUERZOS DE ENCUENTROS (Montante doble en cada extremo del muro) ---
-    addStud(0); // Montante extremo inicio
-    addStud(this.profileFlange); // Refuerzo para panel interior (Corner Stud)
+    addStud(0); 
+    addStud(this.profileFlange); 
     
-    addStud(wall.length - this.profileFlange); // Montante extremo fin
-    addStud(wall.length - this.profileFlange * 2); // Refuerzo para panel interior
+    addStud(wall.length - this.profileFlange); 
+    addStud(wall.length - this.profileFlange * 2); 
 
-    // --- DISTRIBUCIÓN DE MONTANTES (STUDS) ---
     const studCount = Math.floor(wall.length / wall.studSpacing);
     for (let i = 1; i <= studCount; i++) {
       let x = i * wall.studSpacing;
-      
-      // Evitamos duplicar los montantes de refuerzo de los extremos
       if (x < this.profileFlange * 3 || x > wall.length - this.profileFlange * 3) continue;
-
-      // Verificamos si el montante cae dentro de una abertura
       const inOpening = wall.openings.some(op => x > op.position && x < (op.position + op.width - this.profileFlange));
-      
       if (!inOpening) {
         addStud(x);
       }
     }
 
-    // --- ESTRUCTURA DE ABERTURAS (King, Jack, Dinteles) ---
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const opTop = sill + op.height;
 
       if (layers.lintels) {
-        // King Studs (Montantes laterales de carga completa)
         addStud(op.position - this.profileFlange);
         addStud(op.position + op.width);
 
-        // Jack Studs (Montantes de apoyo del dintel)
         structuralGroup.add(this.createProfile(opTop - this.profileFlange, op.position, this.profileFlange, 90, 'PGC', this.colors.steel));
         structuralGroup.add(this.createProfile(opTop - this.profileFlange, op.position + op.width - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.steel));
 
-        // Dintel (Header PGU reforzado)
         structuralGroup.add(this.createProfile(op.width, op.position, opTop, 0, 'PGU', this.colors.lintel));
 
-        // Umbral (para ventanas)
         if (op.type === 'window') {
           structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
         }
 
-        // Cripples (Montantes cortos de transferencia de carga)
         const crippleSpacing = wall.studSpacing;
         for (let x = op.position + crippleSpacing; x < op.position + op.width - this.profileFlange; x += crippleSpacing) {
-          // Cripples superiores
           structuralGroup.add(this.createProfile(wall.height - opTop - this.profileFlange, x, opTop + this.profileFlange, 90, 'PGC'));
-          // Cripples inferiores (solo ventanas)
           if (op.type === 'window') {
             structuralGroup.add(this.createProfile(sill - this.profileFlange * 2, x, this.profileFlange, 90, 'PGC'));
           }
@@ -469,7 +455,6 @@ export class SteelSceneManager {
       }
     });
 
-    // 4. Cruces de San Andrés (X-Bracing) - Evitando aberturas y respetando tramos ciegos
     if (layers.crossBracing) {
       this.addSmartCrossBracing(wall, structuralGroup);
     }
@@ -477,9 +462,6 @@ export class SteelSceneManager {
 
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number): THREE.Mesh {
     const isVertical = rotZ === 90;
-    
-    // Dimensiones de perfilería industrial estándar
-    const thickness = 1.2; 
     const geom = new THREE.BoxGeometry(
       isVertical ? this.profileFlange : len, 
       isVertical ? len : this.profileFlange, 
@@ -493,8 +475,6 @@ export class SteelSceneManager {
     });
     
     const mesh = new THREE.Mesh(geom, mat);
-    
-    // Pivote en esquina para alineación estructural perfecta
     const offX = isVertical ? this.profileFlange / 2 : len / 2;
     const offY = isVertical ? len / 2 : this.profileFlange / 2;
     
@@ -511,7 +491,6 @@ export class SteelSceneManager {
     
     let currentX = 0;
     sortedOpenings.forEach(op => {
-      // Tramo ciego entre aberturas (mínimo 800mm para ser efectivo)
       if (op.position - currentX > 800) {
         solidSegments.push({ start: currentX + 50, end: op.position - 50 });
       }
@@ -529,7 +508,6 @@ export class SteelSceneManager {
     });
 
     solidSegments.forEach(seg => {
-      // X-Bracing (Cruz completa)
       this.addDiagonal(seg.start, this.profileFlange, seg.end, wall.height - this.profileFlange, group, bracingMat);
       this.addDiagonal(seg.end, this.profileFlange, seg.start, wall.height - this.profileFlange, group, bracingMat);
     });
@@ -541,10 +519,9 @@ export class SteelSceneManager {
     const dist = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
     
-    const geom = new THREE.BoxGeometry(dist, 30, 3); // Cinta de acero galvanizado
+    const geom = new THREE.BoxGeometry(dist, 30, 3); 
     const mesh = new THREE.Mesh(geom, material);
     
-    // Evitamos Z-fighting desplazando la cruz 5mm hacia afuera del centro del muro
     mesh.position.set(x1 + dx / 2, y1 + dy / 2, this.profileWidth / 2 + 5);
     mesh.rotation.z = angle;
     group.add(mesh);
@@ -639,6 +616,7 @@ export class SteelSceneManager {
 
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
+    document.removeEventListener('pointerlockerror', this.handlePointerLockError);
     if (this.renderer) this.renderer.dispose();
     if (this.controls) this.controls.dispose();
     if (this.fpControls) this.fpControls.dispose();
