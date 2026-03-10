@@ -82,8 +82,8 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           selectedPanel.width,
           selectedPanel.height,
           targetThickness,
-          4.5, // Kerf
-          10   // Trim
+          4.5, // Kerf industrial
+          10   // Trim estándar
         );
 
         if (res.optimizedLayout.length === 0) {
@@ -93,7 +93,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
         }
       } catch (e) {
         console.error(e);
-        setError("Error en el cálculo industrial.");
+        setError("Error en el cálculo industrial v10.0.");
       } finally {
         setLoading(false);
       }
@@ -120,7 +120,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     const doc = new jsPDF('p', 'mm', 'a4');
     const BRAND_COLOR = [174, 26, 226];
 
-    // Configuración estética
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(24);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
@@ -128,7 +127,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     
     doc.setFontSize(14);
     doc.setTextColor(80, 80, 80);
-    doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
+    doc.text("Plano de Optimización Industrial", 105, 28, { align: 'center' });
     
     doc.setDrawColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.setLineWidth(0.5);
@@ -141,7 +140,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     doc.text(summaryText, 20, 42);
 
     (doc as any).autoTable({
-      head: [['Pieza', 'Largo (mm)', 'Ancho (mm)', 'Cant.', 'Veta']],
+      head: [['Pieza', 'Ancho (mm)', 'Alto (mm)', 'Cant.', 'Veta']],
       body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection]),
       startY: 48,
       headStyles: { fillColor: BRAND_COLOR, font: 'helvetica', fontStyle: 'bold' },
@@ -161,7 +160,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v9.0
+                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v10.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}>
@@ -275,7 +274,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase text-lg">Ejecutando Simulador Industrial v9.0...</p>
+              <p className="font-black text-slate-700 uppercase text-lg">Ejecutando Simulador Industrial v10.0...</p>
             </div>
           ) : error ? (
             <div className="py-20 flex flex-col items-center gap-4 text-red-500 bg-red-50 p-10 rounded-2xl border border-red-100">
@@ -286,7 +285,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
               <LayoutGrid className="w-24 h-24 opacity-10" />
-              <Button variant="secondary" onClick={handleOptimize} className="font-bold uppercase tracking-wider">Calcular Optimización de {targetThickness}mm</Button>
+              <Button variant="secondary" onClick={handleOptimize} className="font-bold uppercase tracking-wider">Calcular Optimización Industrial</Button>
             </div>
           ) : (
             <div className="space-y-12 py-8" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
@@ -335,11 +334,11 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                                  backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
                                }}>
                             <div className="relative w-full h-full overflow-hidden pointer-events-none">
-                              {/* Base (Width) - Línea Inferior */}
+                              {/* Base (Ancho) - Línea Inferior */}
                               <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">
                                 {p.width}
                               </span>
-                              {/* Altura (Height) - Línea Izquierda */}
+                              {/* Altura (Alto) - Línea Izquierda */}
                               <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.8vw,10px)] font-black text-slate-900 leading-none whitespace-nowrap">
                                 {p.height}
                               </span>
@@ -355,7 +354,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
-                      <p className="text-[9px] text-slate-400 italic">Algoritmo de Guillotina v9.0. Optimizado para seccionadoras automáticas con V-Stacking.</p>
+                      <p className="text-[9px] text-slate-400 italic">Optimización ArquiMax v10.0. Estándar industrial de alta densidad.</p>
                     </div>
                   </div>
                 );
