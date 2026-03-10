@@ -12,7 +12,6 @@ import {
   Plus, 
   Trash2, 
   CheckCircle2, 
-  Info,
   Layers,
   ZoomIn,
   ZoomOut,
@@ -29,7 +28,7 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-const LEPTON_DATASET: PartInput[] = [
+const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(1) V1 ESTANTES", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(2) V2 ESTANTES", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(4) V1 CAJ BASE", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
@@ -43,7 +42,7 @@ const LEPTON_DATASET: PartInput[] = [
 ];
 
 export default function TestOptimizerPage() {
-  const [parts, setParts] = useState<PartInput[]>(LEPTON_DATASET);
+  const [parts, setParts] = useState<PartInput[]>(MESOPOTAMIA_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [zoom, setZoom] = useState(0.8);
@@ -64,6 +63,7 @@ export default function TestOptimizerPage() {
 
   const handleOptimize = () => {
     setLoading(true);
+    // Usamos un timeout para permitir que se muestre el estado de carga antes del cálculo pesado
     setTimeout(() => {
       try {
         const res = runOptimization(
@@ -76,7 +76,7 @@ export default function TestOptimizerPage() {
       } finally {
         setLoading(false);
       }
-    }, 800);
+    }, 100);
   };
 
   useEffect(() => {
@@ -95,14 +95,14 @@ export default function TestOptimizerPage() {
             <div>
               <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Validador ArquiMax Ultra v6.0</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Etapas (H-V-H) | Optimización Basada en Lepton
+                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Etapas con V-Stacking | Dataset Mesopotamia (23 Piezas)
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {loading ? "Ejecutando Permutaciones..." : "Optimizar +95%"}
+              {loading ? "Calculando Franjas..." : "Optimizar +95%"}
             </Button>
           </div>
         </header>
@@ -200,7 +200,7 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                     <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-green-500' : 'text-amber-500'}`} /> 
-                    Esquema de Corte (Dataset Lepton)
+                    Esquema de Corte (Guillotina 3-Etapas)
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
