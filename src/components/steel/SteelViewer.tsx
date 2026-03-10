@@ -19,6 +19,11 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
       if (managerRef.current) {
         managerRef.current.enterWalkMode();
       }
+    },
+    setMovement: (direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down', active: boolean) => {
+      if (managerRef.current) {
+        managerRef.current.setMovement(direction, active);
+      }
     }
   }));
 

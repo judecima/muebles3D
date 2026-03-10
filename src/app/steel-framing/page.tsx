@@ -17,12 +17,19 @@ import {
   X,
   Compass,
   MousePointer2,
-  Keyboard
+  Keyboard,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const INITIAL_WALLS: SteelWall[] = [
   { id: 'w1', length: 6000, height: 2600, thickness: 100, x: -3000, z: -3000, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: 2500 }] },
@@ -41,8 +48,9 @@ export default function SteelFramingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
+  const isMobile = useIsMobile();
   
-  const viewerRef = useRef<{ enterWalkMode: () => void }>(null);
+  const viewerRef = useRef<{ enterWalkMode: () => void, setMovement: (dir: any, active: boolean) => void }>(null);
 
   const handleOpeningDoubleClick = (wallId: string, opening: SteelOpening) => {
     setSelectedOpening({ wallId, opening });
@@ -117,10 +125,13 @@ export default function SteelFramingPage() {
               variant={isWalkModeActive ? "secondary" : "default"}
               size="sm" 
               className={`h-8 px-4 text-[10px] font-black uppercase tracking-tighter transition-all ${isWalkModeActive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-              onClick={() => viewerRef.current?.enterWalkMode()}
+              onClick={() => {
+                if (isWalkModeActive) setIsWalkModeActive(false);
+                else viewerRef.current?.enterWalkMode();
+              }}
             >
               <Compass className="w-3.5 h-3.5 mr-2" /> 
-              {isWalkModeActive ? "Caminando..." : "Entrar Modo Caminata"}
+              {isWalkModeActive ? "Salir Caminata" : "Entrar Modo Caminata"}
             </Button>
             <Button variant="outline" size="sm" className="h-8 px-3 text-[10px] font-bold">
               <Download className="w-3.5 h-3.5 mr-2" /> 
@@ -138,51 +149,97 @@ export default function SteelFramingPage() {
           />
           
           <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
-            <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">MODO DE EDICIÓN</span>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <Layout className="w-3 h-3 text-blue-500" />
-                  <span className="text-xs font-black text-slate-800">{config.walls.length} Muros</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Settings2 className="w-3 h-3 text-slate-400" />
-                  <span className="text-[9px] font-medium text-slate-600 uppercase">Doble Click para reacomodar</span>
+            {!isWalkModeActive && (
+              <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">MODO DE EDICIÓN</span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <Layout className="w-3 h-3 text-blue-500" />
+                    <span className="text-xs font-black text-slate-800">{config.walls.length} Muros</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Settings2 className="w-3 h-3 text-slate-400" />
+                    <span className="text-[9px] font-medium text-slate-600 uppercase">Doble Click para reacomodar</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {isWalkModeActive && (
-              <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300">
-                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-2">CONTROLES DE NAVEGACIÓN</span>
+              <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300 pointer-events-auto">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-2">NAVEGACIÓN ACTIVA</span>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   <div className="flex items-center gap-2">
                     <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">WASD: Moverse</span>
+                    <span className="text-[10px] font-medium uppercase">WASD / Flechas: Mover</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <MousePointer2 className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">Mouse: Mirar</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-white/20 rounded flex items-center justify-center text-[8px] font-bold">SP</div>
-                    <span className="text-[10px] font-medium uppercase">Subir</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-white/20 rounded flex items-center justify-center text-[8px] font-bold">SH</div>
-                    <span className="text-[10px] font-medium uppercase">Bajar</span>
+                    <span className="text-[10px] font-medium uppercase">Mouse / Touch: Mirar</span>
                   </div>
                 </div>
-                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">Presiona ESC para salir del modo</div>
+                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">Presiona ESC o el botón para salir</div>
               </div>
             )}
           </div>
 
-          <div className="absolute bottom-4 right-4 bg-slate-900/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 pointer-events-none">
-            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
-              <Move className="w-3 h-3" /> CLICK IZQ: ROTAR | CLICK DER: PAN | RUEDA: ZOOM
-            </p>
-          </div>
+          {/* D-Pad para Móvil en Modo Caminata */}
+          {isWalkModeActive && isMobile && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-50 pointer-events-auto">
+              <div className="flex gap-2">
+                <Button 
+                  variant="secondary" size="icon" className="w-12 h-12 rounded-full opacity-80" 
+                  onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
+                >
+                  <ArrowUp className="w-6 h-6" />
+                </Button>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <Button 
+                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
+                  onTouchStart={() => viewerRef.current?.setMovement('forward', true)} onTouchEnd={() => viewerRef.current?.setMovement('forward', false)}
+                >
+                  <ChevronUp className="w-8 h-8" />
+                </Button>
+                <div className="flex gap-4">
+                  <Button 
+                    variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
+                    onTouchStart={() => viewerRef.current?.setMovement('left', true)} onTouchEnd={() => viewerRef.current?.setMovement('left', false)}
+                  >
+                    <ChevronLeft className="w-8 h-8" />
+                  </Button>
+                  <Button 
+                    variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
+                    onTouchStart={() => viewerRef.current?.setMovement('backward', true)} onTouchEnd={() => viewerRef.current?.setMovement('backward', false)}
+                  >
+                    <ChevronDown className="w-8 h-8" />
+                  </Button>
+                  <Button 
+                    variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600 text-white" 
+                    onTouchStart={() => viewerRef.current?.setMovement('right', true)} onTouchEnd={() => viewerRef.current?.setMovement('right', false)}
+                  >
+                    <ChevronRight className="w-8 h-8" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="secondary" size="icon" className="w-12 h-12 rounded-full opacity-80" 
+                  onTouchStart={() => viewerRef.current?.setMovement('down', true)} onTouchEnd={() => viewerRef.current?.setMovement('down', false)}
+                >
+                  <ArrowDown className="w-6 h-6" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!isWalkModeActive && (
+            <div className="absolute bottom-4 right-4 bg-slate-900/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 pointer-events-none">
+              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
+                <Move className="w-3 h-3" /> CLICK IZQ: ROTAR | CLICK DER: PAN | RUEDA: ZOOM
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Dialogo de Edición de Abertura */}

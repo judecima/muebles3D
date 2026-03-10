@@ -28,6 +28,10 @@ export class SteelSceneManager {
   private direction = new THREE.Vector3();
   private prevTime = performance.now();
 
+  // Control Táctil para Mirada
+  private touchStart = new THREE.Vector2();
+  private isWalkModeActive = false;
+
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
   private onWalkModeLock?: (locked: boolean) => void;
 
@@ -75,11 +79,13 @@ export class SteelSceneManager {
 
     this.fpControls.addEventListener('lock', () => {
       this.controls.enabled = false;
+      this.isWalkModeActive = true;
       if (this.onWalkModeLock) this.onWalkModeLock(true);
     });
 
     this.fpControls.addEventListener('unlock', () => {
       this.controls.enabled = true;
+      this.isWalkModeActive = false;
       if (this.onWalkModeLock) this.onWalkModeLock(false);
     });
 
@@ -108,10 +114,14 @@ export class SteelSceneManager {
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
+
+    // Eventos Táctiles para Móvil
+    this.renderer.domElement.addEventListener('touchstart', this.onTouchStart, { passive: false });
+    this.renderer.domElement.addEventListener('touchmove', this.onTouchMove, { passive: false });
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
-    if (!this.fpControls.isLocked) return;
+    if (!this.isWalkModeActive) return;
     switch (event.code) {
       case 'ArrowUp':
       case 'KeyW': this.moveForward = true; break;
@@ -143,9 +153,48 @@ export class SteelSceneManager {
     }
   };
 
+  private onTouchStart = (event: TouchEvent) => {
+    if (!this.isWalkModeActive) return;
+    const touch = event.touches[0];
+    this.touchStart.set(touch.clientX, touch.clientY);
+  };
+
+  private onTouchMove = (event: TouchEvent) => {
+    if (!this.isWalkModeActive) return;
+    event.preventDefault();
+    const touch = event.touches[0];
+    const movementX = touch.clientX - this.touchStart.x;
+    const movementY = touch.clientY - this.touchStart.y;
+
+    // Rotar cámara manualmente en móvil (PointerLock no bloquea en táctiles)
+    const rotationSpeed = 0.005;
+    this.camera.rotation.y -= movementX * rotationSpeed;
+    this.camera.rotation.x -= movementY * rotationSpeed;
+    this.camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.camera.rotation.x));
+
+    this.touchStart.set(touch.clientX, touch.clientY);
+  };
+
+  public setMovement(direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down', active: boolean) {
+    switch (direction) {
+      case 'forward': this.moveForward = active; break;
+      case 'backward': this.moveBackward = active; break;
+      case 'left': this.moveLeft = active; break;
+      case 'right': this.moveRight = active; break;
+      case 'up': this.moveUp = active; break;
+      case 'down': this.moveDown = active; break;
+    }
+  }
+
   public enterWalkMode() {
     this.camera.position.y = 1700; // Altura de ojos (mm)
-    this.fpControls.lock();
+    this.isWalkModeActive = true;
+    try {
+      this.fpControls.lock();
+    } catch (e) {
+      // En móvil PointerLock puede fallar, pero activamos el modo igual
+      if (this.onWalkModeLock) this.onWalkModeLock(true);
+    }
   }
 
   private onWindowResize = () => {
@@ -156,7 +205,7 @@ export class SteelSceneManager {
   };
 
   private onDoubleClick = (event: MouseEvent) => {
-    if (this.fpControls.isLocked) return;
+    if (this.isWalkModeActive) return;
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -181,7 +230,7 @@ export class SteelSceneManager {
     const time = performance.now();
     const delta = (time - this.prevTime) / 1000;
 
-    if (this.fpControls.isLocked) {
+    if (this.isWalkModeActive) {
       this.velocity.x -= this.velocity.x * 10.0 * delta;
       this.velocity.z -= this.velocity.z * 10.0 * delta;
       this.velocity.y -= this.velocity.y * 10.0 * delta;
@@ -197,9 +246,21 @@ export class SteelSceneManager {
       if (this.moveLeft || this.moveRight) this.velocity.x -= this.direction.x * speed * delta;
       if (this.moveUp || this.moveDown) this.velocity.y += this.direction.y * speed * delta;
 
-      this.fpControls.moveRight(-this.velocity.x * delta);
-      this.fpControls.moveForward(-this.velocity.z * delta);
-      this.fpControls.getObject().position.y += (this.velocity.y * delta);
+      // Movimiento relativo a la cámara
+      const worldDir = new THREE.Vector3();
+      this.camera.getWorldDirection(worldDir);
+      worldDir.y = 0;
+      worldDir.normalize();
+
+      const worldRight = new THREE.Vector3();
+      worldRight.crossVectors(this.camera.up, worldDir).negate();
+
+      const moveVec = new THREE.Vector3();
+      moveVec.addScaledVector(worldDir, -this.velocity.z * delta);
+      moveVec.addScaledVector(worldRight, this.velocity.x * delta);
+      
+      this.camera.position.add(moveVec);
+      this.camera.position.y += (this.velocity.y * delta);
     } else {
       this.controls.update();
     }
@@ -246,7 +307,7 @@ export class SteelSceneManager {
       this.houseGroup.add(floor);
     }
 
-    if (!this.fpControls.isLocked) {
+    if (!this.isWalkModeActive) {
       this.fitCamera();
     }
   }
@@ -359,6 +420,8 @@ export class SteelSceneManager {
     this.renderer.domElement.removeEventListener('dblclick', this.onDoubleClick);
     document.removeEventListener('keydown', this.onKeyDown);
     document.removeEventListener('keyup', this.onKeyUp);
+    this.renderer.domElement.removeEventListener('touchstart', this.onTouchStart);
+    this.renderer.domElement.removeEventListener('touchmove', this.onTouchMove);
     if (this.renderer) this.renderer.dispose();
     this.controls.dispose();
     this.fpControls.dispose();
