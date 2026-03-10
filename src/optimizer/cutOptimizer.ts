@@ -41,14 +41,15 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(flatParts);
 
-  const ITERATIONS = 3000; // Aumentado para búsqueda exhaustiva de combinaciones
+  // Aumentamos a 3000 iteraciones para búsqueda exhaustiva de combinaciones de apilamiento
+  const ITERATIONS = 3000; 
   let bestEfficiency = -1;
   let bestLayouts: OptimizedPanel[] = [];
 
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = [...flatParts];
     
-    // Estrategias de ordenamiento multivariadas
+    // Variamos el ordenamiento en cada iteración para explorar el espacio de soluciones
     if (i === 0) {
       currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     } else if (i === 1) {
@@ -67,8 +68,8 @@ export function runOptimization(
       bestLayouts = JSON.parse(JSON.stringify(currentLayouts));
     }
     
-    // Meta alcanzada (94% es el estándar Lepton para este dataset)
-    if (bestEfficiency > 95) break;
+    // Meta de excelencia industrial alcanzada
+    if (bestEfficiency > 96.5) break;
   }
 
   return {
@@ -84,10 +85,11 @@ export function runOptimization(
 
 /**
  * Algoritmo de Empaquetado por Estantes (Shelf-Packing) con búsqueda de Mejor Ajuste Vertical Exhaustivo.
+ * Implementa una tercera etapa de guillotina que permite apilar piezas pequeñas una sobre otra.
  */
 function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: number, partColors: Record<string, string>): OptimizedPanel[] {
   const panels: OptimizedPanel[] = [];
-  let remainingParts = [...parts];
+  let remainingParts = JSON.parse(JSON.stringify(parts)) as PartToCut[];
 
   while (remainingParts.length > 0) {
     const placedParts: OptimizedPart[] = [];
@@ -96,7 +98,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
     let currentY = 0;
     
     while (currentY < h && usedInPanel.size < remainingParts.length) {
-      // 1. Determinar el líder de la franja (la pieza más alta disponible que quepa en el ancho)
+      // 1. Determinar el líder de la franja (la pieza más alta que quepa en el ancho útil)
       let leaderIdx = -1;
       let shelfH = 0;
 
@@ -104,7 +106,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
         if (usedInPanel.has(i)) continue;
         const p = remainingParts[i];
         
-        // Intentar orientaciones
+        // Intentar orientaciones para definir la altura de la franja (líder)
         if (p.height <= (h - currentY) && p.width <= w) {
           leaderIdx = i;
           shelfH = p.height;
@@ -114,7 +116,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
         if (p.grainDirection === 'libre' && p.width <= (h - currentY) && p.height <= w) {
           leaderIdx = i;
           shelfH = p.width;
-          // Normalizar para esta simulación
+          // Rotación temporal del líder
           [remainingParts[i].width, remainingParts[i].height] = [remainingParts[i].height, remainingParts[i].width];
           break;
         }
@@ -128,7 +130,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
         let colW = 0;
 
         // 2. Buscar piezas para llenar la columna verticalmente (Etapa 3 de Guillotina)
-        // Buscamos la primera pieza que define el ancho de la columna
+        // Buscamos la primera pieza que define el ancho de la columna (Stack Leader)
         for (let i = 0; i < remainingParts.length; i++) {
           if (usedInPanel.has(i)) continue;
           const p = remainingParts[i];
@@ -146,7 +148,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
                 if (usedInPanel.has(j)) continue;
                 const p2 = remainingParts[j];
                 
-                // Debe caber en el ancho definido por la columna y en el alto restante
+                // Debe caber en el ancho definido por la columna y en el alto restante de la franja
                 if (p2.width <= colW && p2.height <= remH) {
                   subPieceIdx = j;
                   break;
@@ -164,7 +166,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
                 usedInPanel.add(subPieceIdx);
                 remH -= (remainingParts[subPieceIdx].height + kerf);
               } else {
-                break; // No caben más piezas en esta columna vertical
+                break; 
               }
             }
             break;
@@ -173,7 +175,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
 
         if (bestColumn.length === 0) break;
 
-        // Registrar piezas
+        // Registrar las piezas apiladas en la columna
         let yOffset = 0;
         bestColumn.forEach(idx => {
           const p = remainingParts[idx];
@@ -207,7 +209,7 @@ function executeGuillotineShelf(parts: PartToCut[], w: number, h: number, kerf: 
     
     remainingParts = remainingParts.filter((_, idx) => !usedInPanel.has(idx));
     
-    // Failsafe para piezas que no caben
+    // Failsafe para evitar bucles si hay piezas imposibles
     if (usedInPanel.size === 0 && remainingParts.length > 0) break;
   }
   return panels;
