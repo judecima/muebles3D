@@ -95,17 +95,16 @@ export class SteelSceneManager {
     });
 
     this.fpControls.addEventListener('unlock', () => {
-      this.controls.enabled = true;
-      this.isWalkModeActive = false;
-      if (this.onWalkModeLock) this.onWalkModeLock(false);
+      // Solo desactivar si realmente queremos salir (no por un fallo de permisos)
+      if (this.isWalkModeActive) {
+        this.controls.enabled = true;
+        this.isWalkModeActive = false;
+        if (this.onWalkModeLock) this.onWalkModeLock(false);
+      }
     });
 
-    // Manejar errores de bloqueo sin colapsar el sistema
     document.addEventListener('pointerlockerror', () => {
       console.warn('Pointer Lock API no pudo activarse. Continuando en modo navegación libre.');
-      // Aseguramos que el estado sea coherente para permitir navegación con joysticks/teclado
-      this.isWalkModeActive = true;
-      if (this.onWalkModeLock) this.onWalkModeLock(true);
     });
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -195,28 +194,33 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
+    // 1. Calcular centro de la casa para teletransporte
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
-    if (!box.isEmpty()) {
+    if (!box.isEmpty() && isFinite(box.min.x)) {
       box.getCenter(center);
     } else {
       center.set(0, 0, 0);
     }
     
-    // Posicionar cámara en el centro de la casa a altura humana
+    // 2. Posicionar cámara
     this.camera.position.set(center.x, 1700, center.z);
     this.camera.rotation.set(0, 0, 0);
     
-    // Forzar activación de estado incluso si el bloqueo de ratón falla
+    // 3. Activar lógica de navegación (esto habilita joysticks y teclado)
     this.isWalkModeActive = true;
-    if (this.onWalkModeLock) this.onWalkModeLock(true);
     this.controls.enabled = false;
+    if (this.onWalkModeLock) this.onWalkModeLock(true);
 
-    // Intentar bloqueo de ratón silenciosamente
+    // 4. Intentar bloqueo de ratón defensivamente (puede fallar en sandboxes)
     try {
-      this.fpControls.lock();
+      // Verificar si el documento permite PointerLock antes de llamar
+      if (document.fullscreenEnabled || (document as any).webkitFullscreenEnabled || true) {
+        this.fpControls.lock();
+      }
     } catch (err) {
-      console.warn('Bloqueo de ratón rechazado por el navegador.');
+      console.warn('No se pudo solicitar Pointer Lock debido a restricciones de seguridad del navegador.');
+      // El modo caminata sigue activo gracias al paso 3
     }
   }
 
