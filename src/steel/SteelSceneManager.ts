@@ -230,7 +230,7 @@ export class SteelSceneManager {
         this.fpControls.lock();
       }
     } catch (err) {
-      console.warn('Pointer Lock blocked. Using manual controls.');
+      // Fallback silencioso si Pointer Lock falla
     }
   }
 
@@ -391,19 +391,20 @@ export class SteelSceneManager {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
-    // Solera Inferior
+    // Solera Inferior (Estricta a longitud del muro)
     structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
-    // Solera Superior
+    // Solera Superior (Estricta a longitud del muro)
     structuralGroup.add(this.createProfile(wall.length, wall.height - this.profileFlange, 0, 0, 'PGU'));
 
     // Montantes
     const studCount = Math.ceil(wall.length / wall.studSpacing);
     for (let i = 0; i <= studCount; i++) {
       let x = i * wall.studSpacing;
-      if (x > wall.length) x = wall.length - this.profileThickness;
+      // Asegurar que el último montante esté exactamente al final del muro
+      if (x > wall.length - this.profileThickness) x = wall.length - this.profileFlange;
 
       // Verificar si choca con abertura
-      const inOpening = wall.openings.some(op => x > op.position && x < (op.position + op.width));
+      const inOpening = wall.openings.some(op => x >= op.position - 1 && x <= (op.position + op.width + 1));
       if (!inOpening) {
         structuralGroup.add(this.createProfile(wall.height, x, 0, 90, 'PGC'));
       }
@@ -414,13 +415,17 @@ export class SteelSceneManager {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       
       if (layers.lintels) {
-        // King Studs (laterales externos)
-        structuralGroup.add(this.createProfile(wall.height, op.position - this.profileWidth, 0, 90, 'PGC'));
-        structuralGroup.add(this.createProfile(wall.height, op.position + op.width, 0, 90, 'PGC'));
+        // King Studs (laterales externos - Ajustados a los límites del muro)
+        if (op.position - this.profileFlange >= 0) {
+          structuralGroup.add(this.createProfile(wall.height, op.position - this.profileFlange, 0, 90, 'PGC'));
+        }
+        if (op.position + op.width <= wall.length - this.profileFlange) {
+          structuralGroup.add(this.createProfile(wall.height, op.position + op.width, 0, 90, 'PGC'));
+        }
 
         // Jack Studs (sostienen dintel)
         structuralGroup.add(this.createProfile(sill + op.height, op.position, 0, 90, 'PGC'));
-        structuralGroup.add(this.createProfile(sill + op.height, op.position + op.width - this.profileWidth, 0, 90, 'PGC'));
+        structuralGroup.add(this.createProfile(sill + op.height, op.position + op.width - this.profileFlange, 0, 90, 'PGC'));
 
         // Dintel (Beam)
         structuralGroup.add(this.createProfile(op.width, op.position, sill + op.height, 0, 'PGU', this.colors.lintel));
@@ -429,7 +434,7 @@ export class SteelSceneManager {
         const crippleCount = Math.ceil(op.width / wall.studSpacing);
         for (let j = 1; j < crippleCount; j++) {
           const cx = op.position + j * wall.studSpacing;
-          if (cx < op.position + op.width) {
+          if (cx < op.position + op.width - this.profileFlange) {
             structuralGroup.add(this.createProfile(wall.height - (sill + op.height), cx, sill + op.height, 90, 'PGC'));
             if (op.type === 'window') {
               structuralGroup.add(this.createProfile(sill, cx, 0, 90, 'PGC'));
@@ -439,9 +444,9 @@ export class SteelSceneManager {
       }
     });
 
-    // Cruces de San Andrés
-    if (layers.crossBracing && (wall.length > 3000 || wall.height > 2500)) {
-      this.addCrossBracing(wall, structuralGroup);
+    // Cruces de San Andrés (Rediseñadas para evitar aberturas)
+    if (layers.crossBracing) {
+      this.addSmartCrossBracing(wall, structuralGroup);
     }
   }
 
@@ -463,23 +468,50 @@ export class SteelSceneManager {
     return mesh;
   }
 
-  private addCrossBracing(wall: SteelWall, group: THREE.Group) {
-    const bracingMat = new THREE.MeshStandardMaterial({ color: this.colors.bracing, metalness: 0.9 });
-    const createDiagonal = (x1: number, y1: number, x2: number, y2: number) => {
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const angle = Math.atan2(dy, dx);
-      
-      const geom = new THREE.BoxGeometry(dist, 50, 5);
-      const mesh = new THREE.Mesh(geom, bracingMat);
-      mesh.position.set(x1 + dx / 2, y1 + dy / 2, this.profileWidth / 2 + 5);
-      mesh.rotation.z = angle;
-      group.add(mesh);
-    };
+  /**
+   * Coloca cruces de San Andrés de forma inteligente evitando las aberturas.
+   * Divide el muro en segmentos sólidos y coloca cruces si el segmento es suficientemente ancho.
+   */
+  private addSmartCrossBracing(wall: SteelWall, group: THREE.Group) {
+    // Identificar zonas sin aberturas
+    const openings = [...wall.openings].sort((a, b) => a.position - b.position);
+    const solidSegments: { start: number, end: number }[] = [];
+    
+    let lastX = 0;
+    openings.forEach(op => {
+      if (op.position - lastX > 600) {
+        solidSegments.push({ start: lastX, end: op.position });
+      }
+      lastX = op.position + op.width;
+    });
+    
+    if (wall.length - lastX > 600) {
+      solidSegments.push({ start: lastX, end: wall.length });
+    }
 
-    createDiagonal(0, 0, wall.length, wall.height);
-    createDiagonal(wall.length, 0, 0, wall.height);
+    const bracingMat = new THREE.MeshStandardMaterial({ color: this.colors.bracing, metalness: 0.9 });
+
+    solidSegments.forEach(seg => {
+      const segW = seg.end - seg.start;
+      // Solo colocar cruces en paneles de al menos 1 metro para que sean efectivas estructuralmente
+      if (segW >= 1000) {
+        this.addDiagonal(seg.start, 0, seg.end, wall.height, group, bracingMat);
+        this.addDiagonal(seg.end, 0, seg.start, wall.height, group, bracingMat);
+      }
+    });
+  }
+
+  private addDiagonal(x1: number, y1: number, x2: number, y2: number, group: THREE.Group, material: THREE.Material) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    
+    const geom = new THREE.BoxGeometry(dist, 50, 5);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.set(x1 + dx / 2, y1 + dy / 2, this.profileWidth / 2 + 5);
+    mesh.rotation.z = angle;
+    group.add(mesh);
   }
 
   private createPanelMesh(wall: SteelWall, side: 'exterior' | 'interior'): THREE.Mesh {
