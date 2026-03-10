@@ -1,18 +1,18 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Alacena Rebatible Red Arquimax v15.3 Industrial
+ * Motor para Alacena Rebatible Red Arquimax v15.6 Industrial
  * - Estructura Sándwich: Base y Tapa de ancho completo (W).
- * - Sistema de Pistones a Gas sincronizados.
- * - Cálculo normativo de bisagras 90°.
+ * - Laterales confinados: H - 2T.
+ * - Sistema de Pistones a Gas cinemáticos.
  */
 export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T, hasBack } = dim;
-  const sideH = H - 2 * T; // Confinados entre base y tapa
+  const sideH = H - 2 * T;
   const innerW = W - 2 * T;
 
   const parts: Part[] = [
-    // Estructura Sándwich
+    // Estructura Sándwich (Base y Tapa W)
     { id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'tapa', name: 'Tapa Superior', width: W, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
@@ -29,14 +29,11 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   }
 
-  // Puerta Rebatible Overlay
-  const doorW = W - 4; // 2mm luz por lado
-  const doorH = H - 3; // 3mm luz superior
+  // Puerta Rebatible Overlay (Luz superior 3mm, laterales 2mm)
+  const doorW = W - 4; 
+  const doorH = H - 3; 
   const doorY = doorH / 2;
 
-  // Cálculo de bisagras 90°
-  let hingeCount = doorW <= 600 ? 2 : doorW <= 1200 ? 3 : 4;
-  
   parts.push({ 
     id: 'door-flip', 
     name: 'Puerta Abatible', 
@@ -47,7 +44,8 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     cutLargo: doorH, cutAncho: doorW, cutEspesor: T, grainDirection: 'horizontal'
   });
 
-  // Renderizado de Bisagras
+  // Cálculo Normativo de Bisagras 90°
+  let hingeCount = doorW <= 600 ? 2 : doorW <= 1200 ? 3 : 4;
   for (let i = 0; i < hingeCount; i++) {
     const posX = i === 0 ? 100 : (i === 1 ? W - 100 : W/2);
     parts.push({
@@ -57,24 +55,34 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   }
 
-  // Pistones Neumáticos
+  // Pistones Neumáticos con Cinemática Real
   const pistonCount = W <= 800 ? 1 : 2;
   const sides: ('left' | 'right')[] = pistonCount === 2 ? ['left', 'right'] : ['right'];
 
   sides.forEach(side => {
     const sideX = side === 'left' ? T + 10 : W - T - 10;
+    // Anclaje en el mueble (fijo)
+    const anchorMueble = { x: sideX, y: H * 0.4, z: D * 0.2 };
+    // Anclaje en la puerta (relativo al centro de la puerta para el render)
+    // El punto de la puerta debe estar cerca de la bisagra pero lo suficiente para pivotear
+    const anchorPuertaLocal = { 
+      x: side === 'left' ? -doorW/2 + 40 : doorW/2 - 40, 
+      y: doorH/2 - 120, 
+      z: -T/2 
+    };
+
     parts.push({
       id: `piston-${side}`,
       name: 'Pistón a Gas',
       width: 15, height: 15, depth: 220, 
-      x: sideX, y: 60, z: D/2 - 20, 
+      x: anchorMueble.x, y: anchorMueble.y, z: anchorMueble.z, 
       type: 'piston-body',
       isHardware: true,
       cutLargo: 0, cutAncho: 0, cutEspesor: 0, grainDirection: 'libre',
       pistonConfig: {
         side,
-        anchorMueble: { x: sideX, y: 60, z: D/2 - 20 },
-        anchorPuertaLocal: { x: side === 'left' ? -W/2 + 40 : W/2 - 40, y: H/2 - 30, z: -T/2 },
+        anchorMueble,
+        anchorPuertaLocal,
         doorId: 'door-flip',
         lengthClosed: 220,
         lengthOpen: 340
@@ -82,5 +90,5 @@ export function superiorWallFlipEngine(dim: FurnitureDimensions): FurnitureModel
     });
   });
 
-  return { parts, summary: `Alacena rebatible v15.3 Industrial con sistema de pistones a gas.`, hasDoors: true, hasDrawers: false };
+  return { parts, summary: `Alacena rebatible v15.6 Industrial: Cinemática de pistones y sándwich de apoyo.`, hasDoors: true, hasDrawers: false };
 }

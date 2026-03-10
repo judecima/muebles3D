@@ -100,7 +100,6 @@ export class SceneManager {
       const groupId = object.userData.groupId || id;
       const type = object.userData.type;
 
-      // Buscar si el grupo al que pertenece el objeto es un cajón o puerta
       let isDrawer = type === 'drawer';
       let isDoor = type?.includes('door');
 
@@ -183,6 +182,28 @@ export class SceneManager {
         const orig = obj.userData.originalPosition as THREE.Vector3;
         obj.position.z = orig.z + offset;
       }
+
+      // Cinemática de Pistones
+      if (type === 'piston-body') {
+        const config = obj.userData.pistonConfig;
+        const door = this.partsMap.get(config.doorId);
+        if (door) {
+          // Obtener punto de anclaje de la puerta en el mundo global
+          const anchorPuertaLocal = new THREE.Vector3(config.anchorPuertaLocal.x, config.anchorPuertaLocal.y, config.anchorPuertaLocal.z);
+          const targetGlobal = door.localToWorld(anchorPuertaLocal);
+          
+          // El pistón mira al punto de la puerta
+          obj.lookAt(targetGlobal);
+
+          // Escalar el vástago (hijo del cuerpo)
+          const rod = obj.getObjectByName('piston-rod');
+          if (rod) {
+            const currentDist = obj.position.distanceTo(targetGlobal);
+            const scale = currentDist / config.lengthClosed;
+            rod.scale.z = scale;
+          }
+        }
+      }
     });
   }
 
@@ -208,40 +229,63 @@ export class SceneManager {
     const interiorColor = baseColor.clone().offsetHSL(0, 0, 0.1); 
 
     parts.forEach(part => {
-      let geometry: THREE.BufferGeometry;
-      if (part.isHardware && part.name.includes('Bisagra')) {
-        geometry = new THREE.CylinderGeometry(17.5, 17.5, 12, 32);
-        geometry.rotateZ(Math.PI / 2); 
+      let mesh: THREE.Object3D;
+
+      if (part.type === 'piston-body') {
+        // Crear cuerpo del pistón
+        const bodyGeom = new THREE.CylinderGeometry(8, 8, part.depth, 16);
+        bodyGeom.rotateX(Math.PI / 2);
+        bodyGeom.translate(0, 0, part.depth / 2);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_body });
+        const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
+        
+        // Crear vástago como hijo
+        const rodGeom = new THREE.CylinderGeometry(4, 4, part.depth, 16);
+        rodGeom.rotateX(Math.PI / 2);
+        rodGeom.translate(0, 0, part.depth / 2);
+        const rodMat = new THREE.MeshStandardMaterial({ color: this.colors.piston_rod });
+        const rodMesh = new THREE.Mesh(rodGeom, rodMat);
+        rodMesh.name = 'piston-rod';
+        bodyMesh.add(rodMesh);
+
+        mesh = bodyMesh;
       } else {
-        geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
-      }
+        let geometry: THREE.BufferGeometry;
+        if (part.isHardware && part.name.includes('Bisagra')) {
+          geometry = new THREE.CylinderGeometry(17.5, 17.5, 12, 32);
+          geometry.rotateZ(Math.PI / 2); 
+        } else {
+          geometry = new THREE.BoxGeometry(part.width, part.height, part.depth);
+        }
 
-      let material: THREE.MeshStandardMaterial;
-      if (part.isHardware) {
-        material = new THREE.MeshStandardMaterial({ color: part.name.includes('Riel') ? this.colors.rail : this.colors.hinge, roughness: 0.2, metalness: 0.8 });
-      } else if (part.name.includes('Fondo')) {
-        material = new THREE.MeshStandardMaterial({ color: this.colors.mdf_back, roughness: 0.9 });
-      } else {
-        const isInternal = part.name.includes('Estante') || 
-                           (part.name.includes('Cajón') && !part.name.includes('Frente')) ||
-                           part.name.includes('Refuerzo') ||
-                           part.name.includes('Divisor');
-        material = new THREE.MeshStandardMaterial({ color: isInternal ? interiorColor : baseColor, roughness: 0.7 });
-      }
+        let material: THREE.MeshStandardMaterial;
+        if (part.isHardware) {
+          material = new THREE.MeshStandardMaterial({ color: part.name.includes('Riel') ? this.colors.rail : this.colors.hinge, roughness: 0.2, metalness: 0.8 });
+        } else if (part.name.includes('Fondo')) {
+          material = new THREE.MeshStandardMaterial({ color: this.colors.mdf_back, roughness: 0.9 });
+        } else {
+          const isInternal = part.name.includes('Estante') || 
+                             (part.name.includes('Cajón') && !part.name.includes('Frente')) ||
+                             part.name.includes('Refuerzo') ||
+                             part.name.includes('Divisor');
+          material = new THREE.MeshStandardMaterial({ color: isInternal ? interiorColor : baseColor, roughness: 0.7 });
+        }
 
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = mesh.receiveShadow = true;
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = mesh.receiveShadow = true;
 
-      if (!part.isHardware) {
-        const edges = new THREE.EdgesGeometry(geometry);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.3 }));
-        mesh.add(line);
+        if (!part.isHardware) {
+          const edges = new THREE.EdgesGeometry(geometry);
+          const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: this.colors.outline, transparent: true, opacity: 0.3 }));
+          mesh.add(line);
+        }
       }
 
       mesh.userData.originalPosition = new THREE.Vector3(part.x, part.y, part.z);
       mesh.userData.type = part.type;
       mesh.userData.id = part.id;
       mesh.userData.groupId = part.groupId;
+      mesh.userData.pistonConfig = part.pistonConfig;
 
       if ((part.type?.includes('door')) && part.pivot) {
         const pivotGroup = new THREE.Group();
