@@ -17,7 +17,8 @@ import {
   ZoomOut,
   Scissors,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  FileDown
 } from 'lucide-react';
 
 interface PartInput {
@@ -28,18 +29,18 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-// Dataset Mesopotamia Gris Tapir 18mm (23 Piezas Exactas)
+// Dataset Mesopotania Gris Tapir 18mm (23 Piezas Exactas según XML Lepton)
 const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(1) V1 ESTANTES", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-  { name: "(2) pieza 2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+  { name: "(2) V2 ESTANTES", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(4) V1 CAJ BASE", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
   { name: "(5) V2 CAJ BASE", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
   { name: "(15) V SUP INF", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
   { name: "(6) V1 LATS", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-  { name: "(8) V1 FREFO", width: 562, height: 150, quantity: 1, grainDirection: 'libre' },
-  { name: "v2 prefo", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-  { name: "v1 v2 caj", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
-  { name: "v caj cent2", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+  { name: "(8) V2 FREFO", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+  { name: "(3) V1V2 CAJ LAT", width: 500, height: 178, quantity: 2, grainDirection: 'libre' },
+  { name: "(22) V CAJ CENT 2", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+  { name: "(24) V CAJ CENT 2", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
 ];
 
 export default function TestOptimizerPage() {
@@ -93,16 +94,16 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax v6.0 Ultra</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax v8.0 Ultra</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Etapas con V-Stacking | Dataset Mesopotamia (23 Piezas)
+                <Scissors className="w-3 h-3 text-primary" /> Guillotina 4-Etapas / V-Stacking Industrial | Meta: +96% Eficiencia
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {loading ? "Calculando Franjas..." : "Optimizar +95%"}
+              {loading ? "Simulando 10,000 Ciclos..." : "Optimizar Nivel Industrial"}
             </Button>
           </div>
         </header>
@@ -111,7 +112,7 @@ export default function TestOptimizerPage() {
           <Card className="lg:col-span-1 shadow-sm border-none rounded-3xl overflow-hidden flex flex-col h-[750px]">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between p-4">
               <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Piezas Dataset ({parts.reduce((a, b) => a + b.quantity, 0)})
+                <Layers className="w-4 h-4" /> Piezas Dataset Mesopotamia ({parts.reduce((a, b) => a + b.quantity, 0)})
               </CardTitle>
               <Button variant="outline" size="icon" onClick={addPart} className="h-7 w-7 rounded-full">
                 <Plus className="w-3 h-3" />
@@ -190,7 +191,7 @@ export default function TestOptimizerPage() {
                   <p className="text-[10px] font-black uppercase tracking-widest">Estado de Optimización</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito! Todas las piezas consolidadas en un único tablero con eficiencia industrial." : "Buscando mejor ajuste..."}
+                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito! Todas las piezas consolidadas en un único tablero (Igualando Lepton)." : "Buscando mejor ajuste..."}
                 </p>
               </Card>
             </div>
@@ -200,7 +201,7 @@ export default function TestOptimizerPage() {
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
                     <CheckCircle2 className={`w-4 h-4 ${result.totalPanels === 1 ? 'text-green-500' : 'text-amber-500'}`} /> 
-                    Esquema de Corte (v6.0 V-Stacking)
+                    Esquema de Corte Industrial (2750x1830)
                   </h2>
                   <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -215,7 +216,7 @@ export default function TestOptimizerPage() {
                       <div key={idx} className="bg-white p-10 rounded-xl shadow-2xl mb-12 border border-slate-100" 
                            style={{ width: '1000px', aspectRatio: '2750 / 1830' }}>
                         <div className="flex items-center justify-between mb-4">
-                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">PANEL ÚNICO (2750x1830)</span>
+                          <span className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">TABLERO ÚNICO - MDF 18mm</span>
                           <span className="text-[10px] font-black text-primary uppercase">{panel.efficiency.toFixed(2)}% EFICIENCIA</span>
                         </div>
 
