@@ -19,7 +19,8 @@ import {
   ArrowUp,
   ArrowDown,
   Zap,
-  Gamepad2
+  Gamepad2,
+  MousePointer
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -174,17 +175,17 @@ export default function SteelFramingPage() {
               <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300 pointer-events-auto">
                 <div className="flex items-center gap-2 mb-2">
                   <Gamepad2 className="w-4 h-4 text-blue-400" />
-                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NAVEGACIÓN GAMER ACTIVA</span>
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NAVEGACIÓN ACTIVA</span>
                 </div>
                 <div className="grid grid-cols-1 gap-y-2">
                   <div className="flex items-center gap-2">
                     <Keyboard className="w-3 h-3 text-slate-400" />
-                    <span className="text-[10px] font-medium uppercase">WASD: Mover | SHIFT: Correr | Flechas: Mirar</span>
+                    <span className="text-[10px] font-medium uppercase">WASD / Flechas: Mover y Mirar</span>
                   </div>
                   {!isMobile && (
                     <div className="flex items-center gap-2">
-                      <MousePointer2 className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] font-medium uppercase">Q/E: Rotar | Mouse: Mirar libre</span>
+                      <MousePointer className="w-3 h-3 text-slate-400" />
+                      <span className="text-[10px] font-medium uppercase">Click en pantalla para mirada libre</span>
                     </div>
                   )}
                 </div>
@@ -194,42 +195,42 @@ export default function SteelFramingPage() {
           </div>
 
           {isWalkModeActive && isMobile && (
-            <div className="absolute inset-0 pointer-events-none z-50">
-              {/* Joystick de Movimiento (Izquierda) */}
-              <div className="absolute bottom-12 left-12 pointer-events-auto">
+            <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
+              {/* Joystick de Movimiento (Izquierda Inferior) */}
+              <div className="absolute bottom-16 left-16 pointer-events-auto">
                 <SteelJoystick 
-                  label="Moverse" 
+                  label="Movimiento" 
                   onMove={(v) => viewerRef.current?.updateJoystickMove(v.x, v.y)} 
                 />
               </div>
               
-              {/* Joystick de Mirada (Derecha) */}
-              <div className="absolute bottom-12 right-12 pointer-events-auto">
+              {/* Joystick de Mirada (Derecha Inferior) */}
+              <div className="absolute bottom-16 right-16 pointer-events-auto">
                 <SteelJoystick 
-                  label="Mirar" 
+                  label="Cámara" 
                   onMove={(v) => viewerRef.current?.updateJoystickLook(v.x, v.y)} 
                 />
               </div>
 
-              {/* Controles de Altura Centrales */}
-              <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+              {/* Controles de Altura Centrales (Opcional pero útil) */}
+              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-auto scale-90">
                 <Button 
-                  variant="secondary" size="icon" className="w-12 h-12 rounded-full opacity-80" 
+                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
                   onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
                 >
-                  <ArrowUp className="w-6 h-6" />
+                  <ArrowUp className="w-6 h-6 text-white" />
                 </Button>
                 <Button 
-                  variant="secondary" size="icon" className="w-12 h-12 rounded-full bg-orange-500 text-white shadow-lg" 
+                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600/60 backdrop-blur border border-white/20 shadow-lg" 
                   onTouchStart={() => viewerRef.current?.setMovement('sprint', true)} onTouchEnd={() => viewerRef.current?.setMovement('sprint', false)}
                 >
-                  <Zap className="w-6 h-6" />
+                  <Zap className="w-6 h-6 text-white" />
                 </Button>
                 <Button 
-                  variant="secondary" size="icon" className="w-12 h-12 rounded-full opacity-80" 
+                  variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
                   onTouchStart={() => viewerRef.current?.setMovement('down', true)} onTouchEnd={() => viewerRef.current?.setMovement('down', false)}
                 >
-                  <ArrowDown className="w-6 h-6" />
+                  <ArrowDown className="w-6 h-6 text-white" />
                 </Button>
               </div>
             </div>
@@ -238,7 +239,7 @@ export default function SteelFramingPage() {
           {!isWalkModeActive && (
             <div className="absolute bottom-4 right-4 bg-slate-900/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 pointer-events-none">
               <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                <Move className="w-3 h-3" /> CLICK IZQ: ROTAR | CLICK DER: PAN | RUEDA: ZOOM
+                <Move className="w-3 h-3" /> ROTAR: CLICK IZQ | PAN: CLICK DER | ZOOM: RUEDA
               </p>
             </div>
           )}

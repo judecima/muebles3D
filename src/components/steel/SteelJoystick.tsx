@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface SteelJoystickProps {
   label: string;
@@ -41,7 +41,8 @@ export function SteelJoystick({ label, onMove, className }: SteelJoystickProps) 
     const y = Math.sin(angle) * limitedDistance;
     
     setKnobPos({ x, y });
-    onMove({ x: x / radius, y: -y / radius }); // y invertido para Three.js
+    // Normalizamos el vector de -1 a 1
+    onMove({ x: x / radius, y: -y / radius }); 
   };
 
   const handleEnd = () => {
@@ -52,10 +53,10 @@ export function SteelJoystick({ label, onMove, className }: SteelJoystickProps) 
 
   return (
     <div className={`flex flex-col items-center gap-2 ${className}`}>
-      <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">{label}</span>
+      <span className="text-[9px] font-black text-white/60 uppercase tracking-[0.2em] drop-shadow-md">{label}</span>
       <div 
         ref={baseRef}
-        className="relative w-24 h-24 rounded-full bg-white/10 backdrop-blur-md border-2 border-white/20 touch-none"
+        className="relative w-32 h-32 rounded-full bg-slate-900/20 backdrop-blur-xl border-4 border-white/20 touch-none shadow-2xl"
         onTouchStart={() => setIsDragging(true)}
         onTouchMove={handleTouch}
         onTouchEnd={handleEnd}
@@ -64,14 +65,22 @@ export function SteelJoystick({ label, onMove, className }: SteelJoystickProps) 
         onMouseUp={handleEnd}
         onMouseLeave={handleEnd}
       >
+        {/* Guía Visual Central */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-1 h-1 rounded-full bg-white/10" />
+        </div>
+        
+        {/* Knob (Mando) */}
         <div 
-          className="absolute w-10 h-10 rounded-full bg-white/40 shadow-xl border border-white/50 transition-transform duration-75"
+          className="absolute w-14 h-14 rounded-full bg-white/30 shadow-2xl border-2 border-white/50 transition-transform duration-75 ease-out flex items-center justify-center"
           style={{ 
             left: '50%', 
             top: '50%', 
             transform: `translate(calc(-50% + ${knobPos.x}px), calc(-50% + ${knobPos.y}px))`
           }}
-        />
+        >
+          <div className="w-6 h-6 rounded-full bg-white/20 border border-white/40" />
+        </div>
       </div>
     </div>
   );

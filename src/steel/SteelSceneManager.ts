@@ -136,7 +136,7 @@ export class SteelSceneManager {
       case 'ShiftLeft':
       case 'ShiftRight': this.isShiftPressed = true; break;
       
-      // Rotación por Teclado
+      // Rotación por Teclado (Mirar)
       case 'ArrowUp': this.lookUp = true; break;
       case 'ArrowDown': this.lookDown = true; break;
       case 'ArrowLeft': this.lookLeft = true; break;
@@ -195,6 +195,7 @@ export class SteelSceneManager {
     try {
       this.fpControls.lock();
     } catch (e) {
+      // Fallback para dispositivos que no soportan pointer lock (móviles)
       if (this.onWalkModeLock) this.onWalkModeLock(true);
     }
   }
@@ -234,22 +235,27 @@ export class SteelSceneManager {
 
     if (this.isWalkModeActive) {
       // 1. Manejo de Rotación (Teclado + Joystick Look)
-      const rotationSpeed = 1.5 * delta;
+      const rotationSpeed = 1.8 * delta;
+      
+      // Rotación Horizontal (Mirar Izquierda/Derecha)
       if (this.lookLeft || this.rotateQ) this.camera.rotation.y += rotationSpeed;
       if (this.lookRight || this.rotateE) this.camera.rotation.y -= rotationSpeed;
+      
+      // Rotación Vertical (Mirar Arriba/Abajo)
       if (this.lookUp) this.camera.rotation.x += rotationSpeed;
       if (this.lookDown) this.camera.rotation.x -= rotationSpeed;
       
-      // Aplicar Joystick Look
+      // Aplicar Joystick Look (Móvil)
       if (this.joystickLook.lengthSq() > 0) {
-        this.camera.rotation.y -= this.joystickLook.x * 2.5 * delta;
-        this.camera.rotation.x += this.joystickLook.y * 2.5 * delta;
+        this.camera.rotation.y -= this.joystickLook.x * 3.5 * delta;
+        this.camera.rotation.x += this.joystickLook.y * 3.5 * delta;
       }
       
-      // Limitar mirada vertical
+      // Limitar mirada vertical para evitar dar la vuelta completa (gimbal lock visual)
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
 
       // 2. Manejo de Velocidad y Dirección
+      // Damping (desaceleración)
       this.velocity.x -= this.velocity.x * 10.0 * delta;
       this.velocity.z -= this.velocity.z * 10.0 * delta;
       this.velocity.y -= this.velocity.y * 10.0 * delta;
@@ -276,10 +282,10 @@ export class SteelSceneManager {
       if (this.direction.x !== 0) this.velocity.x -= this.direction.x * speed * delta;
       if (this.direction.y !== 0) this.velocity.y += this.direction.y * speed * delta;
 
-      // 3. Aplicar Movimiento en espacio Mundo pero orientado a Cámara
+      // 3. Aplicar Movimiento en espacio Mundo pero orientado a la Cámara
       const worldDir = new THREE.Vector3();
       this.camera.getWorldDirection(worldDir);
-      worldDir.y = 0;
+      worldDir.y = 0; // Bloqueamos movimiento vertical por orientación de cámara (caminar recto)
       worldDir.normalize();
 
       const worldRight = new THREE.Vector3();
