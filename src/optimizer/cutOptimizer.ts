@@ -15,8 +15,8 @@ interface InternalPart {
  * Implementa una jerarquía determinística de 4 capas:
  * 1. Panel (Área Útil)
  * 2. Fajas (Strips) - Cortes de lado a lado.
- * 3. Columnas (Containers) - Ancho fijo dentro de la faja.
- * 4. Piezas (Nesting) - Apilado vertical con ANCHO IDÉNTICO.
+ * 3. Columnas (Containers) - Ancho fijo definido por la pieza líder de la columna.
+ * 4. Piezas (Nesting) - Apilado vertical con ANCHO IDÉNTICO para respetar guillotina.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -37,17 +37,16 @@ export function runOptimization(
 
   // Estrategias Industriales Determinísticas
   const strategies = [
-    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área Mayor
-    (a: any, b: any) => b.height - a.height,                         // Altura Mayor
-    (a: any, b: any) => b.width - a.width,                           // Ancho Mayor
+    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área Mayor primero
+    (a: any, b: any) => b.height - a.height,                         // Altura Mayor primero
+    (a: any, b: any) => b.width - a.width,                           // Ancho Mayor primero
     (a: any, b: any) => Math.max(b.width, b.height) - Math.max(a.width, a.height), // Lado Mayor
-    (a: any, b: any) => (b.width / b.height) - (a.width / a.height), // Ratio
   ];
 
   let bestResult: OptimizationResult | null = null;
   const partColors = generateColors(filteredParts);
 
-  // Probar todas las estrategias y ambas orientaciones del panel
+  // EVALUACIÓN GLOBAL: Probar estrategias y orientaciones de panel (Horizontal vs Vertical)
   for (const strategy of strategies) {
     for (const isVerticalPanel of [false, true]) {
       const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
@@ -64,6 +63,7 @@ export function runOptimization(
 
       pool.sort(strategy);
 
+      // Dimensiones según orientación del panel para fajas
       const currentW = isVerticalPanel ? usableH : usableW;
       const currentH = isVerticalPanel ? usableW : usableH;
 
@@ -75,17 +75,18 @@ export function runOptimization(
         trim, 
         selectedThickness, 
         partColors, 
-        isVerticalPanel ? panelHeight : panelWidth, 
-        isVerticalPanel ? panelWidth : panelHeight,
+        panelWidth, 
+        panelHeight,
         isVerticalPanel
       );
       
       const totalPlaced = currentResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0);
-      const bestTotalPlaced = bestResult ? bestResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0) : -1;
+      const expectedTotal = pool.length;
 
-      if (!bestResult || totalPlaced > bestTotalPlaced) {
+      // Prioridad 1: Colocar TODAS las piezas. Prioridad 2: Menor número de paneles. Prioridad 3: Eficiencia.
+      if (!bestResult || totalPlaced > bestResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0)) {
         bestResult = currentResult;
-      } else if (totalPlaced === bestTotalPlaced) {
+      } else if (totalPlaced === bestResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0)) {
         if (currentResult.totalPanels < bestResult.totalPanels) {
           bestResult = currentResult;
         } else if (currentResult.totalPanels === bestResult.totalPanels && currentResult.totalEfficiency > bestResult.totalEfficiency) {
@@ -117,7 +118,7 @@ function buildStrictLayout(
     const placedInPanel: OptimizedPart[] = [];
     let currentY = 0;
 
-    // CAPA 2: FAJAS (STREPS) - Cortes de lado a lado
+    // CAPA 2: FAJAS (STRIPS) - Cortes horizontales de lado a lado
     while (currentY < usableH) {
       const leaderIdx = workingPool.findIndex(p => !p.placed && 
         ((p.width <= usableW && p.height <= (usableH - currentY)) || 
@@ -128,25 +129,21 @@ function buildStrictLayout(
 
       const leader = workingPool[leaderIdx];
       let shelfH = leader.height;
-      let rotatedLeader = false;
-
-      // Definir altura de la faja basada en el líder
+      
+      // Decidir altura de faja óptima si es libre
       if (leader.grainDirection === 'libre') {
         const canN = leader.width <= usableW && leader.height <= (usableH - currentY);
         const canR = leader.height <= usableW && leader.width <= (usableH - currentY);
         if (canR && (!canN || leader.width > leader.height)) {
           shelfH = leader.width;
-          rotatedLeader = true;
         }
       }
 
       let currentX = 0;
 
-      // CAPA 3: COLUMNAS (CONTAINERS) - Ancho fijo
+      // CAPA 3: COLUMNAS (CONTAINERS) - Ancho fijo por pieza líder
       while (currentX < usableW) {
         let colLeaderIdx = -1;
-        
-        // Buscar líder de columna que entre en la altura de la faja
         for (let i = 0; i < workingPool.length; i++) {
           const p = workingPool[i];
           if (p.placed) continue;
@@ -162,8 +159,6 @@ function buildStrictLayout(
 
         const colLeader = workingPool[colLeaderIdx];
         let isColRotated = false;
-        
-        // Decidir orientación del líder de columna
         const canN = colLeader.width <= (usableW - currentX) && colLeader.height <= shelfH;
         const canR = colLeader.grainDirection === 'libre' && colLeader.height <= (usableW - currentX) && colLeader.width <= shelfH;
         
@@ -172,7 +167,8 @@ function buildStrictLayout(
         const colW = isColRotated ? colLeader.height : colLeader.width;
         let colUsedH = 0;
 
-        // CAPA 4: NESTING (PIEZAS) - Apilado vertical ESTRICTO por ancho
+        // CAPA 4: PIEZAS (NESTING) - Apilado vertical ESTRICTO
+        // Regla de Oro: Solo piezas con EL MISMO ANCHO entran en esta columna para guillotina.
         while (colUsedH < shelfH) {
           let bestPartIdx = -1;
           let bestPartRot = false;
@@ -182,7 +178,7 @@ function buildStrictLayout(
             if (p.placed) continue;
             
             const remH = shelfH - colUsedH;
-            // IMPORTANTE: Para que sea guillotina, el ancho debe ser IDÉNTICO al de la columna
+            // Solo entra si el ancho es EXACTAMENTE el mismo que el líder de columna
             const matchesN = p.width === colW && p.height <= remH;
             const matchesR = p.grainDirection === 'libre' && p.height === colW && p.width <= remH;
 
@@ -203,13 +199,18 @@ function buildStrictLayout(
           const finalW = bestPartRot ? p.height : p.width;
           const finalH = bestPartRot ? p.width : p.height;
 
-          // Guardar pieza con coordenadas globales
+          // Convertir a coordenadas globales respetando la orientación del panel
+          const globalX = isVertical ? currentY : currentX;
+          const globalY = isVertical ? currentX : currentY + colUsedH;
+          const globalW = isVertical ? finalH : finalW;
+          const globalH = isVertical ? finalW : finalH;
+
           placedInPanel.push({
             name: p.name,
-            x: isVertical ? currentY : currentX,
-            y: isVertical ? currentX : currentY + colUsedH,
-            width: isVertical ? finalH : finalW,
-            height: isVertical ? finalW : finalH,
+            x: globalX,
+            y: globalY,
+            width: globalW,
+            height: globalH,
             rotated: isVertical ? !bestPartRot : bestPartRot,
             color: colors[p.name]
           });
@@ -236,18 +237,17 @@ function buildStrictLayout(
       totalArea: panelArea
     });
 
-    if (panels.length > 30) break;
+    if (panels.length > 20) break; 
   }
 
   const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
   const totalAvail = panels.length * panelWidth * panelHeight;
-  const totalEfficiency = (totalUsed / totalAvail) * 100;
 
   return {
     optimizedLayout: panels,
     totalPanels: panels.length,
-    totalEfficiency,
-    summary: `ArquiMax Industrial Engine v12.1: Guillotina Estricta de 3 Etapas.`,
+    totalEfficiency: (totalUsed / totalAvail) * 100,
+    summary: `ArquiMax Industrial Engine v12.1: Jerarquía de 4 Capas (3-Stage Guillotine).`,
     kerf,
     trim,
     selectedThickness
