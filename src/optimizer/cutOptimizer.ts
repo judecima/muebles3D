@@ -16,8 +16,8 @@ interface PartToCut {
 }
 
 /**
- * ArquiMax Deep Engine v7.0 (Multi-Strategy Guillotine)
- * Soporta optimización orientada a Medio Panel Horizontal y evaluación de cortes V-H-V.
+ * ArquiMax Deep Engine v7.5 (Multi-Strategy Guillotine)
+ * Optimizado para Medio Panel Horizontal (Corte vertical a los 1375mm).
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -51,21 +51,20 @@ export function runOptimization(
   let bestScore = -Infinity;
   let bestLayouts: OptimizedPanel[] = [];
 
-  // Probamos estrategias de orientación (H-V-H vs V-H-V)
   const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
 
   for (let i = 0; i < ITERATIONS; i++) {
     const currentParts = [...flatParts];
     const strategy = strategies[i % strategies.length];
     
-    // Mezcla de ordenamiento para encontrar el mejor "packing"
     if (i % 4 === 0) currentParts.sort((a, b) => b.height - a.height || b.width - a.width);
     else if (i % 4 === 1) currentParts.sort((a, b) => b.width - a.width || b.height - a.height);
     else if (i % 4 === 2) currentParts.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     else shuffle(currentParts);
 
     const currentLayouts = executeGuillotineStrategy(currentParts, usableW, usableH, kerf, partColors, strategy);
-    const score = calculateScore(currentLayouts, panelHeight / 2);
+    // Evaluamos contra medio panel (usableW / 2)
+    const score = calculateScore(currentLayouts, usableW / 2);
 
     if (score > bestScore) {
       bestScore = score;
@@ -79,7 +78,7 @@ export function runOptimization(
     optimizedLayout: bestLayouts,
     totalPanels: bestLayouts.length,
     totalEfficiency: efficiency,
-    summary: `ArquiMax v7.0 (Optimized): Eficiencia ${efficiency.toFixed(2)}%. Venta mínima: Medio Panel Horizontal.`,
+    summary: `ArquiMax v7.5: Eficiencia ${efficiency.toFixed(2)}%. Prioridad: Medio Panel (1375mm).`,
     kerf,
     trim,
     selectedThickness
@@ -167,7 +166,6 @@ function executeGuillotineStrategy(
         currentY += stripH + kerf;
       }
     } else {
-      // Estrategia Vertical (V-H-V)
       let currentX = 0;
       while (currentX < w && remainingParts.length > 0) {
         let stripLeaderIdx = -1;
@@ -237,17 +235,17 @@ function executeGuillotineStrategy(
   return panels;
 }
 
-function calculateScore(layouts: OptimizedPanel[], halfHeight: number): number {
+function calculateScore(layouts: OptimizedPanel[], halfWidth: number): number {
   if (layouts.length === 0) return -Infinity;
   const firstPanel = layouts[0];
-  const maxY = firstPanel.parts.reduce((max, p) => Math.max(max, p.y + p.height), 0);
+  const maxX = firstPanel.parts.reduce((max, p) => Math.max(max, p.x + p.width), 0);
   
-  // Bonus si cabe en medio panel horizontal
+  // Bonus si cabe en medio panel (1375mm)
   let score = firstPanel.efficiency;
-  if (maxY <= halfHeight) score += 100;
+  if (maxX <= halfWidth) score += 500; // Gran incentivo para entrar en medio panel
   
   // Penalización por paneles extra
-  score -= (layouts.length - 1) * 500;
+  score -= (layouts.length - 1) * 2000;
   return score;
 }
 

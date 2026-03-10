@@ -20,7 +20,7 @@ import {
   AlertCircle,
   Info,
   Layers,
-  ArrowDownToLine
+  ArrowRightToLine
 } from 'lucide-react';
 
 interface PartInput {
@@ -78,8 +78,8 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Motor ArquiMax v7.0</h1>
-              <p className="text-slate-500 text-sm font-medium">Validador de Optimización y Venta de Medio Panel</p>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Laboratorio ArquiMax v7.5</h1>
+              <p className="text-slate-500 text-sm font-medium">Validador Industrial de Medio Panel (1375mm)</p>
             </div>
           </div>
           <Button size="lg" onClick={handleOptimize} disabled={loading} className="font-black uppercase px-10 h-14 bg-slate-900 hover:bg-black">
@@ -88,10 +88,9 @@ export default function TestOptimizerPage() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Formulario de Entrada */}
           <Card className="lg:col-span-2 shadow-sm border-slate-200">
             <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Listado de Piezas</CardTitle>
+              <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-widest">Listado de Piezas Personalizado</CardTitle>
               <Button variant="outline" size="sm" onClick={addPart} className="h-8 text-[10px] font-bold">
                 <Plus className="w-3.5 h-3.5 mr-1" /> AGREGAR PIEZA
               </Button>
@@ -102,8 +101,8 @@ export default function TestOptimizerPage() {
                   <thead className="bg-white sticky top-0 border-b z-10">
                     <tr>
                       <th className="p-4 text-left font-bold text-slate-400 uppercase tracking-widest">Nombre</th>
-                      <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Base (mm)</th>
-                      <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Altura (mm)</th>
+                      <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Largo (mm)</th>
+                      <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Ancho (mm)</th>
                       <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Cant.</th>
                       <th className="p-4 text-center font-bold text-slate-400 uppercase tracking-widest">Veta</th>
                       <th className="p-4"></th>
@@ -149,28 +148,27 @@ export default function TestOptimizerPage() {
             </CardContent>
           </Card>
 
-          {/* Métricas */}
           <div className="space-y-6">
             <Card className="shadow-sm border-slate-200">
               <CardHeader className="pb-2 border-b">
                 <CardTitle className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" /> Resultados de Cálculo
+                  <BarChart3 className="w-4 h-4" /> Métricas ArquiMax
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6 space-y-4">
                 <div className="flex justify-between items-baseline">
                   <span className="text-4xl font-black text-slate-900">{result ? `${result.totalEfficiency.toFixed(2)}%` : '--.--%'}</span>
-                  <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-primary/10 text-primary">Eficiencia</span>
+                  <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-primary/10 text-primary">Aprovechamiento</span>
                 </div>
                 <Progress value={result?.totalEfficiency || 0} className="h-2.5 bg-slate-100" />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-50 p-4 rounded-xl border text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Paneles</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase">Tableros</p>
                     <p className="text-lg font-black text-slate-800">{result?.totalPanels || '-'}</p>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-xl border text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Kerf</p>
-                    <p className="text-lg font-black text-slate-800">4.5mm</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase">Corte Vertical</p>
+                    <p className="text-lg font-black text-slate-800">1375mm</p>
                   </div>
                 </div>
               </CardContent>
@@ -179,31 +177,30 @@ export default function TestOptimizerPage() {
             <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-4">
               <div className="flex items-center gap-3">
                 <Info className="w-5 h-5 text-primary" />
-                <p className="text-xs font-bold uppercase tracking-widest">Lógica Red Arquimax</p>
+                <p className="text-xs font-bold uppercase tracking-widest">Lógica de Venta</p>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                Si el conjunto cabe en <span className="text-white font-bold">Medio Panel Horizontal</span> (2750x915mm), el motor prioriza cortes que maximicen el aprovechamiento de esa unidad de venta mínima.
+                El motor prioriza el <span className="text-white font-bold">Medio Panel Horizontal</span>. En un tablero de 2750x1830, el límite es de <span className="text-primary font-bold">1375mm</span> de ancho manteniendo la altura completa.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Visualización del Panel */}
         {result && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-green-500" /> Esquema de Corte Industrial
+              <CheckCircle2 className="w-6 h-6 text-green-500" /> Plano de Corte Industrial
             </h2>
             
             {result.optimizedLayout.map((panel, idx) => (
               <div key={idx} className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex gap-4 items-center">
-                    <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">PANEL #{panel.panelNumber}</span>
-                    <span className="text-sm font-black text-slate-800">2750 x 1830 mm</span>
+                    <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">TABLERO #{panel.panelNumber}</span>
+                    <span className="text-sm font-black text-slate-800">2750 x 1830 mm (Área Útil: {2750 - result.trim*2}x{1830 - result.trim*2}mm)</span>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Uso de Tablero</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Uso Global</p>
                     <p className="text-xl font-black text-primary">{panel.efficiency.toFixed(2)}%</p>
                   </div>
                 </div>
@@ -211,33 +208,27 @@ export default function TestOptimizerPage() {
                 <div className="relative bg-slate-100 rounded-lg mx-auto overflow-hidden shadow-inner border border-slate-300" 
                      style={{ width: '100%', aspectRatio: '2750 / 1830' }}>
                   
-                  {/* Línea de Medio Panel */}
-                  <div className="absolute left-0 right-0 top-1/2 h-0 border-t-2 border-dashed border-red-400/50 z-30 pointer-events-none">
-                    <span className="absolute right-4 top-2 bg-red-400 text-white px-3 py-1 rounded text-[8px] font-black uppercase">Límite Medio Panel</span>
+                  {/* Línea de Medio Panel (División Vertical a 1375mm) */}
+                  <div className="absolute top-0 bottom-0 left-1/2 w-0 border-l-2 border-dashed border-red-500/50 z-30 pointer-events-none">
+                    <span className="absolute top-4 left-2 bg-red-500 text-white px-3 py-1 rounded text-[8px] font-black uppercase shadow-lg">Límite Medio Panel (1375mm)</span>
                   </div>
 
-                  {/* Trim Visual */}
-                  <div className="absolute inset-0 border-slate-400/20 border-solid pointer-events-none z-20"
-                       style={{ borderWidth: `${(10 / 1830) * 100}% ${(10 / 2750) * 100}%` }}>
-                  </div>
-
-                  {/* Área Útil */}
-                  <div className="absolute" style={{ 
-                    left: `${(10 / 2750) * 100}%`, 
-                    top: `${(10 / 1830) * 100}%`, 
-                    width: `${((2750 - 20) / 2750) * 100}%`, 
-                    height: `${((1830 - 20) / 1830) * 100}%`,
-                    backgroundColor: '#fff',
-                    backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)',
-                    backgroundSize: '20px 20px'
+                  {/* Área Útil (Descontando Trim) */}
+                  <div className="absolute bg-white" style={{ 
+                    left: `${(result.trim / 2750) * 100}%`, 
+                    top: `${(result.trim / 1830) * 100}%`, 
+                    width: `${((2750 - result.trim * 2) / 2750) * 100}%`, 
+                    height: `${((1830 - result.trim * 2) / 1830) * 100}%`,
+                    backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+                    backgroundSize: '24px 24px'
                   }}>
                     {panel.parts.map((p, pIdx) => (
                       <div key={pIdx} className="absolute border border-slate-900/60 flex items-center justify-center transition-all hover:brightness-90 group"
                            style={{
-                             left: `${(p.x / (2750 - 20)) * 100}%`,
-                             top: `${(p.y / (1830 - 20)) * 100}%`,
-                             width: `${(p.width / (2750 - 20)) * 100}%`,
-                             height: `${(p.height / (1830 - 20)) * 100}%`,
+                             left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
+                             top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
+                             width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
+                             height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
                              backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
                            }}>
                         <div className="flex flex-col items-center leading-none p-1 pointer-events-none overflow-hidden text-center">
@@ -250,9 +241,9 @@ export default function TestOptimizerPage() {
                 </div>
                 
                 <div className="flex gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 items-center">
-                  <ArrowDownToLine className="w-5 h-5 text-primary" />
+                  <ArrowRightToLine className="w-5 h-5 text-primary" />
                   <p className="text-[10px] text-slate-500 font-medium italic">
-                    El algoritmo v7.0 ha evaluado tanto cortes de guillotina horizontales como verticales para minimizar el desperdicio dentro de este tablero específico.
+                    El motor ArquiMax v7.5 ha evaluado la distribución para maximizar el área libre en la mitad derecha del panel, favoreciendo la venta de Medio Panel (1375mm).
                   </p>
                 </div>
               </div>
