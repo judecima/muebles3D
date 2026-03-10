@@ -11,24 +11,27 @@ export interface CutlistPart {
 
 /**
  * Transforma las piezas del modelo 3D en una lista de piezas agrupadas para el optimizador.
- * Agrupa automáticamente piezas con las mismas dimensiones técnicas.
+ * Asegura que todas las medidas de salida sean números enteros.
  */
 export function generateCutListFromModel(parts: Part[]): CutlistPart[] {
-  // Filtrar solo piezas que no sean herrajes (madera/MDF)
   const woodParts = parts.filter(p => !p.isHardware);
   
   const aggregated = woodParts.reduce((acc, part) => {
-    // La clave de agrupación incluye dimensiones y dirección de veta
-    const key = `${part.name}-${part.cutLargo}-${part.cutAncho}-${part.cutEspesor}-${part.grainDirection}`;
+    // Forzar redondeo a enteros en la generación de la lista de corte
+    const l = Math.round(part.cutLargo);
+    const a = Math.round(part.cutAncho);
+    const e = Math.round(part.cutEspesor);
+    
+    const key = `${part.name}-${l}-${a}-${e}-${part.grainDirection}`;
     
     if (!acc[key]) {
       acc[key] = {
         name: part.name,
-        width: part.cutLargo,
-        height: part.cutAncho,
+        width: l,
+        height: a,
         quantity: 0,
         grainDirection: part.grainDirection,
-        thickness: part.cutEspesor
+        thickness: e
       };
     }
     
@@ -36,6 +39,5 @@ export function generateCutListFromModel(parts: Part[]): CutlistPart[] {
     return acc;
   }, {} as Record<string, CutlistPart>);
 
-  // Retornar como array ordenado por área descendente (preprocesamiento industrial)
   return Object.values(aggregated).sort((a, b) => (b.width * b.height) - (a.width * a.height));
 }

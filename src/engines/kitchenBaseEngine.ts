@@ -1,43 +1,32 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
-/**
- * Motor para Bajo Mesada Paramétrico Red Arquimax v15.2
- * Estructura Sándwich (Tapas W) + Bisagras Calculadas normativamente.
- */
 export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T, hasBack, hasShelf } = dim;
-  const innerW = W - 2 * T;
-  const sideH = H - T; // Apoyado en base inferior, amarres arriba
+  const innerW = Math.round(W - 2 * T);
+  const sideH = Math.round(H - T); 
 
   const parts: Part[] = [
-    { id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'lat-R', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: Math.round(W), cutAncho: Math.round(D), cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: Math.round(D), cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'lat-R', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: Math.round(D), cutEspesor: T, grainDirection: 'vertical' },
     { id: 'amarre-F', name: 'Amarre Frontal', width: innerW, height: T, depth: 60, x: W/2, y: H - T/2, z: D/2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'amarre-B', name: 'Amarre Trasero', width: innerW, height: 60, depth: T, x: W/2, y: H - 30, z: -D/2 + T/2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
   ];
 
   if (hasBack) {
-    parts.push({ id: 'fondo', name: 'Fondo MDF 3mm', width: W - 2, height: H - 2, depth: 3, x: W/2, y: H/2, z: -D/2 - 1.5, type: 'static', cutLargo: H - 2, cutAncho: W - 2, cutEspesor: 3, grainDirection: 'libre' });
+    parts.push({ id: 'fondo', name: 'Fondo MDF 3mm', width: W - 2, height: H - 2, depth: 3, x: W/2, y: H/2, z: -D/2 - 1.5, type: 'static', cutLargo: Math.round(H - 2), cutAncho: Math.round(W - 2), cutEspesor: 3, grainDirection: 'libre' });
   }
 
   if (hasShelf) {
-    parts.push({ id: 'shelf', name: 'Estante Interno', width: innerW - 2, height: T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: innerW - 2, cutAncho: D * 0.9, cutEspesor: T, grainDirection: 'horizontal' });
+    parts.push({ id: 'shelf', name: 'Estante Interno', width: innerW - 2, height: T, depth: D * 0.9, x: W/2, y: H/2, z: 0, type: 'static', cutLargo: Math.round(innerW - 2), cutAncho: Math.round(D * 0.9), cutEspesor: T, grainDirection: 'horizontal' });
   }
 
-  // Puertas con Bisagras Normativas
-  const doorH = H - 3; // Luz superior 3mm
-  const doorW = (W - 3) / 2; // Luz 3mm total central
+  const doorH = Math.round(H - 3); 
+  const doorW = Math.round((W - 3) / 2); 
   const doorY = doorH / 2;
 
-  const getHingeCount = (h: number, w: number) => {
-    let count = h <= 900 ? 2 : h <= 1500 ? 3 : h <= 2000 ? 4 : 5;
-    if (w > 600) count += 1;
-    return count;
-  };
-
   const addHinges = (doorId: string, h: number, w: number, pivotX: number, dY: number) => {
-    const count = getHingeCount(h, w);
+    const count = h <= 900 ? 2 : h <= 1500 ? 3 : h <= 2000 ? 4 : 5;
     for (let i = 0; i < count; i++) {
       let posY = (dY - h/2 + 100);
       if (count > 1) posY = (dY - h/2 + 100) + (i * (h - 200) / (count - 1));

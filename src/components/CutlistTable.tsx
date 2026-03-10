@@ -14,9 +14,14 @@ export function CutlistTable({ parts }: CutlistTableProps) {
   const hardware = parts.filter(p => p.isHardware);
 
   const aggregatedPanels = panels.reduce((acc, part) => {
-    const key = `${part.name}-${part.cutLargo}-${part.cutAncho}-${part.cutEspesor}`;
+    // Forzar redondeo antes de agrupar para evitar duplicados por decimales
+    const l = Math.round(part.cutLargo);
+    const a = Math.round(part.cutAncho);
+    const e = Math.round(part.cutEspesor);
+    
+    const key = `${part.name}-${l}-${a}-${e}`;
     if (!acc[key]) {
-      acc[key] = { ...part, quantity: 0 };
+      acc[key] = { ...part, cutLargo: l, cutAncho: a, cutEspesor: e, quantity: 0 };
     }
     acc[key].quantity += 1;
     return acc;
@@ -27,7 +32,6 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     if (!acc[key]) {
       acc[key] = { ...part, quantity: 0 };
     }
-    // Lógica Red Arquimax v15.0: Rieles se venden por juego (2 piezas = 1 juego)
     const increment = part.name.toLowerCase().includes('riel') ? 0.5 : 1;
     acc[key].quantity += increment;
     return acc;
@@ -40,7 +44,8 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
       <CardHeader className="py-2 px-4 md:px-6 bg-slate-50 shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-xs md:text-sm font-bold flex items-center gap-2 text-primary">
-          <ListChecks className="w-4 h-4" /> Despiece Técnico (Red Arquimax v15.0)
+          <point className="w-1 h-1 bg-primary rounded-full" />
+          Despiece Técnico (Red Arquimax v15.9)
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex-1 overflow-hidden">
@@ -51,8 +56,8 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                 <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                   <TableRow>
                     <TableHead className="text-[10px] font-bold uppercase py-2 h-8 px-2">Pieza</TableHead>
-                    <TableHead className="text-right text-[10px] font-bold uppercase py-2 h-8 px-2">Largo</TableHead>
-                    <TableHead className="text-right text-[10px] font-bold uppercase py-2 h-8 px-2">Ancho</TableHead>
+                    <TableHead className="text-right text-[10px] font-bold uppercase py-2 h-8 px-2">Largo (mm)</TableHead>
+                    <TableHead className="text-right text-[10px] font-bold uppercase py-2 h-8 px-2">Ancho (mm)</TableHead>
                     <TableHead className="text-right text-[10px] font-bold uppercase py-2 h-8 px-2">Cant.</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -63,8 +68,8 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                     panelList.map((part, idx) => (
                       <TableRow key={idx} className="hover:bg-slate-50 transition-colors h-8">
                         <TableCell className="font-medium text-[10px] py-1 px-2">{part.name}</TableCell>
-                        <TableCell className="text-right text-[10px] py-1 px-2">{part.cutLargo} mm</TableCell>
-                        <TableCell className="text-right text-[10px] py-1 px-2">{part.cutAncho} mm</TableCell>
+                        <TableCell className="text-right text-[10px] py-1 px-2 font-mono">{part.cutLargo}</TableCell>
+                        <TableCell className="text-right text-[10px] py-1 px-2 font-mono">{part.cutAncho}</TableCell>
                         <TableCell className="text-right text-[10px] py-1 px-2 font-bold">{part.quantity}</TableCell>
                       </TableRow>
                     ))
