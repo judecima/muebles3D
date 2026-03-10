@@ -26,7 +26,7 @@ export class SteelSceneManager {
   private moveDown = false;
   private isShiftPressed = false;
   
-  // Rotación por Teclado
+  // Rotación por Teclado (Mirar)
   private lookUp = false;
   private lookDown = false;
   private lookLeft = false;
@@ -87,6 +87,7 @@ export class SteelSceneManager {
     this.fpControls = new PointerLockControls(this.camera, this.renderer.domElement);
     this.scene.add(this.fpControls.getObject());
 
+    // Listeners para PointerLock
     this.fpControls.addEventListener('lock', () => {
       this.controls.enabled = false;
       this.isWalkModeActive = true;
@@ -97,6 +98,13 @@ export class SteelSceneManager {
       this.controls.enabled = true;
       this.isWalkModeActive = false;
       if (this.onWalkModeLock) this.onWalkModeLock(false);
+    });
+
+    // Manejar errores de PointerLock (común en Studio o Móvil)
+    document.addEventListener('pointerlockerror', () => {
+      console.warn('Pointer Lock API no disponible o rechazada. Continuando en modo navegación libre.');
+      this.isWalkModeActive = true;
+      if (this.onWalkModeLock) this.onWalkModeLock(true);
     });
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -179,7 +187,6 @@ export class SteelSceneManager {
     }
   }
 
-  // Métodos para Joystick (Móvil)
   public updateJoystickMove(x: number, y: number) {
     this.joystickMove.set(x, y);
   }
@@ -189,7 +196,7 @@ export class SteelSceneManager {
   }
 
   public enterWalkMode() {
-    // 1. Encontrar el centro de la casa para no aparecer en el vacío (teletransporte)
+    // 1. Encontrar el centro real de la casa
     const box = new THREE.Box3().setFromObject(this.houseGroup);
     const center = new THREE.Vector3();
     if (!box.isEmpty()) {
@@ -198,18 +205,21 @@ export class SteelSceneManager {
       center.set(0, 0, 0);
     }
     
-    // 2. Posicionar la cámara en el centro de la casa a altura humana (1.7m)
-    // Desplazamos un poco en Z para no estar exactamente en el medio si hay muros
+    // 2. Posicionar cámara directamente para evitar saltos
     this.camera.position.set(center.x, 1700, center.z + 1000);
     this.camera.rotation.set(0, 0, 0);
     this.camera.lookAt(center.x, 1700, center.z);
     
+    // 3. Forzar activación de estado incluso si lock falla
     this.isWalkModeActive = true;
+    if (this.onWalkModeLock) this.onWalkModeLock(true);
+    this.controls.enabled = false;
+
+    // 4. Intentar bloqueo de ratón (opcional)
     try {
       this.fpControls.lock();
     } catch (e) {
-      // Fallback para dispositivos que no soportan pointer lock (móviles)
-      if (this.onWalkModeLock) this.onWalkModeLock(true);
+      // Ignorar excepción de API PointerLock
     }
   }
 
@@ -250,30 +260,23 @@ export class SteelSceneManager {
       // 1. Manejo de Rotación (Teclado + Joystick Look)
       const rotationSpeed = 1.8 * delta;
       
-      // Rotación Horizontal (Mirar Izquierda/Derecha)
       if (this.lookLeft || this.rotateQ) this.camera.rotation.y += rotationSpeed;
       if (this.lookRight || this.rotateE) this.camera.rotation.y -= rotationSpeed;
-      
-      // Rotación Vertical (Mirar Arriba/Abajo)
       if (this.lookUp) this.camera.rotation.x += rotationSpeed;
       if (this.lookDown) this.camera.rotation.x -= rotationSpeed;
       
-      // Aplicar Joystick Look (Móvil)
       if (this.joystickLook.lengthSq() > 0) {
         this.camera.rotation.y -= this.joystickLook.x * 3.5 * delta;
         this.camera.rotation.x += this.joystickLook.y * 3.5 * delta;
       }
       
-      // Limitar mirada vertical para evitar dar la vuelta completa (gimbal lock visual)
       this.camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.camera.rotation.x));
 
-      // 2. Manejo de Velocidad y Dirección
-      // Damping (desaceleración)
+      // 2. Manejo de Velocidad
       this.velocity.x -= this.velocity.x * 10.0 * delta;
       this.velocity.z -= this.velocity.z * 10.0 * delta;
       this.velocity.y -= this.velocity.y * 10.0 * delta;
 
-      // Combinar Teclado y Joystick Move
       let dirZ = Number(this.moveForward) - Number(this.moveBackward);
       let dirX = Number(this.moveRight) - Number(this.moveLeft);
       
@@ -295,10 +298,10 @@ export class SteelSceneManager {
       if (this.direction.x !== 0) this.velocity.x -= this.direction.x * speed * delta;
       if (this.direction.y !== 0) this.velocity.y += this.direction.y * speed * delta;
 
-      // 3. Aplicar Movimiento en espacio Mundo pero orientado a la Cámara
+      // 3. Aplicar Movimiento
       const worldDir = new THREE.Vector3();
       this.camera.getWorldDirection(worldDir);
-      worldDir.y = 0; // Bloqueamos movimiento vertical por orientación de cámara (caminar recto)
+      worldDir.y = 0; 
       worldDir.normalize();
 
       const worldRight = new THREE.Vector3();
@@ -336,8 +339,10 @@ export class SteelSceneManager {
     config.walls.forEach(wall => {
       const wallMesh = this.createWallMesh(wall);
       this.houseGroup.add(wallMesh);
-      wallsBox.expandByPoint(new THREE.Vector3(wall.x, 0, wall.z));
-      wallsBox.expandByPoint(new THREE.Vector3(wall.x + wall.length, wall.height, wall.z + wall.length));
+      
+      // Expandir caja de colisión/centro basándose en los puntos del muro
+      const p1 = new THREE.Vector3(wall.x, 0, wall.z);
+      wallsBox.expandByPoint(p1);
       
       this.createOpeningTriggers(wall);
     });
