@@ -14,9 +14,9 @@ interface InternalPart {
 }
 
 /**
- * ArquiMax Industrial Engine v12.2 - FULL COLUMN STACKING
- * Optimiza el aprovechamiento global permitiendo que las columnas crezcan 
- * hasta agotar la altura total del panel, maximizando el sobrante reutilizable.
+ * ArquiMax Industrial Engine v12.3 - COMMON WIDTH STACKING
+ * Optimiza la formación de columnas buscando anchos comunes entre piezas,
+ * permitiendo que piezas como frentes de anafe roten para alinearse con laterales finos.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -45,36 +45,32 @@ export function runOptimization(
   let bestResult: OptimizationResult | null = null;
   const partColors = generateColors(filteredParts);
 
-  // EVALUAR ORIENTACIONES Y ESTRATEGIAS DE FAJA
   for (const strategy of sortStrategies) {
-    // Probamos orientación horizontal y vertical del panel
     for (const isVerticalPanel of [false, true]) {
-      // Probamos dos tipos de fajas: Altura de líder vs Altura total (Full Stacking)
-      for (const useFullHeightStrips of [true, false]) {
-        const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
-          Array.from({ length: p.quantity }, () => ({
-            name: p.name,
-            width: p.width,
-            height: p.height,
-            grainDirection: p.grainDirection,
-            thickness: p.thickness,
-            originalIndex: idx,
-            placed: false
-          }))
-        );
+      // Intentamos siempre maximizar la altura de las columnas (Full Height)
+      const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
+        Array.from({ length: p.quantity }, () => ({
+          name: p.name,
+          width: p.width,
+          height: p.height,
+          grainDirection: p.grainDirection,
+          thickness: p.thickness,
+          originalIndex: idx,
+          placed: false
+        }))
+      );
 
-        pool.sort(strategy);
+      pool.sort(strategy);
 
-        const algoW = isVerticalPanel ? usableH : usableW;
-        const algoH = isVerticalPanel ? usableW : usableH;
+      const algoW = isVerticalPanel ? usableH : usableW;
+      const algoH = isVerticalPanel ? usableW : usableH;
 
-        const currentResult = buildStrictLayout(
-          pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalPanel, useFullHeightStrips
-        );
-        
-        if (!bestResult || currentResult.totalEfficiency > bestResult.totalEfficiency) {
-          bestResult = currentResult;
-        }
+      const currentResult = buildStrictLayout(
+        pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalPanel
+      );
+      
+      if (!bestResult || currentResult.totalEfficiency > bestResult.totalEfficiency) {
+        bestResult = currentResult;
       }
     }
   }
@@ -92,8 +88,7 @@ function buildStrictLayout(
   colors: Record<string, string>,
   panelWidth: number,
   panelHeight: number,
-  isVertical: boolean,
-  useFullHeightStrips: boolean
+  isVertical: boolean
 ): OptimizationResult {
   const panels: OptimizedPanel[] = [];
   let workingPool = pool.map(p => ({ ...p }));
@@ -102,7 +97,7 @@ function buildStrictLayout(
     const placedInPanel: OptimizedPart[] = [];
     let currentY = 0;
 
-    // CAPA 2: FAJAS (STRIPS)
+    // CAPA 2: FAJAS (STRIPS) - Intentamos que la faja sea lo más alta posible
     while (currentY < algoH) {
       const leaderIdx = workingPool.findIndex(p => !p.placed && (
         (p.width <= algoW && p.height <= (algoH - currentY)) || 
@@ -111,48 +106,49 @@ function buildStrictLayout(
 
       if (leaderIdx === -1) break;
 
-      const leader = workingPool[leaderIdx];
-      // Si usamos FullHeightStrips, la faja ocupa todo el alto restante.
-      // Si no, se ajusta a la altura de la pieza líder (clásico).
-      let shelfH = useFullHeightStrips ? (algoH - currentY) : leader.height;
-      
-      // Ajuste de altura si el líder se rota para entrar en la faja
-      if (!useFullHeightStrips && leader.grainDirection === 'libre' && leader.width <= (algoH - currentY) && (leader.width > leader.height || leader.height > algoW)) {
-        if (leader.height > algoW || leader.width > leader.height) shelfH = leader.width;
-      }
-
+      // La faja industrial idealmente ocupa todo el alto sobrante para permitir apilado vertical
+      let shelfH = algoH - currentY;
       let currentX = 0;
 
       // CAPA 3: COLUMNAS (CONTAINERS)
       while (currentX < algoW) {
-        let colLeaderIdx = -1;
+        let bestColLeaderIdx = -1;
+        let bestIsRotated = false;
+        let maxStackCount = -1;
+
+        // Buscamos el líder de columna que permita apilar MÁS piezas (mismo ancho)
         for (let i = 0; i < workingPool.length; i++) {
           const p = workingPool[i];
           if (p.placed) continue;
-          if ((p.width <= (algoW - currentX) && p.height <= shelfH) || 
-              (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= shelfH)) {
-            colLeaderIdx = i;
-            break;
+
+          // Probar orientación Normal
+          if (p.width <= (algoW - currentX) && p.height <= shelfH) {
+            const count = countPotentialStack(workingPool, p.width, shelfH);
+            if (count > maxStackCount) {
+              maxStackCount = count;
+              bestColLeaderIdx = i;
+              bestIsRotated = false;
+            }
+          }
+
+          // Probar orientación Rotada
+          if (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= shelfH) {
+            const count = countPotentialStack(workingPool, p.height, shelfH);
+            if (count > maxStackCount) {
+              maxStackCount = count;
+              bestColLeaderIdx = i;
+              bestIsRotated = true;
+            }
           }
         }
 
-        if (colLeaderIdx === -1) break;
+        if (bestColLeaderIdx === -1) break;
 
-        const colLeader = workingPool[colLeaderIdx];
-        let isColRotated = false;
-        
-        // Priorizar rotación que mejor se ajuste al ancho disponible o mantenga la altura de la faja
-        const fitsN = colLeader.width <= (algoW - currentX) && colLeader.height <= shelfH;
-        const fitsR = colLeader.grainDirection === 'libre' && colLeader.height <= (algoW - currentX) && colLeader.width <= shelfH;
-        
-        if (fitsR && (!fitsN || (colLeader.height > colLeader.width && colLeader.height <= shelfH))) {
-          isColRotated = true;
-        }
-        
-        const colW = isColRotated ? colLeader.height : colLeader.width;
+        const colLeader = workingPool[bestColLeaderIdx];
+        const colW = bestIsRotated ? colLeader.height : colLeader.width;
         let colUsedH = 0;
 
-        // CAPA 4: PIEZAS (STACKING) - Todas con el mismo ancho exacto de columna
+        // CAPA 4: PIEZAS (STACKING) - Forzamos el mismo ancho para guillotina
         while (colUsedH < shelfH) {
           let bestIdx = -1;
           let bestRot = false;
@@ -162,7 +158,6 @@ function buildStrictLayout(
             if (p.placed) continue;
             
             const remH = shelfH - colUsedH;
-            // Solo apilamos si el ancho coincide exactamente con el de la columna (Regla de Guillotina)
             const matchN = p.width === colW && p.height <= remH;
             const matchR = p.grainDirection === 'libre' && p.height === colW && p.width <= remH;
 
@@ -183,11 +178,9 @@ function buildStrictLayout(
           const finalW = bestRot ? p.height : p.width;
           const finalH = bestRot ? p.width : p.height;
 
-          // POSICIONAMIENTO CON TRANSFORMACIÓN DE EJES (SIN SOLAPAMIENTO)
           const localX = currentX;
           const localY = currentY + colUsedH;
 
-          // Mapear coordenadas locales al sistema global del panel (con o sin rotación)
           const gX = isVertical ? localY : localX;
           const gY = isVertical ? localX : localY;
           const gW = isVertical ? finalH : finalW;
@@ -209,14 +202,7 @@ function buildStrictLayout(
 
         currentX += colW + kerf;
       }
-      // La altura real de la faja es la máxima altura utilizada por sus columnas
-      // si no estamos en modo FullHeight.
-      let actualShelfH = shelfH;
-      if (!useFullHeightStrips) {
-        // Encontrar la columna más alta colocada en esta faja para compactar la siguiente
-        // Pero para guillotina pura, la faja debe ser de altura constante.
-      }
-      currentY += actualShelfH + kerf;
+      currentY += shelfH + kerf; // Avanzamos a la siguiente faja (usualmente solo hay una por panel en FullHeight)
     }
 
     if (placedInPanel.length === 0) break;
@@ -230,7 +216,7 @@ function buildStrictLayout(
       totalArea: panelWidth * panelHeight
     });
 
-    if (panels.length > 10) break; // Límite de seguridad
+    if (panels.length > 20) break; 
   }
 
   const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
@@ -240,9 +226,31 @@ function buildStrictLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `ArquiMax v12.2: ${useFullHeightStrips ? 'Column Stacking' : 'Standard Strips'} con compactación perimetral.`,
+    summary: `ArquiMax v12.3: Optimización por Columnas de Ancho Común y Compactación Perimetral.`,
     kerf, trim, selectedThickness
   };
+}
+
+/**
+ * Cuenta cuántas piezas en el pool podrían compartir el mismo ancho para una columna.
+ */
+function countPotentialStack(pool: InternalPart[], targetWidth: number, shelfH: number): number {
+  let count = 0;
+  let currentH = 0;
+  for (const p of pool) {
+    if (p.placed) continue;
+    const canFitN = p.width === targetWidth && (currentH + p.height <= shelfH);
+    const canFitR = p.grainDirection === 'libre' && p.height === targetWidth && (currentH + p.width <= shelfH);
+    
+    if (canFitN) {
+      count++;
+      currentH += p.height;
+    } else if (canFitR) {
+      count++;
+      currentH += p.width;
+    }
+  }
+  return count;
 }
 
 function generateColors(parts: any[]): Record<string, string> {
