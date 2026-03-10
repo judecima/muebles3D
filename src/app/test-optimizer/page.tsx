@@ -17,8 +17,7 @@ import {
   ZoomOut,
   Scissors,
   Loader2,
-  AlertCircle,
-  FileDown
+  AlertCircle
 } from 'lucide-react';
 
 interface PartInput {
@@ -47,7 +46,7 @@ export default function TestOptimizerPage() {
   const [parts, setParts] = useState<PartInput[]>(MESOPOTAMIA_DATASET);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [zoom, setZoom] = useState(0.8);
+  const [zoom, setZoom] = useState(0.85);
 
   const addPart = () => {
     setParts([...parts, { name: `Nueva Pieza ${parts.length + 1}`, width: 500, height: 300, quantity: 1, grainDirection: 'libre' }]);
@@ -77,7 +76,7 @@ export default function TestOptimizerPage() {
       } finally {
         setLoading(false);
       }
-    }, 100);
+    }, 200);
   };
 
   useEffect(() => {
@@ -94,16 +93,16 @@ export default function TestOptimizerPage() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax v8.0 Ultra</h1>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">ArquiMax v8.5 Ultra</h1>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <Scissors className="w-3 h-3 text-primary" /> Guillotina 4-Etapas / V-Stacking Industrial | Meta: +96% Eficiencia
+                <Scissors className="w-3 h-3 text-primary" /> Guillotina 3-Stage + V-Stacking Industrial | Meta: +96% Eficiencia
               </p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Button size="lg" onClick={handleOptimize} disabled={loading} className="flex-1 md:flex-none font-black uppercase px-8 h-12 bg-slate-900 hover:bg-black text-xs rounded-xl shadow-xl transition-all">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              {loading ? "Simulando 10,000 Ciclos..." : "Optimizar Nivel Industrial"}
+              {loading ? "Calculando 10,000 Ciclos..." : "Optimizar Nivel Industrial"}
             </Button>
           </div>
         </header>
@@ -191,7 +190,7 @@ export default function TestOptimizerPage() {
                   <p className="text-[10px] font-black uppercase tracking-widest">Estado de Optimización</p>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito! Todas las piezas consolidadas en un único tablero (Igualando Lepton)." : "Buscando mejor ajuste..."}
+                  {loading ? "Simulando patrones industriales..." : result?.totalPanels === 1 ? "¡Éxito Industrial! Todas las piezas consolidadas en un único tablero (Igualando Lepton)." : "Buscando mejor ajuste..."}
                 </p>
               </Card>
             </div>
