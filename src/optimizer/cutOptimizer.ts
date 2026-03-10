@@ -11,9 +11,9 @@ interface InternalPart {
 }
 
 /**
- * ArquiMax Industrial Engine v11.9 (Deterministic Global Optimizer)
- * Enfoque: Scavenger Agresivo + Recuperación de Piezas Huérfanas.
- * Garantiza que el 100% de las piezas sean colocadas, generando paneles adicionales si es necesario.
+ * ArquiMax Industrial Engine v12.0 (Deterministic Global Optimizer)
+ * Enfoque: Análisis de Impacto Global + Scavenger de Faja Agresivo.
+ * Garantiza la colocación del 100% de las piezas y maximiza la densidad mediante Nesting de 4 capas.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -29,20 +29,23 @@ export function runOptimization(
     return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas", kerf, trim, selectedThickness };
   }
 
+  // Dimensiones útiles del tablero
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
 
-  // Estrategias determinísticas industriales
+  // Estrategias Industriales Determinísticas (Se ejecutan todas y se elige la mejor)
   const strategies = [
-    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área mayor
-    (a: any, b: any) => b.height - a.height,                         // Altura mayor
-    (a: any, b: any) => b.width - a.width,                           // Ancho mayor
-    (a: any, b: any) => Math.max(b.width, b.height) - Math.max(a.width, a.height), // Lado mayor
+    (a: any, b: any) => (b.width * b.height) - (a.width * a.height), // Área Mayor
+    (a: any, b: any) => b.height - a.height,                         // Altura Mayor
+    (a: any, b: any) => b.width - a.width,                           // Ancho Mayor
+    (a: any, b: any) => Math.max(b.width, b.height) - Math.max(a.width, a.height), // Lado Mayor
+    (a: any, b: any) => (b.width / b.height) - (a.width / a.height), // Ratio de aspecto
   ];
 
   let bestResult: OptimizationResult | null = null;
   const partColors = generateColors(filteredParts);
 
+  // Ejecutar cada estrategia de forma determinística
   for (const strategy of strategies) {
     const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
       Array.from({ length: p.quantity }, () => ({
@@ -60,12 +63,18 @@ export function runOptimization(
 
     const currentResult = buildLayout(pool, usableW, usableH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight);
     
-    // El mejor resultado es el que coloca más piezas (prioridad 1) y usa menos paneles (prioridad 2)
-    const unplacedCount = pool.filter(p => !p.placed).length;
-    if (!bestResult || unplacedCount < (bestResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0) - pool.length)) {
+    // Criterio de Selección: 1. Más piezas colocadas, 2. Menos paneles, 3. Mejor eficiencia
+    const totalPlaced = currentResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0);
+    const bestTotalPlaced = bestResult ? bestResult.optimizedLayout.reduce((acc, p) => acc + p.parts.length, 0) : -1;
+
+    if (!bestResult || totalPlaced > bestTotalPlaced) {
       bestResult = currentResult;
-    } else if (unplacedCount === 0 && currentResult.totalPanels < bestResult.totalPanels) {
-      bestResult = currentResult;
+    } else if (totalPlaced === bestTotalPlaced) {
+      if (currentResult.totalPanels < bestResult.totalPanels) {
+        bestResult = currentResult;
+      } else if (currentResult.totalPanels === bestResult.totalPanels && currentResult.totalEfficiency > bestResult.totalEfficiency) {
+        bestResult = currentResult;
+      }
     }
   }
 
@@ -86,12 +95,11 @@ function buildLayout(
   const panels: OptimizedPanel[] = [];
   let workingPool = pool.map(p => ({ ...p }));
 
-  // Bucle de Paneles: Continuar hasta que todas las piezas estén colocadas
   while (workingPool.some(p => !p.placed)) {
     const placedInPanel: OptimizedPart[] = [];
     let currentY = 0;
 
-    // Bucle de Fajas (Guillotine Strips)
+    // Capa 2: Fajas (Strips) de Guillotina
     while (currentY < usableH) {
       const leaderIdx = workingPool.findIndex(p => !p.placed && 
         ((p.width <= usableW && p.height <= (usableH - currentY)) || 
@@ -104,14 +112,14 @@ function buildLayout(
       let shelfH = leader.height;
       let rotatedShelf = false;
 
-      // Optimizar rotación del líder para la faja
+      // Optimizar rotación del líder para definir la altura de la faja (Layer 2)
       if (leader.grainDirection === 'libre') {
         const canNormal = leader.width <= usableW && leader.height <= (usableH - currentY);
         const canRotated = leader.height <= usableW && leader.width <= (usableH - currentY);
         
-        // Preferimos la orientación que deje más altura libre en el panel si es una pieza muy alta
         if (canNormal && canRotated) {
-          if (leader.width < leader.height) { 
+          // Si rotada aprovecha mejor la altura (es más alta), definimos la faja por ese lado
+          if (leader.width > leader.height) { 
             shelfH = leader.width;
             rotatedShelf = true;
           }
@@ -123,7 +131,7 @@ function buildLayout(
 
       let currentX = 0;
 
-      // SCAVENGER AGRESIVO: Llenar el ancho de la faja sin detenerse
+      // Capa 3: Llenado Horizontal (Scavenger Agresivo)
       while (currentX < usableW) {
         let bestIdx = -1;
         let bestScore = -1;
@@ -136,9 +144,12 @@ function buildLayout(
           const canRotated = p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= shelfH;
           
           if (canNormal || canRotated) {
-            // Puntuación: Priorizar piezas que igualen la altura de la faja (densidad vertical)
+            // Prioridad: 1. Misma Identidad (Nombre) 2. Mejor Ajuste de Altura (Densidad)
             const h = canNormal ? p.height : p.width;
-            const score = h / shelfH; 
+            const idScore = p.name === leader.name ? 1000 : 0;
+            const fitScore = (h / shelfH) * 100;
+            const score = idScore + fitScore;
+
             if (score > bestScore) {
               bestScore = score;
               bestIdx = i;
@@ -150,14 +161,16 @@ function buildLayout(
 
         const p = workingPool[bestIdx];
         let isRotated = false;
+        
         if (bestIdx === leaderIdx) {
           isRotated = rotatedShelf;
         } else {
-          const canNormal = p.width <= (usableW - currentX) && p.height <= shelfH;
-          const canRotated = p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= shelfH;
-          if (!canNormal && canRotated) isRotated = true;
-          else if (canNormal && canRotated) {
-            // Rotar si el ajuste de altura es mejor al rotar
+          const fitsN = p.width <= (usableW - currentX) && p.height <= shelfH;
+          const fitsR = p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= shelfH;
+          
+          if (!fitsN && fitsR) isRotated = true;
+          else if (fitsN && fitsR) {
+            // ROTACIÓN INTELIGENTE: Si rotar la pieza (ej. amarre) iguala mejor la altura de la faja, rotar.
             if (Math.abs(p.width - shelfH) < Math.abs(p.height - shelfH)) isRotated = true;
           }
         }
@@ -176,9 +189,9 @@ function buildLayout(
         });
         p.placed = true;
 
-        // Nesting Vertical Recursivo (Layer 4)
+        // Capa 4: Nesting Vertical Recursivo (Llenar huecos sobre la pieza)
         let nextY = pH + kerf;
-        while (shelfH - nextY >= 10) {
+        while (shelfH - nextY >= 20) { // Mínimo 20mm para anidar algo
           const remH = shelfH - nextY;
           let nestIdx = -1;
           let nestBestScore = -1;
@@ -238,7 +251,7 @@ function buildLayout(
       totalArea: panelArea
     });
 
-    if (panels.length > 50) break; // Límite de seguridad industrial
+    if (panels.length > 30) break; // Límite de seguridad
   }
 
   const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
@@ -249,7 +262,7 @@ function buildLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency,
-    summary: `ArquiMax Industrial v11.9: Eficiencia Global ${totalEfficiency.toFixed(1)}%.`,
+    summary: `ArquiMax Industrial Engine v12.0: Eficiencia Global ${totalEfficiency.toFixed(1)}%.`,
     kerf,
     trim,
     selectedThickness

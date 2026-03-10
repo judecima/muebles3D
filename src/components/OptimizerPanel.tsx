@@ -98,7 +98,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
         }
       } catch (e) {
         console.error(e);
-        setError("Error en el cálculo industrial v11.9.");
+        setError("Error en el cálculo industrial v12.0.");
       } finally {
         setLoading(false);
       }
@@ -165,7 +165,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v11.9
+                <Settings2 className="w-4 h-4" /> ArquiMax Industrial v12.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}>
@@ -325,7 +325,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase text-lg">Ejecutando Simulador Industrial v11.9...</p>
+              <p className="font-black text-slate-700 uppercase text-lg">Ejecutando Simulador Industrial v12.0...</p>
             </div>
           ) : error ? (
             <div className="py-20 flex flex-col items-center gap-4 text-red-500 bg-red-50 p-10 rounded-2xl border border-red-100">
@@ -405,7 +405,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
-                      <p className="text-[9px] text-slate-400 italic">Optimización ArquiMax v11.9. Estándar industrial de alta densidad.</p>
+                      <p className="text-[9px] text-slate-400 italic">Optimización ArquiMax v12.0. Estándar industrial de alta densidad.</p>
                     </div>
                   </div>
                 );
