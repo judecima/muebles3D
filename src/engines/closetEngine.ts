@@ -1,21 +1,22 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
 /**
- * Motor para Placard Red Arquimax
- * Sistema constructivo: Caja de 5 piezas + Frente estético independiente.
+ * Motor para Placard Red Arquimax v14.0
+ * Sistema constructivo: Sándwich (Tapas de ancho completo).
  */
 export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T } = dim;
   
   const drawerSectionH = 500; 
   const doorSectionH = H - drawerSectionH;
+  const sideH = H - 2 * T;
   const innerW = W - 2 * T;
 
   const parts: Part[] = [
-    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'base-inf', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'tapa-sup', name: 'Tapa Superior', width: innerW, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'base-inf', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'tapa-sup', name: 'Tapa Superior', width: W, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
     { id: 'divisor-hor', name: 'Estante Divisor', width: innerW, height: T, depth: D, x: W/2, y: drawerSectionH, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
   ];
 
@@ -83,5 +84,5 @@ export function closetEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ id: `${prefix}-box-bottom`, groupId: prefix, name: `Piso Caja ${i+1}`, width: drawerW - 2*T, height: 3, depth: drawerD, x: W/2, y: posY - drawerBoxH/2 + 1.5, z: D/2 - drawerD/2, type: 'drawer', cutLargo: drawerD, cutAncho: drawerW - 2*T, cutEspesor: 3, grainDirection: 'libre' });
   }
 
-  return { parts, summary: 'Placard con sistema de cajonera industrial independiente.', hasDoors: true, hasDrawers: true };
+  return { parts, summary: 'Placard con sistema de cajonera industrial. Estructura sándwich reforzada.', hasDoors: true, hasDrawers: true };
 }

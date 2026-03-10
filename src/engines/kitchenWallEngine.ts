@@ -1,22 +1,28 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
+/**
+ * Motor para Alacena Red Arquimax v14.0
+ * Construcción sándwich: Tapas de ancho completo (W) y laterales internos.
+ */
 export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T, hasBack, hasShelf } = dim;
+  const sideH = H - 2 * T;
+  const innerW = W - 2 * T;
 
   const parts: Part[] = [
-    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'base', name: 'Base Inferior', width: W - 2*T, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
-    { id: 'tapa', name: 'Tapa Superior', width: W - 2*T, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W - 2*T, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'tapa', name: 'Tapa Superior', width: W, height: T, depth: D, x: W/2, y: H - T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'lat-izq', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'lat-der', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
   ];
 
   if (hasBack) {
     parts.push({ 
       id: 'fondo', 
       name: 'Fondo MDF 3mm', 
-      width: W, height: H, depth: 3, 
+      width: W - 2, height: H - 2, depth: 3, 
       x: W/2, y: H/2, z: -D/2 - 1.5, 
-      type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
+      type: 'static', cutLargo: H - 2, cutAncho: W - 2, cutEspesor: 3, grainDirection: 'libre' 
     });
   }
 
@@ -24,35 +30,34 @@ export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({
       id: 'estante-interno',
       name: 'Estante Interno',
-      width: W - 2*T - 2,
+      width: innerW - 2,
       height: T,
       depth: D * 0.9,
       x: W/2,
       y: H/2,
       z: 0,
       type: 'static',
-      cutLargo: W - 2*T - 2,
+      cutLargo: innerW - 2,
       cutAncho: D * 0.9,
       cutEspesor: T,
       grainDirection: 'horizontal'
     });
   }
 
-  const doorH = H - 4;
-  const doorW = W / 2 - 2;
-  const doorY = H / 2;
+  const doorH = H - 3; // Luz superior 3mm
+  const doorW = (W - 3) / 2; // Luz central 3mm
+  const doorY = doorH / 2;
   
   const hingesPerDoor = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
-
   const doorTypes: ('door-left' | 'door-right')[] = ['door-left', 'door-right'];
 
-  doorTypes.forEach((type, idx) => {
+  doorTypes.forEach((type) => {
     const isLeft = type === 'door-left';
     parts.push({ 
       id: `wall-door-${isLeft ? 'L' : 'R'}`, 
       name: `Puerta ${isLeft ? 'Izquierda' : 'Derecha'}`, 
       width: doorW, height: doorH, depth: T, 
-      x: isLeft ? doorW / 2 : W - doorW / 2, 
+      x: isLeft ? 1.5 + doorW / 2 : W - 1.5 - doorW / 2, 
       y: doorY, z: D / 2 + T / 2, 
       type: type, 
       pivot: { x: isLeft ? 0 : W, y: doorY, z: D / 2 },
@@ -76,5 +81,5 @@ export function kitchenWallEngine(dim: FurnitureDimensions): FurnitureModel {
     }
   });
 
-  return { parts, summary: 'Alacena superior con bisagras automáticas por puerta.', hasDoors: true, hasDrawers: false };
+  return { parts, summary: 'Alacena estructural con tapas de ancho completo y laterales de apoyo.', hasDoors: true, hasDrawers: false };
 }

@@ -1,13 +1,20 @@
 import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
 
+/**
+ * Motor para Bajo Mesada Red Arquimax v14.0
+ * Construcción industrial con Base de ancho completo y Amarres superiores.
+ */
 export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T, hasBack, hasShelf } = dim;
   const innerW = W - 2 * T;
+  const sideH = H - T; // De base a ras superior
 
   const parts: Part[] = [
-    { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: H, depth: D, x: T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'lat-R', name: 'Lateral Derecho', width: T, height: H, depth: D, x: W - T/2, y: H/2, z: 0, type: 'static', cutLargo: H, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
-    { id: 'base', name: 'Base Inferior', width: innerW, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: innerW, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'base', name: 'Base Inferior', width: W, height: T, depth: D, x: W/2, y: T/2, z: 0, type: 'static', cutLargo: W, cutAncho: D, cutEspesor: T, grainDirection: 'horizontal' },
+    { id: 'lat-L', name: 'Lateral Izquierdo', width: T, height: sideH, depth: D, x: T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    { id: 'lat-R', name: 'Lateral Derecho', width: T, height: sideH, depth: D, x: W - T/2, y: T + sideH/2, z: 0, type: 'static', cutLargo: sideH, cutAncho: D, cutEspesor: T, grainDirection: 'vertical' },
+    
+    // Amarres internos atornillados en extremos
     { id: 'amarre-front', name: 'Amarre Frontal (H)', width: innerW, height: T, depth: 60, x: W/2, y: H - T/2, z: D/2 - 30, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
     { id: 'amarre-back', name: 'Amarre Trasero (V)', width: innerW, height: 60, depth: T, x: W/2, y: H - 30, z: -D/2 + T/2, type: 'static', cutLargo: innerW, cutAncho: 60, cutEspesor: T, grainDirection: 'horizontal' },
   ];
@@ -16,9 +23,9 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     parts.push({ 
       id: 'fondo', 
       name: 'Fondo MDF 3mm', 
-      width: W, height: H, depth: 3, 
+      width: W - 2, height: H - 2, depth: 3, 
       x: W/2, y: H/2, z: -D/2 - 1.5, 
-      type: 'static', cutLargo: H, cutAncho: W, cutEspesor: 3, grainDirection: 'libre' 
+      type: 'static', cutLargo: H - 2, cutAncho: W - 2, cutEspesor: 3, grainDirection: 'libre' 
     });
   }
 
@@ -40,21 +47,20 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     });
   }
 
-  const doorH = H - 5;
-  const doorW = W / 2 - 2;
-  const doorY = H / 2;
+  const doorH = H - 3; // Luz superior 3mm
+  const doorW = (W - 3) / 2; // Luz central 3mm
+  const doorY = doorH / 2;
   
   const hingesPerDoor = doorH <= 600 ? 2 : doorH <= 1200 ? 3 : 4;
-
   const doorTypes: ('door-left' | 'door-right')[] = ['door-left', 'door-right'];
   
-  doorTypes.forEach((type, idx) => {
+  doorTypes.forEach((type) => {
     const isLeft = type === 'door-left';
     parts.push({ 
       id: `k-door-${isLeft ? 'L' : 'R'}`, 
       name: `Puerta ${isLeft ? 'Izquierda' : 'Derecha'}`, 
       width: doorW, height: doorH, depth: T, 
-      x: isLeft ? doorW / 2 : W - doorW / 2, 
+      x: isLeft ? 1.5 + doorW / 2 : W - 1.5 - doorW / 2, 
       y: doorY, z: D / 2 + T / 2, 
       type: type,
       pivot: { x: isLeft ? 0 : W, y: doorY, z: D / 2 },
@@ -78,5 +84,5 @@ export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
     }
   });
 
-  return { parts, summary: 'Bajo mesada Red Arquimax con bisagras automáticas.', hasDoors: true, hasDrawers: false };
+  return { parts, summary: 'Bajo mesada con base de apoyo estructural y laterales internos.', hasDoors: true, hasDrawers: false };
 }
