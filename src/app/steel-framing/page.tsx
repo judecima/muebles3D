@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
 import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
@@ -14,7 +14,10 @@ import {
   Layout,
   Move,
   Settings2,
-  X
+  X,
+  Compass,
+  MousePointer2,
+  Keyboard
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -37,6 +40,9 @@ export default function SteelFramingPage() {
   const [config, setConfig] = useState<SteelHouseConfig>(INITIAL_CONFIG);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
+  const [isWalkModeActive, setIsWalkModeActive] = useState(false);
+  
+  const viewerRef = useRef<{ enterWalkMode: () => void }>(null);
 
   const handleOpeningDoubleClick = (wallId: string, opening: SteelOpening) => {
     setSelectedOpening({ wallId, opening });
@@ -107,21 +113,28 @@ export default function SteelFramingPage() {
           </div>
 
           <div className="flex gap-2">
+            <Button 
+              variant={isWalkModeActive ? "secondary" : "default"}
+              size="sm" 
+              className={`h-8 px-4 text-[10px] font-black uppercase tracking-tighter transition-all ${isWalkModeActive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              onClick={() => viewerRef.current?.enterWalkMode()}
+            >
+              <Compass className="w-3.5 h-3.5 mr-2" /> 
+              {isWalkModeActive ? "Caminando..." : "Entrar Modo Caminata"}
+            </Button>
             <Button variant="outline" size="sm" className="h-8 px-3 text-[10px] font-bold">
               <Download className="w-3.5 h-3.5 mr-2" /> 
               EXPORTAR
-            </Button>
-            <Button size="sm" className="h-8 px-3 text-[10px] font-bold bg-blue-600 hover:bg-blue-700">
-              <Share2 className="w-3.5 h-3.5 mr-2" /> 
-              COMPARTIR
             </Button>
           </div>
         </header>
 
         <div className="flex-1 relative overflow-hidden">
           <SteelViewer 
+            ref={viewerRef}
             config={config} 
             onOpeningDoubleClick={handleOpeningDoubleClick}
+            onWalkModeLock={setIsWalkModeActive}
           />
           
           <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
@@ -138,6 +151,31 @@ export default function SteelFramingPage() {
                 </div>
               </div>
             </div>
+
+            {isWalkModeActive && (
+              <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in slide-in-from-left duration-300">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-2">CONTROLES DE NAVEGACIÓN</span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2">
+                    <Keyboard className="w-3 h-3 text-slate-400" />
+                    <span className="text-[10px] font-medium uppercase">WASD: Moverse</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MousePointer2 className="w-3 h-3 text-slate-400" />
+                    <span className="text-[10px] font-medium uppercase">Mouse: Mirar</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-white/20 rounded flex items-center justify-center text-[8px] font-bold">SP</div>
+                    <span className="text-[10px] font-medium uppercase">Subir</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-white/20 rounded flex items-center justify-center text-[8px] font-bold">SH</div>
+                    <span className="text-[10px] font-medium uppercase">Bajar</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2 border-t border-white/10 text-[9px] text-slate-400 italic">Presiona ESC para salir del modo</div>
+              </div>
+            )}
           </div>
 
           <div className="absolute bottom-4 right-4 bg-slate-900/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 pointer-events-none">

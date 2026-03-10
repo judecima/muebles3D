@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
 
 export class SteelSceneManager {
@@ -9,13 +10,26 @@ export class SteelSceneManager {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls;
+  private fpControls: PointerLockControls;
   private houseGroup: THREE.Group;
   private openingsGroup: THREE.Group;
   private container: HTMLElement;
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
+  // Movimiento FPS
+  private moveForward = false;
+  private moveBackward = false;
+  private moveLeft = false;
+  private moveRight = false;
+  private moveUp = false;
+  private moveDown = false;
+  private velocity = new THREE.Vector3();
+  private direction = new THREE.Vector3();
+  private prevTime = performance.now();
+
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
+  private onWalkModeLock?: (locked: boolean) => void;
 
   private colors = {
     background: 0xf1f5f9,
@@ -26,14 +40,19 @@ export class SteelSceneManager {
     openingHover: 0x3b82f6
   };
 
-  constructor(container: HTMLElement, onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void) {
+  constructor(
+    container: HTMLElement, 
+    onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void,
+    onWalkModeLock?: (locked: boolean) => void
+  ) {
     this.container = container;
     this.onOpeningDoubleClickCallback = onOpeningDoubleClick;
+    this.onWalkModeLock = onWalkModeLock;
     
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(this.colors.background);
 
-    this.camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 10, 100000);
+    this.camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 10, 100000);
     this.camera.position.set(8000, 6000, 8000);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -46,8 +65,23 @@ export class SteelSceneManager {
     }
     this.container.appendChild(this.renderer.domElement);
 
+    // Controles de Inspección (Orbit)
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
+
+    // Controles de Caminata (FPS)
+    this.fpControls = new PointerLockControls(this.camera, document.body);
+    this.scene.add(this.fpControls.getObject());
+
+    this.fpControls.addEventListener('lock', () => {
+      this.controls.enabled = false;
+      if (this.onWalkModeLock) this.onWalkModeLock(true);
+    });
+
+    this.fpControls.addEventListener('unlock', () => {
+      this.controls.enabled = true;
+      if (this.onWalkModeLock) this.onWalkModeLock(false);
+    });
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     this.scene.add(ambientLight);
@@ -72,6 +106,46 @@ export class SteelSceneManager {
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
+    document.addEventListener('keydown', this.onKeyDown);
+    document.addEventListener('keyup', this.onKeyUp);
+  }
+
+  private onKeyDown = (event: KeyboardEvent) => {
+    if (!this.fpControls.isLocked) return;
+    switch (event.code) {
+      case 'ArrowUp':
+      case 'KeyW': this.moveForward = true; break;
+      case 'ArrowLeft':
+      case 'KeyA': this.moveLeft = true; break;
+      case 'ArrowDown':
+      case 'KeyS': this.moveBackward = true; break;
+      case 'ArrowRight':
+      case 'KeyD': this.moveRight = true; break;
+      case 'Space': this.moveUp = true; break;
+      case 'ShiftLeft':
+      case 'ShiftRight': this.moveDown = true; break;
+    }
+  };
+
+  private onKeyUp = (event: KeyboardEvent) => {
+    switch (event.code) {
+      case 'ArrowUp':
+      case 'KeyW': this.moveForward = false; break;
+      case 'ArrowLeft':
+      case 'KeyA': this.moveLeft = false; break;
+      case 'ArrowDown':
+      case 'KeyS': this.moveBackward = false; break;
+      case 'ArrowRight':
+      case 'KeyD': this.moveRight = false; break;
+      case 'Space': this.moveUp = false; break;
+      case 'ShiftLeft':
+      case 'ShiftRight': this.moveDown = false; break;
+    }
+  };
+
+  public enterWalkMode() {
+    this.camera.position.y = 1700; // Altura de ojos (mm)
+    this.fpControls.lock();
   }
 
   private onWindowResize = () => {
@@ -82,6 +156,7 @@ export class SteelSceneManager {
   };
 
   private onDoubleClick = (event: MouseEvent) => {
+    if (this.fpControls.isLocked) return;
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -102,7 +177,34 @@ export class SteelSceneManager {
   private animate = () => {
     if (!this.renderer || !this.scene || !this.camera) return;
     requestAnimationFrame(this.animate);
-    this.controls.update();
+
+    const time = performance.now();
+    const delta = (time - this.prevTime) / 1000;
+
+    if (this.fpControls.isLocked) {
+      this.velocity.x -= this.velocity.x * 10.0 * delta;
+      this.velocity.z -= this.velocity.z * 10.0 * delta;
+      this.velocity.y -= this.velocity.y * 10.0 * delta;
+
+      this.direction.z = Number(this.moveForward) - Number(this.moveBackward);
+      this.direction.x = Number(this.moveRight) - Number(this.moveLeft);
+      this.direction.y = Number(this.moveUp) - Number(this.moveDown);
+      this.direction.normalize();
+
+      const speed = 40000.0; // Velocidad en mm/s
+
+      if (this.moveForward || this.moveBackward) this.velocity.z -= this.direction.z * speed * delta;
+      if (this.moveLeft || this.moveRight) this.velocity.x -= this.direction.x * speed * delta;
+      if (this.moveUp || this.moveDown) this.velocity.y += this.direction.y * speed * delta;
+
+      this.fpControls.moveRight(-this.velocity.x * delta);
+      this.fpControls.moveForward(-this.velocity.z * delta);
+      this.fpControls.getObject().position.y += (this.velocity.y * delta);
+    } else {
+      this.controls.update();
+    }
+
+    this.prevTime = time;
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -135,7 +237,7 @@ export class SteelSceneManager {
       const center = new THREE.Vector3();
       wallsBox.getCenter(center);
 
-      const floorGeom = new THREE.PlaneGeometry(size.x + 2000, size.z + 2000);
+      const floorGeom = new THREE.PlaneGeometry(size.x + 15000, size.z + 15000);
       const floorMat = new THREE.MeshStandardMaterial({ color: this.colors.floor });
       const floor = new THREE.Mesh(floorGeom, floorMat);
       floor.rotation.x = -Math.PI / 2;
@@ -144,7 +246,9 @@ export class SteelSceneManager {
       this.houseGroup.add(floor);
     }
 
-    this.fitCamera();
+    if (!this.fpControls.isLocked) {
+      this.fitCamera();
+    }
   }
 
   private createWallMesh(wall: SteelWall): THREE.Mesh {
@@ -195,7 +299,7 @@ export class SteelSceneManager {
   private createOpeningTriggers(wall: SteelWall) {
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      const geometry = new THREE.BoxGeometry(op.width, op.height, wall.thickness + 2);
+      const geometry = new THREE.BoxGeometry(op.width, op.height, wall.thickness + 5);
       const material = new THREE.MeshBasicMaterial({ 
         color: this.colors.openingHover, 
         transparent: true, 
@@ -253,7 +357,10 @@ export class SteelSceneManager {
   public dispose() {
     window.removeEventListener('resize', this.onWindowResize);
     this.renderer.domElement.removeEventListener('dblclick', this.onDoubleClick);
+    document.removeEventListener('keydown', this.onKeyDown);
+    document.removeEventListener('keyup', this.onKeyUp);
     if (this.renderer) this.renderer.dispose();
     this.controls.dispose();
+    this.fpControls.dispose();
   }
 }

@@ -1,21 +1,34 @@
 'use client';
 
-import React, { useEffect, useRef, forwardRef } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { SteelSceneManager } from '@/steel/SteelSceneManager';
 import { SteelHouseConfig, SteelOpening } from '@/lib/steel/types';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
   onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void;
+  onWalkModeLock?: (locked: boolean) => void;
 }
 
-export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick }: SteelViewerProps, ref) => {
+export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkModeLock }: SteelViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SteelSceneManager | null>(null);
 
+  useImperativeHandle(ref, () => ({
+    enterWalkMode: () => {
+      if (managerRef.current) {
+        managerRef.current.enterWalkMode();
+      }
+    }
+  }));
+
   useEffect(() => {
     if (containerRef.current && !managerRef.current) {
-      managerRef.current = new SteelSceneManager(containerRef.current, onOpeningDoubleClick);
+      managerRef.current = new SteelSceneManager(
+        containerRef.current, 
+        onOpeningDoubleClick,
+        onWalkModeLock
+      );
     }
 
     return () => {
@@ -24,7 +37,7 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick }: SteelVi
         managerRef.current = null;
       }
     };
-  }, [onOpeningDoubleClick]);
+  }, [onOpeningDoubleClick, onWalkModeLock]);
 
   useEffect(() => {
     if (managerRef.current) {
