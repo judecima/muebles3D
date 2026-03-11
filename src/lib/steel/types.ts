@@ -1,3 +1,4 @@
+
 export type OpeningType = 'door' | 'window';
 
 export interface SteelOpening {

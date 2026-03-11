@@ -1,6 +1,8 @@
+
 'use client';
 
-import * as THREE from 'three';
+import * as THREE from 'white';
+import * as THREE_LIB from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility, InternalWall } from '@/lib/steel/types';
 import { StructuralEngine } from '@/utils/steel/structuralEngine';
@@ -8,6 +10,8 @@ import { InputController } from '@/engine/player/InputController';
 import { CollisionSystem } from '@/engine/player/CollisionSystem';
 import { PlayerController } from '@/engine/player/PlayerController';
 import { ThirdPersonCamera } from '@/engine/player/ThirdPersonCamera';
+
+const THREE = THREE_LIB;
 
 export class SteelSceneManager {
   private scene: THREE.Scene;
@@ -34,7 +38,7 @@ export class SteelSceneManager {
   public onOpeningDoubleClick: ((wallId: string, opening: SteelOpening, isInternal?: boolean) => void) | null = null;
   public onWallDoubleClick: ((wallId: string, x: number, side: 'exterior' | 'interior') => void) | null = null;
   public onWalkModeLock: ((locked: boolean) => void) | null = null;
-  public onInternalWallDoubleClick: ((iw: InternalWall) => void) | null = null;
+  public onInternalWallDoubleClick: ((iw: InternalWall, x: number) => void) | null = null;
 
   private colors = {
     background: 0xf1f5f9,
@@ -54,7 +58,7 @@ export class SteelSceneManager {
     status_ok: 0x22c55e,
     status_warning: 0xf59e0b,
     status_error: 0xef4444,
-    ladder: 0xec4899 // Rosa para destacar el sistema Ladder Backing
+    ladder: 0xec4899 
   };
 
   private profileWidth = 100; 
@@ -152,9 +156,11 @@ export class SteelSceneManager {
     const internalIntersects = this.raycaster.intersectObjects(this.internalWallsGroup.children, true);
     if (internalIntersects.length > 0) {
       let object = internalIntersects[0].object;
+      const hitPoint = internalIntersects[0].point.clone();
       while (object.parent && !object.userData.isInternalWall) object = object.parent;
       if (object.userData.isInternalWall && this.onInternalWallDoubleClick) {
-        this.onInternalWallDoubleClick(object.userData.internalWall);
+        const localPoint = object.worldToLocal(hitPoint);
+        this.onInternalWallDoubleClick(object.userData.internalWall, localPoint.x);
         return;
       }
     }
@@ -338,11 +344,7 @@ export class SteelSceneManager {
 
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wall.id) {
-        // Implementación de Ladder Backing (Escalera) en la unión T
-        // Proporciona fijación para placas sin bloquear la aislación térmica
         structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange/2, this.profileFlange, 90, 'PGC', this.colors.junction));
-        
-        // Bloqueos tipo Escalera
         StructuralEngine.calculateLadderBacking(wall.height).forEach(l => {
           structuralGroup.add(this.createProfile(l.xEnd - l.xStart, iw.xPosition + l.xStart, l.y, 0, 'PGU', this.colors.ladder));
         });
@@ -381,8 +383,9 @@ export class SteelSceneManager {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config);
       const opColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
 
-      const fusedL = analysis.isFusedWithCorner === 'left';
-      const fusedR = analysis.isFusedWithCorner === 'right';
+      const fusion = analysis.isFusedWithCorner;
+      const fusedL = fusion === 'left';
+      const fusedR = fusion === 'right';
 
       if (!fusedL) {
         structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));

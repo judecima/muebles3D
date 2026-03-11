@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -8,8 +9,8 @@ import { SteelJoystick } from './SteelJoystick';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
-  onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void;
-  onInternalWallDoubleClick?: (iw: InternalWall) => void;
+  onOpeningDoubleClick?: (wallId: string, opening: SteelOpening, isInternal?: boolean) => void;
+  onInternalWallDoubleClick?: (iw: InternalWall, x: number) => void;
   onWallDoubleClick?: (wallId: string, x: number, side: 'exterior' | 'interior') => void;
   onWalkModeLock?: (locked: boolean) => void;
 }
