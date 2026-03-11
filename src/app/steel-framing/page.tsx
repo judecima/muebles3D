@@ -20,7 +20,8 @@ import {
   MousePointer,
   X,
   Plus,
-  Trash2
+  Trash2,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -28,7 +29,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// Constantes de normativa Steel Framing ArquiMax
 const EDGE_MARGIN = 400; 
 const HEADER_SPACE = 300; 
 const MIN_SPACE_BETWEEN = 600; 
@@ -48,11 +48,12 @@ const INITIAL_CONFIG: SteelHouseConfig = {
   walls: createInitialWalls(6000, 6000, 2600),
   layers: {
     exteriorPanels: true,
-    interiorPanels: false,
+    interiorPanels: true,
     steelProfiles: true,
     horizontalBlocking: true,
     lintels: true,
-    reinforcements: true
+    reinforcements: true,
+    bracing: true
   },
   structuralMode: false
 };
@@ -127,6 +128,12 @@ export default function SteelFramingPage() {
     if (field === 'width') {
       const maxW = wall.length - newOpening.position - EDGE_MARGIN;
       newOpening.width = Math.max(0, Math.min(safeVal, maxW));
+      if (checkOverlap(wall, newOpening.id, newOpening.position, newOpening.width)) return;
+    }
+
+    if (field === 'position') {
+      const maxP = wall.length - newOpening.width - EDGE_MARGIN;
+      newOpening.position = Math.max(EDGE_MARGIN, Math.min(safeVal, maxP));
       if (checkOverlap(wall, newOpening.id, newOpening.position, newOpening.width)) return;
     }
 
@@ -304,7 +311,7 @@ export default function SteelFramingPage() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-[9px] font-black text-slate-600 uppercase">Motor de Vanos OK</span>
+                        <span className="text-[9px] font-black text-slate-600 uppercase">Transferencia OK</span>
                       </div>
                     </div>
                   </div>
@@ -363,6 +370,19 @@ export default function SteelFramingPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="position" className="text-right text-[10px] font-black uppercase text-slate-500">Posición</Label>
+                <div className="col-span-3 flex items-center gap-2">
+                  <ArrowRightLeft className="w-4 h-4 text-slate-400" />
+                  <Input
+                    id="position"
+                    type="number"
+                    value={Math.round(selectedOpening?.opening.position ?? 0)}
+                    onChange={(e) => updateOpeningDim('position', parseInt(e.target.value) || 0)}
+                    className="h-9 font-bold"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="height" className="text-right text-[10px] font-black uppercase text-slate-500">Alto</Label>
                 <Input
                   id="height"
@@ -385,20 +405,20 @@ export default function SteelFramingPage() {
                 </div>
               )}
             </div>
-            <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 border-t pt-4">
               <Button 
                 variant="destructive" 
                 onClick={handleDeleteOpening}
                 className="w-full sm:w-auto bg-red-500 hover:bg-red-600 font-bold uppercase text-[10px] tracking-widest h-11"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Eliminar Vano
+                Eliminar
               </Button>
               <Button 
                 onClick={() => setSelectedOpening(null)} 
                 className="flex-1 bg-blue-600 hover:bg-blue-700 font-black uppercase text-[10px] tracking-widest h-11"
               >
-                Confirmar
+                Confirmar Cambios
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -461,7 +481,7 @@ export default function SteelFramingPage() {
                 Insertar Vano
               </Button>
               <p className="text-[9px] text-slate-400 italic text-center">
-                Se aplicarán márgenes normativos de 400mm y 600mm.
+                Se aplican márgenes normativos de 400mm y 600mm.
               </p>
             </DialogFooter>
           </DialogContent>

@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility, WallPanelData } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
 import { StructuralEngine } from '@/utils/steel/structuralEngine';
 import { InputController } from '@/engine/player/InputController';
 import { CollisionSystem } from '@/engine/player/CollisionSystem';
@@ -34,7 +34,7 @@ export class SteelSceneManager {
 
   private colors = {
     background: 0xf1f5f9,
-    steel: 0x9ca3af,      // Gris (Estructura base)
+    steel: 0x9ca3af,      
     header: 0x2563eb,
     headerTriple: 0x1e40af,
     headerTube: 0x0f172a,
@@ -43,11 +43,11 @@ export class SteelSceneManager {
     grid: 0xd1d5db,
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
-    panel_int: 0xe2e8f0,
-    blocking: 0x22c55e,   // Verde (Blocking)
-    junction: 0x3b82f6,   // Azul (Uniones de paneles)
-    corner: 0xef4444,     // Rojo (Refuerzos de esquina)
-    bracing: 0xf59e0b     // Ámbar (Cruces de San Andrés)
+    panel_int: 0xd1d5db,
+    blocking: 0x22c55e,   
+    junction: 0x3b82f6,   
+    corner: 0xef4444,     
+    bracing: 0xf59e0b     
   };
 
   private profileWidth = 100; 
@@ -210,7 +210,7 @@ export class SteelSceneManager {
         if (config.layers.interiorPanels) {
           const mesh = this.createPanelMesh(wall, 'interior');
           wallGroup.add(mesh);
-          this.collisions.registerWall(mesh);
+          // Los paneles internos no necesitan colisiones para el jugador normalmente
         }
       }
 
@@ -238,12 +238,11 @@ export class SteelSceneManager {
     const studHeight = wall.height - (this.profileFlange * 2);
 
     panels.forEach(panel => {
-      // 1. SOLERAS (PGU) - Por panel
+      // 1. SOLERAS (PGU)
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
 
       // 2. MONTANTES (PGC)
-      // Unión entre paneles (Doble montante azul) o Esquina (Triple rojo)
       const junctionColor = panel.isWallStart ? this.colors.corner : this.colors.junction;
       const startStudCount = panel.isWallStart ? 3 : 2;
       
@@ -251,7 +250,6 @@ export class SteelSceneManager {
         structuralGroup.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', junctionColor));
       }
 
-      // Montantes de campo
       for (let x = panel.xStart + wall.studSpacing; x < panel.xEnd - 50; x += wall.studSpacing) {
         const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
         if (!inOpening) {
@@ -259,14 +257,13 @@ export class SteelSceneManager {
         }
       }
 
-      // Cierre de panel final
       if (panel.isWallEnd) {
         for (let i = 0; i < 3; i++) {
           structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner));
         }
       }
 
-      // 3. RIGIDIZACIÓN (Cruces de San Andrés Ámbar)
+      // 3. RIGIDIZACIÓN (Cruces de San Andrés - Eje Z centrado)
       if (layers.bracing && panel.needsBracing) {
         const opInPanel = wall.openings.some(op => op.position < panel.xEnd && (op.position + op.width) > panel.xStart);
         if (!opInPanel) {
@@ -283,7 +280,7 @@ export class SteelSceneManager {
       });
     }
 
-    // 5. VANOS Y DINTELES
+    // 5. VANOS, DINTELES Y UMBRALES
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
@@ -297,7 +294,7 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      // Dintel según análisis AISI
+      // Dintel (Transferencia de carga superior)
       if (headerAnalysis.type === 'truss') {
         this.createTrussHeader(structuralGroup, op.position, headerH, op.width);
       } else if (headerAnalysis.type === 'tube') {
@@ -311,7 +308,7 @@ export class SteelSceneManager {
         }
       }
 
-      // Umbrales
+      // Umbral (Bajo ventana)
       if (op.type === 'window') {
         structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       }
@@ -322,16 +319,16 @@ export class SteelSceneManager {
     const angle = Math.atan2(h, w);
     const length = Math.sqrt(w*w + h*h);
     
-    // Diagonal 1: /
-    const d1 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, 20);
+    // Diagonal 1: / (Z centrado para no chocar con OSB)
+    const d1 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, 5);
     d1.rotation.z = angle;
-    d1.position.set(x + w/2, y + h/2, 20);
+    d1.position.set(x + w/2, y + h/2, 5);
     group.add(d1);
 
     // Diagonal 2: \
-    const d2 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, -20);
+    const d2 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, -5);
     d2.rotation.z = -angle;
-    d2.position.set(x + w/2, y + h/2, -20);
+    d2.position.set(x + w/2, y + h/2, -5);
     group.add(d2);
   }
 
@@ -376,7 +373,7 @@ export class SteelSceneManager {
       new THREE.ExtrudeGeometry(shape, { depth: 12, beveled: false }),
       new THREE.MeshStandardMaterial({ color: side === 'exterior' ? this.colors.panel_ext : this.colors.panel_int })
     );
-    mesh.position.z = side === 'exterior' ? -65 : 50;
+    mesh.position.z = side === 'exterior' ? -65 : 55;
     mesh.userData = { wallId: wall.id, isWall: true };
     return mesh;
   }
