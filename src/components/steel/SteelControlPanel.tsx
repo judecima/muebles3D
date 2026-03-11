@@ -27,9 +27,11 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
 
-const EDGE_MARGIN = 150; 
-const HEADER_SPACE = 100;
-const MIN_SPACE_BETWEEN = 50;
+// NUEVAS CONSTANTES NORMATIVAS
+const EDGE_MARGIN = 400; // Distancia lateral mínima (400 mm)
+const HEADER_SPACE = 300; // Dintel mínimo superior (300 mm)
+const MIN_SPACE_BETWEEN = 600; // Distancia entre aberturas (600 mm)
+const DEFAULT_SILL = 900; // Antepecho ventana estándar (900 mm)
 
 interface SteelControlPanelProps {
   config: SteelHouseConfig;
@@ -92,7 +94,8 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
         return finalW;
       }
       case 'height': {
-        const maxH = wall.height - (opening.type === 'window' ? (opening.sillHeight || 0) : 0) - HEADER_SPACE;
+        const sill = opening.type === 'window' ? (opening.sillHeight || 0) : 0;
+        const maxH = wall.height - sill - HEADER_SPACE;
         return Math.max(0, Math.min(val, maxH));
       }
       case 'position': {
@@ -115,16 +118,15 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
     if (!wall) return;
 
     let w = type === 'door' ? 900 : 1200;
-    let h = type === 'door' ? 2050 : 1100;
+    let h = type === 'door' ? 2000 : 1100;
     
-    // Validar que quepa al menos lo básico
     const maxW = wall.length - (EDGE_MARGIN * 2);
-    const maxH = wall.height - HEADER_SPACE;
+    const maxH = wall.height - HEADER_SPACE - (type === 'window' ? DEFAULT_SILL : 0);
     
     w = Math.min(w, maxW);
     h = Math.min(h, maxH);
     
-    if (w < 100) return; // Muro demasiado pequeño
+    if (w < 100) return;
 
     const newOpening: SteelOpening = {
       id: Math.random().toString(36).substr(2, 9),
@@ -132,12 +134,10 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
       width: w,
       height: h,
       position: EDGE_MARGIN,
-      sillHeight: type === 'window' ? Math.min(900, wall.height - h - HEADER_SPACE) : 0
+      sillHeight: type === 'window' ? DEFAULT_SILL : 0
     };
 
     if (checkOverlap(wall, newOpening.id, newOpening.position, newOpening.width)) {
-      // Intentar buscar una posición libre si el inicio está ocupado
-      // Para este MVP simplemente no añadimos si hay conflicto inicial directo
       return;
     }
 

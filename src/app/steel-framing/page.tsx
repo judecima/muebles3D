@@ -33,15 +33,17 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-const EDGE_MARGIN = 150; // Margen mínimo estructural desde el borde del muro
-const HEADER_SPACE = 100; // Espacio mínimo superior para dintel y solera
-const MIN_SPACE_BETWEEN = 50; // Espacio mínimo entre aberturas para montantes
+// NUEVAS CONSTANTES NORMATIVAS
+const EDGE_MARGIN = 400; // Distancia lateral mínima (400 mm)
+const HEADER_SPACE = 300; // Dintel mínimo superior (300 mm)
+const MIN_SPACE_BETWEEN = 600; // Distancia entre aberturas (600 mm)
+const DEFAULT_SILL = 900; // Antepecho ventana estándar (900 mm)
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
-  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: EDGE_MARGIN }], studSpacing: 400 },
-  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN, sillHeight: 900 }], studSpacing: 400 },
+  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2000, position: EDGE_MARGIN }], studSpacing: 400 },
+  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
   { id: 'w3', length: w, height: h, thickness: 100, x: w/2, z: l/2, rotation: 180, openings: [], studSpacing: 400 },
-  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN, sillHeight: 900 }], studSpacing: 400 },
+  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
 ];
 
 const INITIAL_CONFIG: SteelHouseConfig = {
@@ -162,7 +164,8 @@ export default function SteelFramingPage() {
     }
 
     if (field === 'height') {
-      const maxH = wall.height - (newOpening.type === 'window' ? (newOpening.sillHeight || 0) : 0) - HEADER_SPACE;
+      const sill = newOpening.type === 'window' ? (newOpening.sillHeight || 0) : 0;
+      const maxH = wall.height - sill - HEADER_SPACE;
       newOpening.height = Math.max(0, Math.min(safeVal, maxH));
     }
 
