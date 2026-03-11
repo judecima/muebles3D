@@ -10,18 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Menu, 
   Home, 
-  Download,
-  Layout,
   Settings2,
   Compass,
   Box,
   ClipboardList,
-  ChevronRight,
   MousePointer,
-  X,
   Plus,
   Trash2,
-  ArrowRightLeft,
   Columns,
   Info
 } from 'lucide-react';
@@ -64,7 +59,6 @@ export default function SteelFramingPage() {
   const [config, setConfig] = useState<SteelHouseConfig>(INITIAL_CONFIG);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Estados para modales y edición de vanos
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
   const [localOpeningData, setLocalOpeningData] = useState<{ width: string, position: string } | null>(null);
   const [addingOpening, setAddingOpening] = useState<{ wallId: string, x: number } | null>(null);
@@ -72,19 +66,14 @@ export default function SteelFramingPage() {
     type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL
   });
 
-  // Estados para edición de tabiques internos
   const [editingInternalWall, setEditingInternalWall] = useState<InternalWall | null>(null);
   const [localIWData, setLocalIWData] = useState<{ length: string, xPosition: string } | null>(null);
   
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
   
-  const viewerRef = useRef<{ 
-    enterWalkMode: () => void, 
-    exitWalkMode: () => void
-  }>(null);
+  const viewerRef = useRef<{ enterWalkMode: () => void, exitWalkMode: () => void }>(null);
 
-  // Sincronizar paredes perimetrales si cambian dimensiones globales
   useEffect(() => {
     const newWalls = config.walls.map(w => {
       if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
@@ -100,9 +89,7 @@ export default function SteelFramingPage() {
       w.z !== config.walls[i]?.z
     );
 
-    if (hasChanges) {
-      setConfig(prev => ({ ...prev, walls: newWalls }));
-    }
+    if (hasChanges) setConfig(prev => ({ ...prev, walls: newWalls }));
   }, [config.width, config.length]);
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening) => {
@@ -128,13 +115,10 @@ export default function SteelFramingPage() {
       const parent = config.walls.find(w => w.id === wallId);
       if (!parent) return;
 
-      // Cálculo de rotación para que apunte hacia ADENTRO
       const targetRotation = (parent.rotation - 90 + 360) % 360;
-
-      // Calcular largo máximo basado en la pared opuesta
       let maxPossibleLength = 2000;
-      if (parent.id === 'w1' || parent.id === 'w3') maxPossibleLength = config.length - 100;
-      if (parent.id === 'w2' || parent.id === 'w4') maxPossibleLength = config.width - 100;
+      if (parent.id === 'w1' || parent.id === 'w3') maxPossibleLength = config.length - 150;
+      if (parent.id === 'w2' || parent.id === 'w4') maxPossibleLength = config.width - 150;
 
       const newIW: InternalWall = {
         id: Math.random().toString(36).substr(2, 9),
@@ -143,19 +127,12 @@ export default function SteelFramingPage() {
         length: Math.min(2000, maxPossibleLength), 
         height: config.globalWallHeight,
         rotation: targetRotation,
-        x: 0, 
-        z: 0
+        x: 0, z: 0
       };
       
-      setConfig(prev => ({
-        ...prev,
-        internalWalls: [...prev.internalWalls, newIW]
-      }));
+      setConfig(prev => ({ ...prev, internalWalls: [...prev.internalWalls, newIW] }));
       setEditingInternalWall(newIW);
-      setLocalIWData({
-        length: newIW.length.toString(),
-        xPosition: Math.round(newIW.xPosition).toString()
-      });
+      setLocalIWData({ length: newIW.length.toString(), xPosition: Math.round(x).toString() });
     }
   }, [config.walls, config.globalWallHeight, config.width, config.length]);
 
@@ -168,40 +145,26 @@ export default function SteelFramingPage() {
     let len = parseInt(localIWData.length) || 0;
     let xPos = parseInt(localIWData.xPosition) || 0;
 
-    // Validar límites de posición en pared padre
     xPos = Math.max(50, Math.min(xPos, parent.length - 50));
-
-    // Validar límites de largo según perímetro
     let maxLen = 2000;
     if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - 150;
     if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - 150;
     
     len = Math.max(100, Math.min(len, maxLen));
 
-    const updated: InternalWall = { 
-      ...editingInternalWall, 
-      length: len, 
-      xPosition: xPos 
-    };
-
+    const updated: InternalWall = { ...editingInternalWall, length: len, xPosition: xPos };
     setConfig(prev => ({
       ...prev,
       internalWalls: prev.internalWalls.map(iw => iw.id === updated.id ? updated : iw)
     }));
     
     setEditingInternalWall(updated);
-    setLocalIWData({
-      length: len.toString(),
-      xPosition: xPos.toString()
-    });
+    setLocalIWData({ length: len.toString(), xPosition: xPos.toString() });
   };
 
   const deleteInternalWall = () => {
     if (!editingInternalWall) return;
-    setConfig(prev => ({
-      ...prev,
-      internalWalls: prev.internalWalls.filter(iw => iw.id !== editingInternalWall.id)
-    }));
+    setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.filter(iw => iw.id !== editingInternalWall.id) }));
     setEditingInternalWall(null);
   };
 
@@ -214,27 +177,22 @@ export default function SteelFramingPage() {
     const wall = config.walls.find(w => w.id === selectedOpening.wallId);
     if (!wall) return;
 
-    // Validar que no salga de la pared
     const finalW = Math.min(w, wall.length - EDGE_MARGIN * 2);
     const finalP = Math.max(EDGE_MARGIN, Math.min(p, wall.length - finalW - EDGE_MARGIN));
 
     const newOpening = { ...selectedOpening.opening, width: finalW, position: finalP };
-    
-    const newWalls = config.walls.map(w => 
+    setConfig({ ...config, walls: config.walls.map(w => 
       w.id === selectedOpening.wallId 
         ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? newOpening : o) } 
         : w
-    );
-    
-    setConfig({ ...config, walls: newWalls });
+    )});
     setSelectedOpening({ ...selectedOpening, opening: newOpening });
     setLocalOpeningData({ width: finalW.toString(), position: finalP.toString() });
   };
 
   const handleDeleteOpening = () => {
     if (!selectedOpening) return;
-    const newWalls = config.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.filter(o => o.id !== selectedOpening.opening.id) } : w);
-    setConfig({ ...config, walls: newWalls });
+    setConfig({ ...config, walls: config.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.filter(o => o.id !== selectedOpening.opening.id) } : w) });
     setSelectedOpening(null);
   };
 
@@ -252,7 +210,6 @@ export default function SteelFramingPage() {
       sillHeight: newOpData.type === 'window' ? newOpData.sill : 0
     };
 
-    // Validar colisión con otras aberturas (simplificado)
     const collision = wall.openings.some(op => {
       const start = op.position - 200;
       const end = op.position + op.width + 200;
@@ -298,9 +255,7 @@ export default function SteelFramingPage() {
                 <TabsTrigger value="materials" className="text-[10px] font-bold uppercase h-6 px-3"><ClipboardList className="w-3 h-3 mr-1.5" /> Listado Materiales</TabsTrigger>
               </TabsList>
             </Tabs>
-            <div className="flex gap-2">
-              <Button variant="default" size="sm" className="h-8 px-4 text-[10px] font-black uppercase bg-blue-600 hover:bg-blue-700 text-white" onClick={() => viewerRef.current?.enterWalkMode()}><Compass className="w-3.5 h-3.5 mr-2" /> Inspección 3P</Button>
-            </div>
+            <Button variant="default" size="sm" className="h-8 px-4 text-[10px] font-black uppercase bg-blue-600 hover:bg-blue-700 text-white" onClick={() => viewerRef.current?.enterWalkMode()}><Compass className="w-3.5 h-3.5 mr-2" /> Inspección 3P</Button>
           </div>
         </header>
 
@@ -334,7 +289,6 @@ export default function SteelFramingPage() {
           </Tabs>
         </div>
 
-        {/* Modal Editar Vano */}
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -345,25 +299,11 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
-                <Input 
-                  type="number" 
-                  value={localOpeningData?.width || ''} 
-                  onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)}
-                  onBlur={commitOpeningChange}
-                  onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()}
-                  className="col-span-3" 
-                />
+                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} onBlur={commitOpeningChange} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Posición</Label>
-                <Input 
-                  type="number" 
-                  value={localOpeningData?.position || ''} 
-                  onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)}
-                  onBlur={commitOpeningChange}
-                  onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()}
-                  className="col-span-3" 
-                />
+                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} onBlur={commitOpeningChange} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
@@ -373,7 +313,6 @@ export default function SteelFramingPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Modal Nuevo Vano */}
         <Dialog open={!!addingOpening} onOpenChange={(open) => !open && setAddingOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader><DialogTitle className="font-black text-green-600 uppercase">Nuevo Vano</DialogTitle></DialogHeader>
@@ -394,51 +333,27 @@ export default function SteelFramingPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Modal Editar Tabique Interno */}
         <Dialog open={!!editingInternalWall} onOpenChange={(open) => !open && setEditingInternalWall(null)}>
           <DialogContent className="sm:max-w-[450px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-purple-600">
-                <Columns className="w-5 h-5" /> Tabique Drywall Interior
-              </DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-purple-600"><Columns className="w-5 h-5" /> Tabique Drywall</DialogTitle></DialogHeader>
             <div className="grid gap-6 py-4">
               <Alert className="bg-purple-50 border-purple-100">
                 <Info className="h-4 w-4 text-purple-600" />
                 <AlertTitle className="text-[10px] font-black uppercase text-purple-700">Referencia de Anclaje</AlertTitle>
-                <AlertDescription className="text-[10px] text-purple-600 font-medium">
-                  Este muro nace de la pared perimetral <span className="font-black">#{editingInternalWall?.parentWallId}</span>. 
-                  Las medidas se limitan automáticamente al perímetro exterior.
-                </AlertDescription>
+                <AlertDescription className="text-[10px] text-purple-600 font-medium">Este muro nace de la pared perimetral #{editingInternalWall?.parentWallId}.</AlertDescription>
               </Alert>
-
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right text-[10px] font-black uppercase text-slate-500">Punto Inicio (mm)</Label>
-                <Input
-                  type="number"
-                  value={localIWData?.xPosition || ''}
-                  onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)}
-                  onBlur={commitInternalWallChanges}
-                  onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()}
-                  className="col-span-3 h-9 font-bold"
-                />
+                <Label className="text-right text-[10px] font-black uppercase text-slate-500">Inicio (mm)</Label>
+                <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} onBlur={commitInternalWallChanges} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} className="col-span-3 h-9 font-bold" />
               </div>
-
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Largo (mm)</Label>
-                <Input
-                  type="number"
-                  value={localIWData?.length || ''}
-                  onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)}
-                  onBlur={commitInternalWallChanges}
-                  onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()}
-                  className="col-span-3 h-9 font-bold"
-                />
+                <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} onBlur={commitInternalWallChanges} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} className="col-span-3 h-9 font-bold" />
               </div>
             </div>
             <DialogFooter className="flex gap-2">
-              <Button variant="destructive" onClick={deleteInternalWall} className="font-bold uppercase text-[10px] h-10"><Trash2 className="w-4 h-4 mr-2" /> Eliminar Muro</Button>
-              <Button onClick={() => setEditingInternalWall(null)} className="bg-purple-600 font-black uppercase text-[10px] flex-1 h-10">Confirmar Diseño</Button>
+              <Button variant="destructive" onClick={deleteInternalWall} className="font-bold uppercase text-[10px] h-10"><Trash2 className="w-4 h-4 mr-2" /> Eliminar</Button>
+              <Button onClick={() => setEditingInternalWall(null)} className="bg-purple-600 font-black uppercase text-[10px] flex-1 h-10">Confirmar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

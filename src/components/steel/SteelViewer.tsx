@@ -40,18 +40,10 @@ export const SteelViewer = forwardRef(({
     }
   }));
 
+  // Inicialización ÚNICA del manager
   useEffect(() => {
     if (containerRef.current && !managerRef.current) {
-      managerRef.current = new SteelSceneManager(
-        containerRef.current, 
-        onOpeningDoubleClick,
-        onWallDoubleClick,
-        (locked) => {
-          setIsWalkMode(locked);
-          if (onWalkModeLock) onWalkModeLock(locked);
-        },
-        onInternalWallDoubleClick
-      );
+      managerRef.current = new SteelSceneManager(containerRef.current);
     }
 
     return () => {
@@ -60,8 +52,22 @@ export const SteelViewer = forwardRef(({
         managerRef.current = null;
       }
     };
-  }, [onOpeningDoubleClick, onWallDoubleClick, onWalkModeLock, onInternalWallDoubleClick]);
+  }, []);
 
+  // Actualización de callbacks sin re-crear el manager
+  useEffect(() => {
+    if (managerRef.current) {
+      managerRef.current.onOpeningDoubleClick = onOpeningDoubleClick || null;
+      managerRef.current.onWallDoubleClick = onWallDoubleClick || null;
+      managerRef.current.onInternalWallDoubleClick = onInternalWallDoubleClick || null;
+      managerRef.current.onWalkModeLock = (locked) => {
+        setIsWalkMode(locked);
+        if (onWalkModeLock) onWalkModeLock(locked);
+      };
+    }
+  }, [onOpeningDoubleClick, onWallDoubleClick, onInternalWallDoubleClick, onWalkModeLock]);
+
+  // Actualización de la casa
   useEffect(() => {
     if (managerRef.current) {
       managerRef.current.buildHouse(config);
