@@ -147,21 +147,24 @@ export default function SteelFramingPage() {
     if (!editingInternalWall || !localIWData) return;
     
     const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
-    if (!parent) return;
+    if (!parent) {
+      setEditingInternalWall(null);
+      return;
+    }
 
     let len = parseInt(localIWData.length) || 0;
     let xPos = parseInt(localIWData.xPosition) || 0;
 
-    // Validar anclaje sobre abertura
-    const isOverOpening = parent.openings.some(op => xPos >= op.position && xPos <= (op.position + op.width));
+    // Validar anclaje sobre abertura (con un margen de 50mm para tornillería)
+    const isOverOpening = parent.openings.some(op => xPos >= (op.position - 50) && xPos <= (op.position + op.width + 50));
     if (isOverOpening) {
-      alert("El punto de inicio coincide con una abertura. Elija otra posición.");
+      alert("El punto de anclaje interfiere con una abertura del perímetro. Desplace el tabique.");
       return;
     }
 
     xPos = Math.max(50, Math.min(xPos, parent.length - 50));
     
-    let maxLen = 2000;
+    let maxLen = 10000;
     if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - 150;
     if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - 150;
     
@@ -174,8 +177,9 @@ export default function SteelFramingPage() {
       internalWalls: prev.internalWalls.map(iw => iw.id === updated.id ? updated : iw)
     }));
     
-    setEditingInternalWall(updated);
-    setLocalIWData({ length: len.toString(), xPosition: xPos.toString() });
+    // CERRAR MODAL TRAS ÉXITO
+    setEditingInternalWall(null);
+    setLocalIWData(null);
   };
 
   const deleteInternalWall = () => {
