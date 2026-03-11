@@ -18,7 +18,6 @@ export class SteelSceneManager {
   private houseGroup: THREE.Group;
   private openingsGroup: THREE.Group;
   private internalWallsGroup: THREE.Group;
-  private wallClickMeshes: THREE.Group; // Grupo optimizado para clics
   
   private container: HTMLElement;
   private raycaster = new THREE.Raycaster();
@@ -32,7 +31,7 @@ export class SteelSceneManager {
 
   private prevTime = performance.now();
 
-  // Callbacks dinámicos para evitar re-creación de instancia
+  // Callbacks dinámicos
   public onOpeningDoubleClick: ((wallId: string, opening: SteelOpening) => void) | null = null;
   public onWallDoubleClick: ((wallId: string, x: number, side: 'exterior' | 'interior') => void) | null = null;
   public onWalkModeLock: ((locked: boolean) => void) | null = null;
@@ -43,18 +42,15 @@ export class SteelSceneManager {
     steel: 0x9ca3af,      
     steelDrywall: 0x64748b, 
     header: 0x2563eb,
-    headerTriple: 0x1e40af,
-    headerTube: 0x0f172a,
     king: 0xef4444,
     jack: 0xf59e0b,
-    grid: 0xd1d5db,
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
     panel_int: 0xd1d5db,
     blocking: 0x22c55e,   
     junction: 0x3b82f6,   
     corner: 0xef4444,     
-    bracing: 0xf59e0b     
+    highlight: 0xae1ae2
   };
 
   private profileWidth = 100; 
@@ -105,9 +101,6 @@ export class SteelSceneManager {
     this.internalWallsGroup = new THREE.Group();
     this.scene.add(this.internalWallsGroup);
 
-    this.wallClickMeshes = new THREE.Group();
-    this.scene.add(this.wallClickMeshes);
-
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
@@ -146,7 +139,7 @@ export class SteelSceneManager {
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // 1. Detección de aberturas (Alta prioridad)
+    // 1. Detección de aberturas
     const openingIntersects = this.raycaster.intersectObjects(this.openingsGroup.children);
     if (openingIntersects.length > 0) {
       const { wallId, opening } = openingIntersects[0].object.userData;
@@ -165,12 +158,12 @@ export class SteelSceneManager {
       }
     }
 
-    // 3. Detección de muros perimetrales (Optimizado)
-    const wallIntersects = this.raycaster.intersectObjects(this.wallClickMeshes.children);
-    if (wallIntersects.length > 0) {
-      const intersect = wallIntersects[0];
-      const { wallId, side } = intersect.object.userData;
-      const localPoint = intersect.object.worldToLocal(intersect.point.clone());
+    // 3. Detección de muros perimetrales (Optimizado sin duplicación)
+    const wallIntersects = this.raycaster.intersectObjects(this.houseGroup.children, true);
+    const wallHit = wallIntersects.find(i => i.object.userData.isWall);
+    if (wallHit) {
+      const { wallId, side } = wallHit.object.userData;
+      const localPoint = wallHit.object.worldToLocal(wallHit.point.clone());
       if (this.onWallDoubleClick) this.onWallDoubleClick(wallId, localPoint.x, side);
     }
   };
@@ -179,7 +172,7 @@ export class SteelSceneManager {
     if (!this.renderer || !this.scene || !this.camera) return;
     requestAnimationFrame(this.animate);
     const time = performance.now();
-    const delta = Math.min((time - this.prevTime) / 1000, 0.1); // Cap delta to prevent teleports
+    const delta = Math.min((time - this.prevTime) / 1000, 0.1);
 
     if (this.isWalkModeActive) {
       this.player.update(delta, this.tpCamera.rotationY);
@@ -193,11 +186,12 @@ export class SteelSceneManager {
   };
 
   public buildHouse(config: SteelHouseConfig) {
-    // Limpieza agresiva de grupos
-    [this.houseGroup, this.openingsGroup, this.internalWallsGroup, this.wallClickMeshes].forEach(group => {
+    // Limpieza
+    [this.houseGroup, this.openingsGroup, this.internalWallsGroup].forEach(group => {
       while (group.children.length > 0) {
-        this.disposeObject(group.children[0]);
-        group.remove(group.children[0]);
+        const child = group.children[0];
+        this.disposeObject(child);
+        group.remove(child);
       }
     });
 
@@ -209,17 +203,16 @@ export class SteelSceneManager {
       wallGroup.position.set(wall.x, 0, wall.z);
       wallGroup.rotation.y = (wall.rotation * Math.PI) / 180;
       this.houseGroup.add(wallGroup);
+      wallGroup.updateMatrixWorld(true);
 
       if (!config.structuralMode) {
         if (config.layers.exteriorPanels) {
           const mesh = this.createPanelMesh(wall, 'exterior');
-          this.wallClickMeshes.add(mesh.clone().applyMatrix4(wallGroup.matrixWorld)); // Copia para clics
           wallGroup.add(mesh);
           this.collisions.registerWall(mesh);
         }
         if (config.layers.interiorPanels) {
           const mesh = this.createPanelMesh(wall, 'interior');
-          this.wallClickMeshes.add(mesh.clone().applyMatrix4(wallGroup.matrixWorld)); // Copia para clics
           wallGroup.add(mesh);
         }
       }
@@ -230,7 +223,7 @@ export class SteelSceneManager {
       this.createOpeningTriggers(wall);
     });
 
-    // Muros Internos (Drywall)
+    // Muros Internos
     config.internalWalls.forEach(iw => {
       const parent = config.walls.find(w => w.id === iw.parentWallId);
       if (!parent) return;
@@ -242,12 +235,12 @@ export class SteelSceneManager {
         .makeRotationY((parent.rotation * Math.PI) / 180)
         .setPosition(parent.x, 0, parent.z);
       
-      // Desfase para que nazca de la cara interna
       const pos = new THREE.Vector3(iw.xPosition, 0, 50).applyMatrix4(parentMatrix);
       
       iwGroup.position.copy(pos);
       iwGroup.rotation.y = (iw.rotation * Math.PI) / 180;
       this.internalWallsGroup.add(iwGroup);
+      iwGroup.updateMatrixWorld(true);
 
       this.generateInternalWall(iw, iwGroup, config);
     });
@@ -267,7 +260,6 @@ export class SteelSceneManager {
     const height = iw.height;
     const len = iw.length;
 
-    // Estructura Drywall
     if (config.layers.steelProfiles) {
       group.add(this.createProfile(len, 0, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
       group.add(this.createProfile(len, 0, height - this.profileFlange, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
@@ -278,7 +270,6 @@ export class SteelSceneManager {
       }
     }
 
-    // Paneles Drywall (Yeso)
     if (!config.structuralMode && config.layers.interiorPanels) {
       const panelGeom = new THREE.BoxGeometry(len, height, 12.5);
       const panelMat = new THREE.MeshStandardMaterial({ color: this.colors.panel_int });
@@ -295,7 +286,6 @@ export class SteelSceneManager {
       this.collisions.registerWall(p2);
     }
 
-    // Hit-box invisible para edición fácil
     const hitBox = new THREE.Mesh(
       new THREE.BoxGeometry(len, height, thickness + 30),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
