@@ -25,7 +25,6 @@ export interface LayerVisibility {
   exteriorPanels: boolean;
   interiorPanels: boolean;
   steelProfiles: boolean;
-  crossBracing: boolean;
   horizontalBlocking: boolean; // Rigidizadores horizontales
   lintels: boolean;
   reinforcements: boolean;

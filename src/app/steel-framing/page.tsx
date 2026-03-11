@@ -50,7 +50,6 @@ const INITIAL_CONFIG: SteelHouseConfig = {
     exteriorPanels: true,
     interiorPanels: false,
     steelProfiles: true,
-    crossBracing: true,
     horizontalBlocking: true,
     lintels: true,
     reinforcements: true

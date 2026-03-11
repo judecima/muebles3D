@@ -2,8 +2,9 @@ import { SteelHouseConfig, MaterialEstimate, MaterialItem } from '@/lib/steel/ty
 import { StructuralEngine } from './structuralEngine';
 
 /**
- * Calculador de Materiales Industrial v6.0
+ * Calculador de Materiales Industrial v6.1
  * Considera panelización, refuerzos de esquina y uniones estructurales.
+ * (Cruces de San Andrés eliminadas)
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -79,16 +80,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
 
     totalPGCLenMM += (Math.max(0, fieldStuds) * studHeight);
 
-    // 3. REFUERZOS LATERALES (Cruces de San Andrés)
-    if (config.layers.crossBracing) {
-      const braces = StructuralEngine.calculateBracing(wall);
-      braces.forEach(b => {
-        const len = Math.sqrt(Math.pow(b.xEnd - b.xStart, 2) + Math.pow(b.yEnd - b.yStart, 2));
-        totalPGULenMM += len; 
-      });
-    }
-
-    // 4. BLOQUEOS HORIZONTALES
+    // 3. BLOQUEOS HORIZONTALES
     if (config.layers.horizontalBlocking) {
       const blocks = StructuralEngine.calculateBlocking(wall);
       blocks.forEach(b => {

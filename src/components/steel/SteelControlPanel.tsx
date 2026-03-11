@@ -219,7 +219,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                     { id: 'ext-pan', label: 'OSB Exterior', key: 'exteriorPanels' },
                     { id: 'int-pan', label: 'Yeso Interior', key: 'interiorPanels' },
                     { id: 'profiles', label: 'Perfilería Acero', key: 'steelProfiles' },
-                    { id: 'bracing', label: 'Cruces San Andrés', key: 'crossBracing', color: 'text-red-500' },
                     { id: 'blocking', label: 'Blocking Horiz.', key: 'horizontalBlocking', color: 'text-amber-600' },
                     { id: 'lintels', label: 'Dinteles/Vanos', key: 'lintels', color: 'text-blue-500' }
                   ].map(layer => (
@@ -305,7 +304,7 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                                 <Input type="number" value={op.width} onChange={(e) => {
                                   const newVal = validateOpeningValue(wall, op.id, 'width', parseInt(e.target.value) || 0);
                                   const newOps = wall.openings.map(o => o.id === op.id ? { ...o, width: newVal } : o);
-                                  updateWall(wall.id, 'openings', newOps);
+                                  updateWall(wallId, 'openings', newOps);
                                 }} className="h-6 text-[9px] font-bold" />
                               </div>
                               <div className="space-y-1">
@@ -313,7 +312,7 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                                 <Input type="number" value={op.height} onChange={(e) => {
                                   const newVal = validateOpeningValue(wall, op.id, 'height', parseInt(e.target.value) || 0);
                                   const newOps = wall.openings.map(o => o.id === op.id ? { ...o, height: newVal } : o);
-                                  updateWall(wall.id, 'openings', newOps);
+                                  updateWall(wallId, 'openings', newOps);
                                 }} className="h-6 text-[9px] font-bold" />
                               </div>
                               <div className="space-y-1">
@@ -321,7 +320,7 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                                 <Input type="number" value={op.position} onChange={(e) => {
                                   const newVal = validateOpeningValue(wall, op.id, 'position', parseInt(e.target.value) || 0);
                                   const newOps = wall.openings.map(o => o.id === op.id ? { ...o, position: newVal } : o);
-                                  updateWall(wall.id, 'openings', newOps);
+                                  updateWall(wallId, 'openings', newOps);
                                 }} className="h-6 text-[9px] font-bold" />
                               </div>
                               {op.type === 'window' && (
@@ -330,7 +329,7 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                                   <Input type="number" value={op.sillHeight} onChange={(e) => {
                                     const newVal = validateOpeningValue(wall, op.id, 'sillHeight', parseInt(e.target.value) || 0);
                                     const newOps = wall.openings.map(o => o.id === op.id ? { ...o, sillHeight: newVal } : o);
-                                    updateWall(wall.id, 'openings', newOps);
+                                    updateWall(wallId, 'openings', newOps);
                                   }} className="h-6 text-[9px] font-bold" />
                                 </div>
                               )}

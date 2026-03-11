@@ -44,7 +44,6 @@ export class SteelSceneManager {
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
     panel_int: 0xe2e8f0,
-    bracing: 0xf97316, // Naranja para X-Bracing
     blocking: 0x0d9488, // Verde para Blocking
     junction: 0x2563eb, // Azul para uniones de paneles
     corner: 0xef4444    // Rojo para refuerzos de esquina
@@ -270,20 +269,6 @@ export class SteelSceneManager {
       }
     });
 
-    // Cruces de San Andrés (Calculadas per panel)
-    if (layers.crossBracing) {
-      const braces = StructuralEngine.calculateBracing(wall);
-      braces.forEach(b => {
-        const len = Math.sqrt(Math.pow(b.xEnd - b.xStart, 2) + Math.pow(b.yEnd - b.yStart, 2));
-        const angle = Math.atan2(b.yEnd - b.yStart, b.xEnd - b.xStart);
-        // Renderizado estrictamente EN EL PLANO (zOffset = 0)
-        const mesh = this.createProfile(len, b.xStart, b.yStart, 0, 'PGU', this.colors.bracing, 0);
-        mesh.rotation.z = angle;
-        mesh.scale.y = 0.4; // Fleje estructural
-        structuralGroup.add(mesh);
-      });
-    }
-
     // Bloqueos Horizontales
     if (layers.horizontalBlocking) {
       const blocks = StructuralEngine.calculateBlocking(wall);
@@ -292,7 +277,7 @@ export class SteelSceneManager {
       });
     }
 
-    // Aberturas y Vanos (Sin cambios en lógica, solo colores si aplica)
+    // Aberturas y Vanos
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;

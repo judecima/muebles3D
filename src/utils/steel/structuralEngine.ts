@@ -88,41 +88,8 @@ export class StructuralEngine {
   }
 
   static calculateBracing(wall: SteelWall): BracingData[] {
-    const braces: BracingData[] = [];
-    const minBraceWidth = 600; 
-    
-    // Las cruces ahora se calculan dentro de los paneles
-    const panels = this.calculateWallPanels(wall);
-
-    panels.forEach(panel => {
-      // Buscar espacios libres de aberturas dentro del panel
-      const sortedOpenings = [...wall.openings]
-        .filter(op => op.position < panel.xEnd && (op.position + op.width) > panel.xStart)
-        .sort((a, b) => a.position - b.position);
-
-      let currentX = panel.xStart;
-      
-      sortedOpenings.forEach(op => {
-        if (op.position - currentX > minBraceWidth) {
-          this.addBraceToSegment(currentX, op.position, wall.height, braces);
-        }
-        currentX = op.position + op.width;
-      });
-
-      if (panel.xEnd - currentX > minBraceWidth) {
-        this.addBraceToSegment(currentX, panel.xEnd, wall.height, braces);
-      }
-    });
-
-    return braces;
-  }
-
-  private static addBraceToSegment(start: number, end: number, height: number, list: BracingData[]) {
-    const margin = 50;
-    // Cruz principal \
-    list.push({ xStart: start + margin, yStart: margin, xEnd: end - margin, yEnd: height - margin });
-    // Cruz invertida /
-    list.push({ xStart: end - margin, yStart: margin, xEnd: start + margin, yEnd: height - margin });
+    // Cruces de San Andrés eliminadas del sistema
+    return [];
   }
 
   static calculateBlocking(wall: SteelWall): BlockingData[] {
