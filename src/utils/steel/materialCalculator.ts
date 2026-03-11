@@ -59,11 +59,10 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     });
 
     wall.openings.forEach(op => {
-      const analysis = StructuralEngine.calculateHeader(op, wall.length, config);
+      const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
       
-      // King Studs (apoyos laterales reforzados para trusses)
       const numKings = analysis.type === 'truss' ? 3 : 1;
       if (fusion === 'none') {
         pgc100Len += numKings * 2 * studHeight; 
@@ -71,14 +70,12 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
         pgc100Len += numKings * 1 * studHeight; 
       }
 
-      // Jack Studs
       pgc100Len += 2 * (sill + op.height - 40); 
 
-      // Header / Truss
       if (analysis.type === 'truss') {
-        pgc100Len += op.width * 2; // Cordones superior e inferior
+        pgc100Len += op.width * 2; 
         const numDiagonals = Math.ceil(op.width / 400);
-        pgc100Len += numDiagonals * 600; // Aproximación de diagonales y montantes de viga
+        pgc100Len += numDiagonals * (analysis.trussData?.height || 400) * 1.5; 
       } else {
         pgc100Len += op.width; 
       }

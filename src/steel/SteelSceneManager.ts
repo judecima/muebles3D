@@ -189,12 +189,12 @@ export class SteelSceneManager {
       wallGroup.updateMatrixWorld(true);
       if (!config.structuralMode) {
         if (config.layers.exteriorPanels) {
-          const mesh = this.createPanelMesh(wall, 'exterior');
+          const mesh = this.createPanelMesh(wall, 'exterior', config);
           wallGroup.add(mesh);
           this.collisions.registerWall(mesh);
         }
         if (config.layers.interiorPanels) {
-          const mesh = this.createPanelMesh(wall, 'interior');
+          const mesh = this.createPanelMesh(wall, 'interior', config);
           wallGroup.add(mesh);
         }
       }
@@ -242,14 +242,14 @@ export class SteelSceneManager {
       openings.forEach(op => {
         const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
         const headerH = sill + op.height;
-        const analysis = StructuralEngine.calculateHeader(op, iw.length, config);
+        const analysis = StructuralEngine.calculateHeader(op, iw.length, config, iw.height);
         const headerColor = analysis.type === 'truss' ? this.colors.header_truss : this.colors.header;
         
         group.add(this.createProfile(studHeight, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         
         if (analysis.type === 'truss') {
-          this.drawTrussHeader(group, op.position, headerH - 400, op.width, 400, thickness);
+          this.drawTrussHeader(group, op.position, headerH, op.width, analysis.trussData?.height || 400, thickness);
         } else {
           group.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', headerColor, 0, thickness));
         }
@@ -301,25 +301,23 @@ export class SteelSceneManager {
     });
     if (layers.horizontalBlocking) StructuralEngine.calculateBlocking(wall).forEach(b => structuralGroup.add(this.createProfile(b.xEnd - b.xStart, b.xStart, b.y, 0, 'PGU', this.colors.blocking)));
     wall.openings.forEach(op => {
-      const analysis = StructuralEngine.calculateHeader(op, wall.length, config);
+      const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerTop = sill + op.height;
       const fusion = analysis.isFusedWithCorner;
       const fusedL = fusion === 'left'; const fusedR = fusion === 'right';
 
-      // Refuerzos de apoyo lateral (King Studs)
       const numKings = analysis.type === 'truss' ? 3 : 1;
       for (let i = 0; i < numKings; i++) {
         if (!fusedL) structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * (2 + i), this.profileFlange, 90, 'PGC', this.colors.king));
         if (!fusedR) structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange * (1 + i), this.profileFlange, 90, 'PGC', this.colors.king));
       }
 
-      // Jack Studs (Apoyo directo de viga)
       if (!fusedL) structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       if (!fusedR) structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
       if (analysis.type === 'truss') {
-        this.drawTrussHeader(structuralGroup, op.position, headerTop - 400, op.width, 400, this.profileWidth);
+        this.drawTrussHeader(structuralGroup, op.position, headerTop, op.width, analysis.trussData?.height || 400, this.profileWidth);
       } else {
         const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
         const finalHeaderW = fusedL || fusedR ? op.width + 50 : op.width;
@@ -333,19 +331,13 @@ export class SteelSceneManager {
   }
 
   private drawTrussHeader(group: THREE.Group, x: number, y: number, w: number, h: number, thickness: number) {
-    // Cordón Inferior
     group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    // Cordón Superior
     group.add(this.createProfile(w, x, y + h - 40, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    
-    // Diagonales y montantes internos
     const numDivisions = Math.ceil(w / 400);
     const divW = w / numDivisions;
     for (let i = 0; i <= numDivisions; i++) {
       const posX = x + (i * divW);
-      // Montante vertical interno
       group.add(this.createProfile(h - 80, posX - 20, y + 40, 90, 'PGC', this.colors.header_truss, 0, thickness));
-      // Diagonal (simplificada visualmente con perfil rotado)
       if (i < numDivisions) {
         const diagLen = Math.sqrt(divW * divW + h * h);
         const angle = Math.atan2(h, divW);
@@ -365,7 +357,7 @@ export class SteelSceneManager {
     mesh.castShadow = mesh.receiveShadow = true; return mesh;
   }
 
-  private createPanelMesh(wall: SteelWall, side: 'exterior' | 'interior'): THREE.Mesh {
+  private createPanelMesh(wall: SteelWall, side: 'exterior' | 'interior', config: SteelHouseConfig): THREE.Mesh {
     const shape = new THREE.Shape();
     shape.moveTo(0, 0); shape.lineTo(wall.length, 0); shape.lineTo(wall.length, wall.height); shape.lineTo(0, wall.height); shape.lineTo(0, 0);
     wall.openings.forEach(op => {
@@ -374,13 +366,13 @@ export class SteelSceneManager {
       shape.holes.push(hole);
     });
     const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 12, beveled: false }), new THREE.MeshStandardMaterial({ color: side === 'exterior' ? this.colors.panel_ext : this.colors.panel_int, transparent: true, opacity: side === 'exterior' ? 1 : 0.8 }));
-    mesh.position.z = side === 'exterior' ? -65 : 55; mesh.userData = { wallId: wall.id, isWall: true, side: side }; return mesh;
+    mesh.position.z = side === 'exterior' ? -62 : 50; mesh.userData = { wallId: wall.id, isWall: true, side: side }; return mesh;
   }
 
   private createOpeningTriggers(wallId: string, length: number, height: number, rotation: number, x: number, z: number, openings: SteelOpening[], isInternal: boolean, config: SteelHouseConfig) {
     openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      const analysis = StructuralEngine.calculateHeader(op, length, config);
+      const analysis = StructuralEngine.calculateHeader(op, length, config, height);
       const opColor = analysis.status === 'error' ? 0xff0000 : (analysis.status === 'warning' ? 0xffff00 : 0x00ff00);
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, op.height, 120), new THREE.MeshBasicMaterial({ color: opColor, transparent: true, opacity: 0.1 }));
       const matrix = new THREE.Matrix4().makeRotationY((rotation * Math.PI) / 180).setPosition(x, 0, z);

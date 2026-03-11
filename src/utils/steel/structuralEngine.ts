@@ -46,9 +46,6 @@ export class StructuralEngine {
     return 'none';
   }
 
-  /**
-   * Divide el muro en paneles evitando que las uniones caigan dentro de aberturas.
-   */
   static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): WallPanelData[] {
     const panels: WallPanelData[] = [];
     const maxPanelWidth = 4000; 
@@ -61,18 +58,12 @@ export class StructuralEngine {
     while (currentX < wall.length) {
       let targetX = Math.min(currentX + maxPanelWidth, wall.length);
       
-      // Si no es el final del muro, validar interferencia con aberturas
       if (targetX < wall.length) {
         for (const op of openings) {
           const opStart = op.position;
           const opEnd = op.position + op.width;
-          
-          // Si el punto de unión cae dentro de una abertura
           if (targetX > opStart && targetX < opEnd) {
-            // Mover la unión al inicio de la abertura (posición más segura)
             targetX = opStart - 10; 
-            
-            // Si el panel resultante es demasiado pequeño, intentar mover al final de la abertura
             if (targetX - currentX < minPanelWidth) {
               targetX = opEnd + 10;
             }
@@ -81,7 +72,6 @@ export class StructuralEngine {
         }
       }
 
-      // Asegurar que no nos pasamos del largo total
       targetX = Math.min(targetX, wall.length);
       const width = targetX - currentX;
 
@@ -103,8 +93,6 @@ export class StructuralEngine {
 
       currentX = targetX;
       panelIndex++;
-      
-      // Evitar bucles infinitos
       if (panelIndex > 50) break;
     }
 
@@ -120,7 +108,7 @@ export class StructuralEngine {
     return { verticalLoadN: verticalLoadKN * 1000, shearForceN: shearForceKN * 1000, overturningMomentNm: shearForceKN * heightM };
   }
 
-  static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig): HeaderAnalysis {
+  static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig, wallHeight: number): HeaderAnalysis {
     const L = opening.width;
     const tributaryWidth = config.length / 2; 
     const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; 
@@ -133,11 +121,16 @@ export class StructuralEngine {
     let status: HeaderAnalysis['status'] = 'ok';
     let trussData: HeaderAnalysis['trussData'] = undefined;
 
+    // Calcular altura disponible para la viga (desde el vano hasta la solera superior)
+    const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
+    const headerBottom = sill + opening.height;
+    const availableHeightForTruss = wallHeight - headerBottom - 40; // Restamos solera superior
+
     if (L > 2500 || requiredIx > this.TUBE_IX) {
       type = 'truss';
       status = L > 3500 ? 'error' : 'warning';
       trussData = {
-        height: 400, 
+        height: Math.max(400, availableHeightForTruss), // La viga ocupa todo el espacio hasta arriba
         numDiagonals: Math.ceil(L / 400),
         chordThickness: 1.25
       };
@@ -154,10 +147,6 @@ export class StructuralEngine {
     return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, trussData };
   }
 
-  /**
-   * Calcula los cripple studs asegurando que siempre haya desplazamiento de fuerzas
-   * desde la solera superior al dintel y del antepecho a la solera inferior.
-   */
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
     const cripples: CrippleData[] = [];
     const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
@@ -165,11 +154,16 @@ export class StructuralEngine {
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerTop = sill + opening.height;
 
-    // Cripples SUPERIORES (Desplazamiento de carga desde techo a dintel)
-    // Se generan siempre para mantener el camino de carga, incluso sobre trusses
-    for (let x = spacing; x < wall.length; x += spacing) {
-      if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-        cripples.push({ x, yStart: headerTop, yEnd: wallH - 40, type: 'upper' });
+    // Determinar si hay una viga reticulada que cubra todo el espacio superior
+    const analysis = this.calculateHeader(opening, wall.length, config, wallH);
+    const hasFullTruss = analysis.type === 'truss' && (analysis.trussData?.height || 0) >= (wallH - headerTop - 50);
+
+    // Cripples SUPERIORES (Solo si la viga no llega hasta la solera superior)
+    if (!hasFullTruss) {
+      for (let x = spacing; x < wall.length; x += spacing) {
+        if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
+          cripples.push({ x, yStart: headerTop + (analysis.type === 'truss' ? (analysis.trussData?.height || 400) : 100), yEnd: wallH - 40, type: 'upper' });
+        }
       }
     }
 
@@ -222,7 +216,7 @@ export class StructuralEngine {
     const alerts: any[] = [];
     config.walls.forEach(wall => {
       wall.openings.forEach(op => {
-        const analysis = this.calculateHeader(op, wall.length, config);
+        const analysis = this.calculateHeader(op, wall.length, config, wall.height);
         if (analysis.status !== 'ok') {
           const msg = analysis.type === 'truss' 
             ? `Vano ${op.width}mm en ${wall.id}: Requiere Viga Reticulada (Truss)`
