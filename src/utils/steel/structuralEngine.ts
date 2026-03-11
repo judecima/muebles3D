@@ -58,7 +58,6 @@ export class StructuralEngine {
     while (currentX < wall.length) {
       let targetX = Math.min(currentX + maxPanelWidth, wall.length);
       
-      // Ajuste automático: Si una unión de panel cae dentro de una abertura, moverla al borde
       if (targetX < wall.length) {
         for (const op of openings) {
           const opStart = op.position;
@@ -125,7 +124,6 @@ export class StructuralEngine {
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
     
-    // Altura técnica disponible para la viga (hasta solera superior)
     const availableHeightForTruss = Math.max(0, wallHeight - headerBottom - 40);
 
     if (L > 2500 || requiredIx > this.TUBE_IX) {
@@ -154,22 +152,25 @@ export class StructuralEngine {
     const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
     const wallH = wall.height;
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
-    const headerTop = sill + opening.height;
+    const headerBottom = sill + opening.height;
 
     const analysis = this.calculateHeader(opening, wall.length, config, wallH);
-    const hasFullTruss = analysis.type === 'truss' && (analysis.trussData?.height || 0) >= (wallH - headerTop - 50);
+    const headerHeight = analysis.type === 'truss' ? (analysis.trussData?.height || 400) : 100;
+    const headerTop = headerBottom + headerHeight;
 
-    // Cripples SUPERIORES (Solo si la viga no ocupa todo el espacio)
-    if (!hasFullTruss) {
+    const isFullTruss = analysis.type === 'truss' && (headerTop >= wallH - 50);
+
+    // Cripples SUPERIORES: Conectan la cara superior del header con la solera superior
+    if (!isFullTruss) {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-          const trussOffset = analysis.type === 'truss' ? (analysis.trussData?.height || 400) : 100;
-          cripples.push({ x, yStart: headerTop + trussOffset, yEnd: wallH - 40, type: 'upper' });
+          // El cripple nace justo encima del header y termina en la solera superior (con un offset de 40mm por ala solera)
+          cripples.push({ x, yStart: headerTop, yEnd: wallH - 40, type: 'upper' });
         }
       }
     }
 
-    // Cripples INFERIORES (Ventanas)
+    // Cripples INFERIORES: Ventanas
     if (opening.type === 'window') {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {

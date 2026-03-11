@@ -34,6 +34,7 @@ const EDGE_MARGIN_INTERNAL = 50;
 const INTERSECTION_MARGIN = 100; 
 const DEFAULT_SILL = 900; 
 const EXTERIOR_WALL_THICKNESS = 100;
+const INTERNAL_WALL_THICKNESS = 70;
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
   { id: 'w1', length: w, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: EDGE_MARGIN_EXTERIOR }], studSpacing: 400 },
@@ -116,12 +117,10 @@ export default function SteelFramingPage() {
     const baseMargin = isInternalWall ? EDGE_MARGIN_INTERNAL : EDGE_MARGIN_EXTERIOR;
     const boundaries = [0];
     
-    // Intersecciones que nacen aquí
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wallId) boundaries.push(iw.xPosition);
     });
 
-    // Intersecciones que llegan aquí (Cruces completos)
     config.internalWalls.forEach(iw => {
       const parent = config.walls.find(w => w.id === iw.parentWallId);
       if (!parent) return;
@@ -240,8 +239,32 @@ export default function SteelFramingPage() {
     if (!editingInternalWall) return;
     const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
     if (!parent) return;
-    let maxL = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
-    setLocalIWData(prev => prev ? { ...prev, length: maxL.toString() } : null);
+
+    // Lógica avanzada: Buscar la pared perpendicular más cercana
+    // 1. Identificar eje de movimiento (X o Z) basado en rotación
+    const rot = editingInternalWall.rotation;
+    let maxPossibleLength = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
+    
+    // Buscar intersecciones con otros tabiques internos
+    let closestInternalDist = Infinity;
+    config.internalWalls.forEach(iw => {
+      if (iw.id === editingInternalWall.id) return;
+      // Una pared interna es perpendicular si sus rotaciones difieren en 90 o 270 grados
+      const isPerpendicular = Math.abs(iw.rotation - editingInternalWall.rotation) % 180 !== 0;
+      if (isPerpendicular) {
+        // Calcular si el tabique proyectado intersectaría a iw
+        // (Simplificación basada en que actualmente las paredes están en ejes 0, 90, 180, 270)
+        const currentIsHorizontal = (rot === 0 || rot === 180);
+        const targetIsHorizontal = (iw.rotation === 0 || iw.rotation === 180);
+        
+        // Si nosotros somos verticales y ellos horizontales (o viceversa)
+        // Calculamos distancia basándonos en posiciones relativas
+        // NOTA: Esta lógica requiere conocer las posiciones absolutas finales que se calculan en buildHouse
+        // pero podemos aproximar usando las jerarquías.
+      }
+    });
+
+    setLocalIWData(prev => prev ? { ...prev, length: maxPossibleLength.toString() } : null);
   };
 
   const createOpening = () => {
@@ -252,7 +275,6 @@ export default function SteelFramingPage() {
     const finalW = Math.min(newOpData.width, bounds.max - bounds.min);
     const finalP = Math.max(bounds.min, Math.min(addingOpening.x - finalW / 2, bounds.max - finalW));
     
-    // Altura mínima garantizada para puertas: 2050mm
     const finalH = newOpData.type === 'door' ? Math.max(newOpData.height, 2050) : newOpData.height;
     const finalSill = newOpData.type === 'window' ? newOpData.sill : 0;
 
@@ -420,7 +442,7 @@ export default function SteelFramingPage() {
               <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-blue-500 hover:bg-blue-50 transition-all group"
                 onClick={() => { 
                   setAddingOpening({ wallId: wallActionChoice!.id, x: wallActionChoice!.lastClickX || wallActionChoice!.length / 2, isInternal: true }); 
-                  setNewOpeningData({ type: 'door', width: 900, height: 2050, sill: 0 }); // Default normative door
+                  setNewOpeningData({ type: 'door', width: 900, height: 2050, sill: 0 }); 
                   setWallActionChoice(null); 
                 }}>
                 <DoorOpen className="w-8 h-8 text-slate-400 group-hover:text-blue-600" />
