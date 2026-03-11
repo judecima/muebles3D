@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as THREE_LIB from 'three';
@@ -134,6 +133,7 @@ export class SteelSceneManager {
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
+    // Priorizamos aberturas existentes para edición
     const openingIntersects = this.raycaster.intersectObjects(this.openingsGroup.children);
     if (openingIntersects.length > 0) {
       const { wallId, opening, isInternal } = openingIntersects[0].object.userData;
@@ -141,6 +141,7 @@ export class SteelSceneManager {
       return;
     }
 
+    // Si no es apertura, buscamos tabiques internos
     const internalIntersects = this.raycaster.intersectObjects(this.internalWallsGroup.children, true);
     if (internalIntersects.length > 0) {
       let object = internalIntersects[0].object;
@@ -153,6 +154,7 @@ export class SteelSceneManager {
       }
     }
 
+    // Finalmente paredes exteriores
     const wallIntersects = this.raycaster.intersectObjects(this.houseGroup.children, true);
     const wallHit = wallIntersects.find(i => i.object.userData.isWall);
     if (wallHit) {
@@ -162,7 +164,6 @@ export class SteelSceneManager {
       return;
     }
 
-    // Detección de clic en suelo para "Generar Ambiente"
     if (this.floorMesh) {
       const floorIntersects = this.raycaster.intersectObject(this.floorMesh);
       if (floorIntersects.length > 0 && this.onFloorDoubleClick) {
@@ -214,22 +215,19 @@ export class SteelSceneManager {
         }
       }
       if (config.layers.steelProfiles) this.generateWallStructure(wall, wallGroup, config.layers, config);
-      this.createOpeningTriggers(wall.id, wall.length, wall.height, wall.rotation, wall.x, wall.z, wall.openings, false, config);
+      this.createOpeningTriggers(wall.id, wall.length, wall.height, wall.rotation, wall.x, wall.z, wall.openings, false, config, 100);
     });
 
     config.internalWalls.forEach(iw => {
       const iwGroup = new THREE.Group();
       iwGroup.userData = { isInternalWall: true, internalWall: iw };
-      
-      // Cálculo de posición global basado en padre (Sea SteelWall o InternalWall)
       const globalPos = this.calculateGlobalPosition(iw, config);
       iwGroup.position.copy(globalPos);
       iwGroup.rotation.y = (iw.rotation * Math.PI) / 180;
-      
       this.internalWallsGroup.add(iwGroup);
       iwGroup.updateMatrixWorld(true);
       this.generateInternalWall(iw, iwGroup, config);
-      this.createOpeningTriggers(iw.id, iw.length, iw.height, iw.rotation, iwGroup.position.x, iwGroup.position.z, iw.openings || [], true, config);
+      this.createOpeningTriggers(iw.id, iw.length, iw.height, iw.rotation, iwGroup.position.x, iwGroup.position.z, iw.openings || [], true, config, 70);
     });
 
     const floorGeom = new THREE.PlaneGeometry(40000, 40000);
@@ -242,21 +240,17 @@ export class SteelSceneManager {
   }
 
   private calculateGlobalPosition(iw: InternalWall, config: SteelHouseConfig): THREE.Vector3 {
-    // Buscar en paredes exteriores
     const extParent = config.walls.find(w => w.id === iw.parentWallId);
     if (extParent) {
       const parentMatrix = new THREE.Matrix4().makeRotationY((extParent.rotation * Math.PI) / 180).setPosition(extParent.x, 0, extParent.z);
       return new THREE.Vector3(iw.xPosition, 0, 50).applyMatrix4(parentMatrix);
     }
-    
-    // Buscar en paredes internas
     const intParent = config.internalWalls.find(w => w.id === iw.parentWallId);
     if (intParent) {
       const parentGlobal = this.calculateGlobalPosition(intParent, config);
       const parentMatrix = new THREE.Matrix4().makeRotationY((intParent.rotation * Math.PI) / 180).setPosition(parentGlobal.x, 0, parentGlobal.z);
       return new THREE.Vector3(iw.xPosition, 0, 0).applyMatrix4(parentMatrix);
     }
-
     return new THREE.Vector3();
   }
 
@@ -283,12 +277,9 @@ export class SteelSceneManager {
         const analysis = StructuralEngine.calculateHeader(op, iw.length, config, iw.height);
         const headerBottom = op.height;
         const headerHeight = analysis.actualHeight;
-        
         group.add(this.createProfile(studHeight, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
-        
         group.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', this.colors.header, 0, thickness, headerHeight));
-        
         StructuralEngine.calculateCrippleStuds(iw, op, config).forEach(c => {
           group.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness));
         });
@@ -346,16 +337,13 @@ export class SteelSceneManager {
       const headerHeight = analysis.actualHeight;
       const fusion = analysis.isFusedWithCorner;
       const fusedL = fusion === 'left'; const fusedR = fusion === 'right';
-
       const numKings = analysis.type === 'truss' ? 3 : 1;
       for (let i = 0; i < numKings; i++) {
         if (!fusedL) structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * (2 + i), this.profileFlange, 90, 'PGC', this.colors.king));
         if (!fusedR) structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange * (1 + i), this.profileFlange, 90, 'PGC', this.colors.king));
       }
-
       if (!fusedL) structuralGroup.add(this.createProfile(headerBottom - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       if (!fusedR) structuralGroup.add(this.createProfile(headerBottom - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
-
       if (analysis.type === 'truss') {
         this.drawTrussHeader(structuralGroup, op.position, headerBottom, op.width, headerHeight, this.profileWidth);
       } else {
@@ -364,7 +352,6 @@ export class SteelSceneManager {
         const finalHeaderX = fusedL ? op.position - 50 : op.position;
         structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerBottom, 0, 'PGC', headerColor, 0, this.profileWidth, headerHeight));
       }
-      
       if (op.type === 'window' && sill > 80) structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       StructuralEngine.calculateCrippleStuds(wall, op, config).forEach(c => structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple)));
     });
@@ -373,22 +360,18 @@ export class SteelSceneManager {
   private drawTrussHeader(group: THREE.Group, x: number, y: number, w: number, h: number, thickness: number) {
     group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, 0, thickness));
     group.add(this.createProfile(w, x, y + h - 40, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    
     const numDivisions = Math.ceil(w / 400);
     const divW = w / numDivisions;
-    
     for (let i = 0; i <= numDivisions; i++) {
       const posX = x + (i * divW);
       if (posX >= x + w - 5) break;
       group.add(this.createProfile(h - 80, posX, y + 40, 90, 'PGC', this.colors.header_truss, 0, thickness));
-      
       if (i < numDivisions) {
         const diagH = h - 80;
         const diagLen = Math.sqrt(divW * divW + diagH * diagH);
         const angle = Math.atan2(diagH, divW);
         const diagGeom = new THREE.BoxGeometry(diagLen, 15, thickness - 10);
-        const diagMat = new THREE.MeshStandardMaterial({ color: this.colors.header_truss, metalness: 0.8 });
-        const diagMesh = new THREE.Mesh(diagGeom, diagMat);
+        const diagMesh = new THREE.Mesh(diagGeom, new THREE.MeshStandardMaterial({ color: this.colors.header_truss, metalness: 0.8 }));
         diagMesh.position.set(posX + divW/2, y + h/2, 0);
         diagMesh.rotation.z = i % 2 === 0 ? angle : -angle;
         group.add(diagMesh);
@@ -402,11 +385,7 @@ export class SteelSceneManager {
     const isVertical = rotZ === 90;
     const geomH = isVertical ? len : flangeHeight;
     const geomW = isVertical ? this.profileFlange : len;
-    
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(geomW, geomH, width), 
-      new THREE.MeshStandardMaterial({ color: color || this.colors.steel, metalness: 0.8, roughness: 0.2 })
-    );
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(geomW, geomH, width), new THREE.MeshStandardMaterial({ color: color || this.colors.steel, metalness: 0.8, roughness: 0.2 }));
     mesh.position.set(x + geomW / 2, y + geomH / 2, zOffset);
     mesh.castShadow = mesh.receiveShadow = true; 
     return mesh;
@@ -424,12 +403,13 @@ export class SteelSceneManager {
     mesh.position.z = side === 'exterior' ? -62 : 50; mesh.userData = { wallId: wall.id, isWall: true, side: side }; return mesh;
   }
 
-  private createOpeningTriggers(wallId: string, length: number, height: number, rotation: number, x: number, z: number, openings: SteelOpening[], isInternal: boolean, config: SteelHouseConfig) {
+  private createOpeningTriggers(wallId: string, length: number, height: number, rotation: number, x: number, z: number, openings: SteelOpening[], isInternal: boolean, config: SteelHouseConfig, thickness: number) {
     openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const analysis = StructuralEngine.calculateHeader(op, length, config, height);
       const opColor = analysis.status === 'error' ? 0xff0000 : (analysis.status === 'warning' ? 0xffff00 : 0x00ff00);
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, op.height, 120), new THREE.MeshBasicMaterial({ color: opColor, transparent: true, opacity: 0.1 }));
+      // Reducimos el ancho del disparador para que no sobresalga lateralmente de la viga
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, op.height, thickness + 10), new THREE.MeshBasicMaterial({ color: opColor, transparent: true, opacity: 0.15 }));
       const matrix = new THREE.Matrix4().makeRotationY((rotation * Math.PI) / 180).setPosition(x, 0, z);
       const pos = new THREE.Vector3(op.position + op.width / 2, sill + op.height / 2, 0).applyMatrix4(matrix);
       mesh.position.copy(pos); mesh.rotation.y = (rotation * Math.PI) / 180; mesh.userData = { wallId, opening: op, isInternal };

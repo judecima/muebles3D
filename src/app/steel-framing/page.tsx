@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -105,6 +104,12 @@ export default function SteelFramingPage() {
     
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wallId) boundaries.push(iw.xPosition);
+      // Detección de cruce completo (la otra pared pasa a través de esta)
+      const otherWallId = iw.parentWallId;
+      const otherParent = config.walls.find(w => w.id === otherWallId) || config.internalWalls.find(w => w.id === otherWallId);
+      if (otherParent && iw.id === wallId) {
+        // En este caso, la intersección es en iw.xPosition
+      }
     });
 
     const sortedBounds = Array.from(new Set([...boundaries, totalLength])).sort((a, b) => a - b);
@@ -162,12 +167,13 @@ export default function SteelFramingPage() {
   }, []);
 
   const handleWallDoubleClick = useCallback((wallId: string, x: number, side: 'exterior' | 'interior') => {
+    const parent = config.walls.find(w => w.id === wallId);
+    if (!parent) return;
+
     if (side === 'exterior') {
       setAddingOpening({ wallId, x, isInternal: false });
       setNewOpeningData({ type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL });
     } else {
-      const parent = config.walls.find(w => w.id === wallId);
-      if (!parent) return;
       const targetRot = (parent.rotation - 90 + 360) % 360;
       let maxLen = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
       const newIW: InternalWall = { id: Math.random().toString(36).substr(2, 9), parentWallId: wallId, xPosition: Math.round(x), length: Math.min(2000, maxLen), height: config.globalWallHeight, rotation: targetRot, x: 0, z: 0, openings: [] };
@@ -213,7 +219,6 @@ export default function SteelFramingPage() {
     setRoomGenerator(null);
   };
 
-  // Función mejorada para obtener el segmento global de cualquier muro
   const getWallGlobalSegment = (wall: SteelWall | InternalWall) => {
     if ('rotation' in wall && !('parentWallId' in wall)) {
       const sw = wall as SteelWall;
@@ -238,11 +243,11 @@ export default function SteelFramingPage() {
   };
 
   const extendToNextWall = () => {
-    if (!editingInternalWall) return;
+    if (!editingInternalWall || !localIWData) return;
+    const currentLength = parseInt(localIWData.length) || editingInternalWall.length;
     const seg = getWallGlobalSegment(editingInternalWall);
     const dir = { x: Math.cos((editingInternalWall.rotation * Math.PI) / 180), z: -Math.sin((editingInternalWall.rotation * Math.PI) / 180) };
     
-    // Buscar todas las paredes que no sean la actual ni su padre
     const otherWalls = [
       ...config.walls,
       ...config.internalWalls.filter(iw => iw.id !== editingInternalWall.id && iw.id !== editingInternalWall.parentWallId)
@@ -251,7 +256,6 @@ export default function SteelFramingPage() {
     const intersections: number[] = [];
     otherWalls.forEach(w => {
       const otherSeg = getWallGlobalSegment(w);
-      // Intersección de rayo con segmento
       const x1 = seg.p1.x, z1 = seg.p1.z, x2 = seg.p1.x + dir.x * 10000, z2 = seg.p1.z + dir.z * 10000;
       const x3 = otherSeg.p1.x, z3 = otherSeg.p1.z, x4 = otherSeg.p2.x, z4 = otherSeg.p2.z;
       const den = (x1 - x2) * (z3 - z4) - (z1 - z2) * (x3 - x4);
@@ -264,31 +268,38 @@ export default function SteelFramingPage() {
     });
 
     const sorted = Array.from(new Set(intersections)).sort((a, b) => a - b);
-    const currentLen = parseInt(localIWData?.length || "0") || editingInternalWall.length;
-    
-    // Buscar la siguiente intersección después del largo actual
-    const next = sorted.find(d => d > currentLen + 50);
-    const finalLen = next || sorted[0] || currentLen;
+    const next = sorted.find(d => d > currentLength + 50);
+    const finalLen = next || sorted[0] || currentLength;
     
     setLocalIWData(prev => prev ? { ...prev, length: finalLen.toString() } : null);
   };
 
   const joinWithParallel = (side: 'left' | 'right') => {
-    if (!editingInternalWall) return;
-    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
+    if (!editingInternalWall || !localIWData) return;
+    const currentLength = parseInt(localIWData.length) || editingInternalWall.length;
+    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId) || config.internalWalls.find(w => w.id === editingInternalWall.parentWallId);
     if (!parent) return;
+
     const parallels = config.internalWalls.filter(iw => iw.parentWallId === parent.id && iw.id !== editingInternalWall.id);
     const sorted = parallels.sort((a, b) => a.xPosition - b.xPosition);
     let target: InternalWall | null = null;
     if (side === 'left') target = sorted.reverse().find(iw => iw.xPosition < editingInternalWall.xPosition) || null;
     else target = sorted.find(iw => iw.xPosition > editingInternalWall.xPosition) || null;
 
+    // Si no hay tabique paralelo, buscamos la pared exterior
+    let dist = 0;
     if (target) {
-      const dist = Math.abs(editingInternalWall.xPosition - target.xPosition);
+      dist = Math.abs(editingInternalWall.xPosition - target.xPosition);
+    } else {
+      // Si no hay target interno, tomamos la distancia al extremo del padre
+      dist = side === 'left' ? editingInternalWall.xPosition : (parent.length - editingInternalWall.xPosition);
+    }
+
+    if (dist > 0) {
       const bridge: InternalWall = {
         id: Math.random().toString(36).substr(2, 9),
         parentWallId: editingInternalWall.id,
-        xPosition: editingInternalWall.length,
+        xPosition: currentLength,
         length: dist,
         height: editingInternalWall.height,
         rotation: (editingInternalWall.rotation + (side === 'left' ? -90 : 90) + 360) % 360,
@@ -367,11 +378,6 @@ export default function SteelFramingPage() {
               </DialogTitle>
               <DialogDescription className="text-[10px] font-bold uppercase">Se han detectado tabiques paralelos libres. ¿Deseas unirlos para cerrar el recinto?</DialogDescription>
             </DialogHeader>
-            <div className="py-6 flex justify-center">
-              <div className="w-full h-32 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/50 flex items-center justify-center">
-                <UnfoldHorizontal className="w-12 h-12 text-blue-300 animate-pulse" />
-              </div>
-            </div>
             <DialogFooter>
               <Button onClick={closeRoomWithNewWall} className="w-full bg-blue-600 font-black uppercase text-xs h-11">Unir Tabiques y Cerrar</Button>
             </DialogFooter>
