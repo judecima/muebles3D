@@ -24,7 +24,8 @@ import {
   MousePointer,
   Box,
   ClipboardList,
-  ChevronRight
+  ChevronRight,
+  Ruler
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -144,29 +145,32 @@ export default function SteelFramingPage() {
     setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, position: newPos } });
   };
 
-  const updateOpeningDim = (field: 'width' | 'height', val: number) => {
+  const updateOpeningDim = (field: keyof SteelOpening, val: number) => {
     if (!selectedOpening) return;
     const safeVal = isNaN(val) ? 0 : val;
     const wall = config.walls.find(w => w.id === selectedOpening.wallId);
     if (!wall) return;
 
-    // Al cambiar dimensiones también validamos límites
-    let newWidth = field === 'width' ? safeVal : selectedOpening.opening.width;
-    if (newWidth + selectedOpening.opening.position > wall.length) {
-      newWidth = wall.length - selectedOpening.opening.position;
+    let newOpening = { ...selectedOpening.opening, [field]: safeVal };
+
+    // Validar que el ancho no exceda el muro según la posición actual
+    if (field === 'width') {
+      if (safeVal + newOpening.position > wall.length) {
+        newOpening.width = Math.max(0, wall.length - newOpening.position);
+      }
     }
 
     const newWalls = config.walls.map(w => {
       if (w.id === selectedOpening.wallId) {
         return {
           ...w,
-          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, [field]: safeVal, width: newWidth } : o)
+          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? newOpening : o)
         };
       }
       return w;
     });
     setConfig({ ...config, walls: newWalls });
-    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, [field]: safeVal, width: newWidth } });
+    setSelectedOpening({ ...selectedOpening, opening: newOpening });
   };
 
   return (
@@ -299,36 +303,58 @@ export default function SteelFramingPage() {
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Settings2 className="w-5 h-5 text-blue-500" />
-                Desplazar {selectedOpening?.opening.type === 'door' ? 'Puerta' : 'Ventana'}
+              <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-blue-600">
+                <Settings2 className="w-5 h-5" />
+                Editar {selectedOpening?.opening.type === 'door' ? 'Puerta' : 'Ventana'}
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="position" className="text-right text-xs font-bold uppercase">Posición</Label>
+                <Label htmlFor="position" className="text-right text-[10px] font-black uppercase text-slate-500">Posición</Label>
                 <Input
                   id="position"
                   type="number"
                   value={selectedOpening?.opening.position ?? 0}
                   onChange={(e) => updateOpeningPosition(parseInt(e.target.value) || 0)}
-                  className="col-span-3 h-9"
+                  className="col-span-3 h-9 font-bold"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="width" className="text-right text-xs font-bold uppercase">Ancho</Label>
+                <Label htmlFor="width" className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
                 <Input
                   id="width"
                   type="number"
                   value={selectedOpening?.opening.width ?? 0}
                   onChange={(e) => updateOpeningDim('width', parseInt(e.target.value) || 0)}
-                  className="col-span-3 h-9"
+                  className="col-span-3 h-9 font-bold"
                 />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="height" className="text-right text-[10px] font-black uppercase text-slate-500">Alto</Label>
+                <Input
+                  id="height"
+                  type="number"
+                  value={selectedOpening?.opening.height ?? 0}
+                  onChange={(e) => updateOpeningDim('height', parseInt(e.target.value) || 0)}
+                  className="col-span-3 h-9 font-bold"
+                />
+              </div>
+              {selectedOpening?.opening.type === 'window' && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="sillHeight" className="text-right text-[10px] font-black uppercase text-slate-500">Antepecho</Label>
+                  <Input
+                    id="sillHeight"
+                    type="number"
+                    value={selectedOpening?.opening.sillHeight ?? 0}
+                    onChange={(e) => updateOpeningDim('sillHeight', parseInt(e.target.value) || 0)}
+                    className="col-span-3 h-9 font-bold"
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button onClick={() => setSelectedOpening(null)} className="w-full bg-blue-600 hover:bg-blue-700 font-bold uppercase text-xs">
-                Confirmar Ubicación
+              <Button onClick={() => setSelectedOpening(null)} className="w-full bg-blue-600 hover:bg-blue-700 font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-200 h-11">
+                Confirmar Cambios
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -321,15 +321,31 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                                 <Input type="number" value={op.width} onChange={(e) => {
                                   const newOps = wall.openings.map(o => o.id === op.id ? { ...o, width: parseInt(e.target.value) || 0 } : o);
                                   updateWall(wall.id, 'openings', newOps);
-                                }} className="h-6 text-[9px]" />
+                                }} className="h-6 text-[9px] font-bold" />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[7px] font-black uppercase text-slate-400">Alto</Label>
+                                <Input type="number" value={op.height} onChange={(e) => {
+                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, height: parseInt(e.target.value) || 0 } : o);
+                                  updateWall(wall.id, 'openings', newOps);
+                                }} className="h-6 text-[9px] font-bold" />
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-[7px] font-black uppercase text-slate-400">Posición</Label>
                                 <Input type="number" value={op.position} onChange={(e) => {
                                   const newOps = wall.openings.map(o => o.id === op.id ? { ...o, position: parseInt(e.target.value) || 0 } : o);
                                   updateWall(wall.id, 'openings', newOps);
-                                }} className="h-6 text-[9px]" />
+                                }} className="h-6 text-[9px] font-bold" />
                               </div>
+                              {op.type === 'window' && (
+                                <div className="space-y-1">
+                                  <Label className="text-[7px] font-black uppercase text-slate-400">Antepecho</Label>
+                                  <Input type="number" value={op.sillHeight} onChange={(e) => {
+                                    const newOps = wall.openings.map(o => o.id === op.id ? { ...o, sillHeight: parseInt(e.target.value) || 0 } : o);
+                                    updateWall(wall.id, 'openings', newOps);
+                                  }} className="h-6 text-[9px] font-bold" />
+                                </div>
+                              )}
                             </div>
                             <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover/op:opacity-100 text-red-400" onClick={() => removeOpening(wall.id, op.id)}>
                               <Trash2 className="w-3 h-3" />
