@@ -108,11 +108,18 @@ export default function SteelFramingPage() {
   }, []);
 
   const handleWallDoubleClick = useCallback((wallId: string, x: number, side: 'exterior' | 'interior') => {
+    const parent = config.walls.find(w => w.id === wallId);
+    if (!parent) return;
+
     if (side === 'exterior') {
       setAddingOpening({ wallId, x });
     } else {
-      const parent = config.walls.find(w => w.id === wallId);
-      if (!parent) return;
+      // Validar que no estemos sobre una ventana
+      const isOverOpening = parent.openings.some(op => x >= op.position && x <= (op.position + op.width));
+      if (isOverOpening) {
+        alert("No se puede anclar un tabique sobre una abertura.");
+        return;
+      }
 
       const targetRotation = (parent.rotation - 90 + 360) % 360;
       let maxPossibleLength = 2000;
@@ -145,7 +152,15 @@ export default function SteelFramingPage() {
     let len = parseInt(localIWData.length) || 0;
     let xPos = parseInt(localIWData.xPosition) || 0;
 
+    // Validar anclaje sobre abertura
+    const isOverOpening = parent.openings.some(op => xPos >= op.position && xPos <= (op.position + op.width));
+    if (isOverOpening) {
+      alert("El punto de inicio coincide con una abertura. Elija otra posición.");
+      return;
+    }
+
     xPos = Math.max(50, Math.min(xPos, parent.length - 50));
+    
     let maxLen = 2000;
     if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - 150;
     if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - 150;
@@ -153,6 +168,7 @@ export default function SteelFramingPage() {
     len = Math.max(100, Math.min(len, maxLen));
 
     const updated: InternalWall = { ...editingInternalWall, length: len, xPosition: xPos };
+    
     setConfig(prev => ({
       ...prev,
       internalWalls: prev.internalWalls.map(iw => iw.id === updated.id ? updated : iw)
@@ -187,6 +203,16 @@ export default function SteelFramingPage() {
       if (!wall) return;
       const finalW = Math.min(w, wall.length - EDGE_MARGIN * 2);
       const finalP = Math.max(EDGE_MARGIN, Math.min(p, wall.length - finalW - EDGE_MARGIN));
+      
+      // Validar si hay un tabique interno en esa posición antes de mover la ventana
+      const hasInternalWall = config.internalWalls.some(iw => 
+        iw.parentWallId === wall.id && iw.xPosition >= finalP && iw.xPosition <= (finalP + finalW)
+      );
+      if (hasInternalWall) {
+        alert("No se puede mover la abertura sobre un tabique interno.");
+        return;
+      }
+
       const newOpening = { ...selectedOpening.opening, width: finalW, position: finalP };
       setConfig({ ...config, walls: config.walls.map(w => 
         w.id === selectedOpening.wallId 
@@ -246,6 +272,15 @@ export default function SteelFramingPage() {
       position: Math.max(EDGE_MARGIN, Math.min(addingOpening.x - newOpData.width / 2, wall.length - newOpData.width - EDGE_MARGIN)),
       sillHeight: newOpData.type === 'window' ? newOpData.sill : 0
     };
+
+    // Validar colisión con tabiques internos
+    const hasInternalWall = config.internalWalls.some(iw => 
+      iw.parentWallId === wall.id && iw.xPosition >= newOp.position && iw.xPosition <= (newOp.position + newOp.width)
+    );
+    if (hasInternalWall) {
+      alert("No se puede colocar una abertura sobre un tabique interno.");
+      return;
+    }
 
     const collision = wall.openings.some(op => {
       const start = op.position - 200;
@@ -390,7 +425,7 @@ export default function SteelFramingPage() {
             </div>
             <DialogFooter className="flex gap-2">
               <Button variant="destructive" onClick={deleteInternalWall} className="font-bold uppercase text-[10px] h-10"><Trash2 className="w-4 h-4 mr-2" /> Eliminar</Button>
-              <Button onClick={() => setEditingInternalWall(null)} className="bg-purple-600 font-black uppercase text-[10px] flex-1 h-10">Confirmar</Button>
+              <Button onClick={commitInternalWallChanges} className="bg-purple-600 font-black uppercase text-[10px] flex-1 h-10">Confirmar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
