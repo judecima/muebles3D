@@ -1,3 +1,4 @@
+
 import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall } from '@/lib/steel/types';
 
 export interface HeaderAnalysis {
@@ -23,12 +24,6 @@ export interface CrippleData {
   type: 'upper' | 'lower';
 }
 
-export interface JunctionNode {
-  type: 'T' | 'X' | 'L';
-  position: { x: number, z: number };
-  walls: string[];
-}
-
 export class StructuralEngine {
   private static readonly STEEL_MODULUS = 203000; 
   private static readonly PGC_IX_SINGLE = 185000; 
@@ -48,8 +43,7 @@ export class StructuralEngine {
 
   static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): WallPanelData[] {
     const panels: WallPanelData[] = [];
-    const maxPanelWidth = 4000; // Máximo ancho por panel transportable (Norma Argentina)
-    
+    const maxPanelWidth = 4000; 
     let numPanels = Math.ceil(wall.length / maxPanelWidth);
     const panelWidth = wall.length / numPanels;
 
@@ -77,15 +71,9 @@ export class StructuralEngine {
     const widthM = widthMm / 1000;
     const heightM = heightMm / 1000;
     const tributaryWidthM = Math.max(2, config.length / 2000); 
-
     const verticalLoadKN = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * widthM * tributaryWidthM;
     const shearForceKN = this.WIND_PRESSURE_KPA * widthM * heightM;
-
-    return {
-      verticalLoadN: verticalLoadKN * 1000,
-      shearForceN: shearForceKN * 1000,
-      overturningMomentNm: shearForceKN * heightM
-    };
+    return { verticalLoadN: verticalLoadKN * 1000, shearForceN: shearForceKN * 1000, overturningMomentNm: shearForceKN * heightM };
   }
 
   static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig): HeaderAnalysis {
@@ -93,11 +81,10 @@ export class StructuralEngine {
     const tributaryWidth = config.length / 2; 
     const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; 
     const loadNmm = designLoadTotal * tributaryWidth; 
-    
     const maxAllowableDeflection = L / 360;
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
-
     const fusion = this.analyzeOpeningFusion(opening, wallLen);
+    
     let type: HeaderAnalysis['type'] = 'single';
     let status: HeaderAnalysis['status'] = 'ok';
 
@@ -114,18 +101,14 @@ export class StructuralEngine {
 
     if (L > 3500) status = 'error'; 
 
-    return { 
-      type, 
-      loadNmm, 
-      deflectionMm: 0, 
-      maxAllowableDeflection, 
-      requiredIx, 
-      status,
-      isFusedWithCorner: fusion
-    };
+    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion };
   }
 
-  static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening): CrippleData[] {
+  static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
+    const analysis = this.calculateHeader(opening, wall.length, config);
+    // Si es reticulada o viga tubo masiva, no requiere cripples estándar (el refuerzo ocupa todo el espacio)
+    if (analysis.type === 'truss' || analysis.type === 'tube') return [];
+
     const cripples: CrippleData[] = [];
     const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
     const wallH = wall.height;
@@ -134,28 +117,17 @@ export class StructuralEngine {
 
     for (let x = spacing; x < wall.length; x += spacing) {
       if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-        cripples.push({
-          x,
-          yStart: headerTop,
-          yEnd: wallH - 40,
-          type: 'upper'
-        });
+        cripples.push({ x, yStart: headerTop, yEnd: wallH - 40, type: 'upper' });
       }
     }
 
     if (opening.type === 'window') {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-          cripples.push({
-            x,
-            yStart: 40,
-            yEnd: sill - 40,
-            type: 'lower'
-          });
+          cripples.push({ x, yStart: 40, yEnd: sill - 40, type: 'lower' });
         }
       }
     }
-
     return cripples;
   }
 
@@ -172,61 +144,39 @@ export class StructuralEngine {
       for (let x = 0; x <= wall.length - studSpacing; x += studSpacing) {
         const xStart = x + 40; 
         const xEnd = x + studSpacing; 
-
         const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
           const top = sill + op.height;
           return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
         });
-
-        if (!intersects) {
-          blockings.push({ xStart, xEnd, y });
-        }
+        if (!intersects) blockings.push({ xStart, xEnd, y });
       }
     }
     return blockings;
   }
 
-  /**
-   * Calcula el sistema de Ladder Backing (Escalera) para uniones en T de tabiques internos.
-   * Proporciona soporte para placas y permite el paso de aislación.
-   */
   static calculateLadderBacking(wallHeight: number): BlockingData[] {
     const ladders: BlockingData[] = [];
-    const numBlocks = 4; // 4 bloques por altura de tabique para fijación segura
+    const numBlocks = 4;
     const spacing = wallHeight / (numBlocks + 1);
-
     for (let i = 1; i <= numBlocks; i++) {
-      ladders.push({
-        xStart: -35, // Centrado sobre el eje
-        xEnd: 35,
-        y: i * spacing
-      });
+      ladders.push({ xStart: -35, xEnd: 35, y: i * spacing });
     }
     return ladders;
   }
 
   static validateStructure(config: SteelHouseConfig): { wallId: string, status: 'ok' | 'warning' | 'error', message: string }[] {
     const alerts: any[] = [];
-
     config.walls.forEach(wall => {
       wall.openings.forEach(op => {
         const analysis = this.calculateHeader(op, wall.length, config);
         if (analysis.status !== 'ok') {
-          alerts.push({ 
-            wallId: wall.id, 
-            status: analysis.status, 
-            message: `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico - Viga Laminada' : 'Refuerzo Especial'}` 
-          });
+          alerts.push({ wallId: wall.id, status: analysis.status, message: `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico - Viga Reticulada' : 'Refuerzo Especial'}` });
         }
       });
-
       const hasUnions = config.internalWalls.some(iw => iw.parentWallId === wall.id);
-      if (hasUnions && !config.layers.reinforcements) {
-        alerts.push({ wallId: wall.id, status: 'warning', message: `Refuerzos de unión desactivados en ${wall.id}.` });
-      }
+      if (hasUnions && !config.layers.reinforcements) alerts.push({ wallId: wall.id, status: 'warning', message: `Refuerzos de unión desactivados en ${wall.id}.` });
     });
-
     return alerts;
   }
 }

@@ -116,40 +116,26 @@ export default function SteelFramingPage() {
 
   const getWallSegments = useCallback((wallId: string, clickX: number, totalLength: number, isInternalWall: boolean) => {
     const baseMargin = isInternalWall ? EDGE_MARGIN_INTERNAL : EDGE_MARGIN_EXTERIOR;
-    
-    // 1. Intersecciones que nacen en este muro
-    const startingIntersections = config.internalWalls
-      .filter(iw => iw.parentWallId === wallId)
-      .map(iw => iw.xPosition);
-    
-    // 2. Intersecciones que llegan o cruzan este muro (Cruce en Cruz)
-    const arrivingIntersections: number[] = [];
     const currentWall = isInternalWall 
       ? config.internalWalls.find(iw => iw.id === wallId)
       : config.walls.find(w => w.id === wallId);
 
+    const startingIntersections = config.internalWalls
+      .filter(iw => iw.parentWallId === wallId)
+      .map(iw => iw.xPosition);
+    
+    const arrivingIntersections: number[] = [];
     if (currentWall) {
       config.internalWalls.forEach(other => {
         if (other.id === wallId) return;
-        
-        // Detección de cruce perpendicular (Cruces en cruz internos)
         if (isInternalWall) {
           const isV1 = currentWall.rotation === 90 || currentWall.rotation === 270;
           const isV2 = other.rotation === 90 || other.rotation === 270;
-          if (isV1 !== isV2) {
-            // Se cruzan en la xPosition del otro
-            arrivingIntersections.push(other.xPosition);
-          }
+          if (isV1 !== isV2) arrivingIntersections.push(other.xPosition);
         } else {
-          // Detección de llegada desde muro opuesto
           const parentOfOther = config.walls.find(w => w.id === other.parentWallId);
           if (parentOfOther) {
-            const isOpp = (
-              (parentOfOther.id === 'w1' && wallId === 'w3') ||
-              (parentOfOther.id === 'w3' && wallId === 'w1') ||
-              (parentOfOther.id === 'w2' && wallId === 'w4') ||
-              (parentOfOther.id === 'w4' && wallId === 'w2')
-            );
+            const isOpp = ((parentOfOther.id === 'w1' && wallId === 'w3') || (parentOfOther.id === 'w3' && wallId === 'w1') || (parentOfOther.id === 'w2' && wallId === 'w4') || (parentOfOther.id === 'w4' && wallId === 'w2'));
             if (isOpp) {
               const maxL = (wallId === 'w1' || wallId === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
               if (Math.abs(other.length - maxL) < 10) arrivingIntersections.push(other.xPosition);
@@ -161,7 +147,6 @@ export default function SteelFramingPage() {
 
     const allIntersections = Array.from(new Set([...startingIntersections, ...arrivingIntersections]));
     const boundaries = [0, ...allIntersections, totalLength].sort((a, b) => a - b);
-    
     for (let i = 0; i < boundaries.length - 1; i++) {
       if (clickX >= boundaries[i] && clickX <= boundaries[i+1]) {
         const start = boundaries[i];
@@ -172,7 +157,7 @@ export default function SteelFramingPage() {
       }
     }
     return { start: 0, end: totalLength, min: baseMargin, max: totalLength - baseMargin };
-  }, [config.internalWalls, config.width, config.length]);
+  }, [config.internalWalls, config.width, config.length, config.walls]);
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening, isInternal?: boolean) => {
     const wall = isInternal 
@@ -192,11 +177,9 @@ export default function SteelFramingPage() {
     if (!selectedOpening || !localOpeningData) return;
     const inputW = parseInt(localOpeningData.width) || 0;
     const inputRelP = parseInt(localOpeningData.position) || 0;
-    
     const wall = selectedOpening.isInternal 
       ? config.internalWalls.find(iw => iw.id === selectedOpening.wallId)
       : config.walls.find(w => w.id === selectedOpening.wallId);
-    
     if (!wall) return;
     const bounds = getWallSegments(wall.id, selectedOpening.opening.position + selectedOpening.opening.width / 2, wall.length, !!selectedOpening.isInternal);
     const absPos = bounds.start + inputRelP;
@@ -204,21 +187,19 @@ export default function SteelFramingPage() {
     const finalP = Math.max(bounds.min, Math.min(absPos, bounds.max - finalW));
 
     if (selectedOpening.isInternal) {
-      setConfig(prev => ({
-        ...prev,
-        internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? {
-          ...iw,
-          openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o)
-        } : iw)
-      }));
+      setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : iw) }));
     } else {
-      setConfig(prev => ({
-        ...prev,
-        walls: prev.walls.map(w => w.id === selectedOpening.wallId ? {
-          ...w,
-          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o)
-        } : w)
-      }));
+      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : w) }));
+    }
+    setSelectedOpening(null);
+  };
+
+  const deleteOpening = () => {
+    if (!selectedOpening) return;
+    if (selectedOpening.isInternal) {
+      setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.filter(o => o.id !== selectedOpening.opening.id) } : iw) }));
+    } else {
+      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.filter(o => o.id !== selectedOpening.opening.id) } : w) }));
     }
     setSelectedOpening(null);
   };
@@ -235,21 +216,9 @@ export default function SteelFramingPage() {
       if (!parent) return;
       const isOverOp = parent.openings.some(op => x >= (op.position - 50) && x <= (op.position + op.width + 50));
       if (isOverOp) return;
-
       const targetRot = (parent.rotation - 90 + 360) % 360;
       let maxLen = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
-
-      const newIW: InternalWall = {
-        id: Math.random().toString(36).substr(2, 9),
-        parentWallId: wallId,
-        xPosition: Math.round(x),
-        length: Math.min(2000, maxLen), 
-        height: config.globalWallHeight,
-        rotation: targetRot,
-        x: 0, z: 0,
-        openings: []
-      };
-      
+      const newIW: InternalWall = { id: Math.random().toString(36).substr(2, 9), parentWallId: wallId, xPosition: Math.round(x), length: Math.min(2000, maxLen), height: config.globalWallHeight, rotation: targetRot, x: 0, z: 0, openings: [] };
       setConfig(prev => ({ ...prev, internalWalls: [...prev.internalWalls, newIW] }));
       setEditingInternalWall(newIW);
       setLocalIWData({ length: newIW.length.toString(), xPosition: Math.round(x).toString() });
@@ -258,34 +227,16 @@ export default function SteelFramingPage() {
 
   const createOpening = () => {
     if (!addingOpening) return;
-    const wall = addingOpening.isInternal 
-      ? config.internalWalls.find(iw => iw.id === addingOpening.wallId)
-      : config.walls.find(w => w.id === addingOpening.wallId);
-    
+    const wall = addingOpening.isInternal ? config.internalWalls.find(iw => iw.id === addingOpening.wallId) : config.walls.find(w => w.id === addingOpening.wallId);
     if (!wall) return;
     const bounds = getWallSegments(wall.id, addingOpening.x, wall.length, !!addingOpening.isInternal);
     const finalW = Math.min(newOpData.width, bounds.max - bounds.min);
     const finalP = Math.max(bounds.min, Math.min(addingOpening.x - finalW / 2, bounds.max - finalW));
-
-    const newOp: SteelOpening = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: newOpData.type,
-      width: finalW,
-      height: newOpData.height,
-      position: finalP,
-      sillHeight: newOpData.type === 'window' ? newOpData.sill : 0
-    };
-
+    const newOp: SteelOpening = { id: Math.random().toString(36).substr(2, 9), type: newOpData.type, width: finalW, height: newOpData.height, position: finalP, sillHeight: newOpData.type === 'window' ? newOpData.sill : 0 };
     if (addingOpening.isInternal) {
-      setConfig(prev => ({
-        ...prev,
-        internalWalls: prev.internalWalls.map(iw => iw.id === wall.id ? { ...iw, openings: [...iw.openings, newOp] } : iw)
-      }));
+      setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === wall.id ? { ...iw, openings: [...iw.openings, newOp] } : iw) }));
     } else {
-      setConfig(prev => ({
-        ...prev,
-        walls: prev.walls.map(w => w.id === wall.id ? { ...w, openings: [...w.openings, newOp] } : w)
-      }));
+      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === wall.id ? { ...w, openings: [...w.openings, newOp] } : w) }));
     }
     setAddingOpening(null);
   };
@@ -336,7 +287,6 @@ export default function SteelFramingPage() {
                 onWalkModeLock={(locked) => setIsWalkModeActive(locked)}
               />
             </TabsContent>
-
             <TabsContent value="materials" className="w-full h-full m-0 bg-slate-50 overflow-y-auto p-4 md:p-8">
               <div className="max-w-4xl mx-auto">
                 <SteelMaterialsTable config={config} />
@@ -355,15 +305,16 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
-                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Offset (mm)</Label>
-                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} className="col-span-3" />
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={commitOpeningChange} className="w-full bg-blue-600 font-black uppercase text-[10px]">Guardar</Button>
+            <DialogFooter className="flex gap-2">
+              <Button variant="destructive" onClick={deleteOpening} className="flex-1 font-black uppercase text-[10px]"><Trash2 className="w-3 h-3 mr-2" /> Eliminar</Button>
+              <Button onClick={commitOpeningChange} className="flex-1 bg-blue-600 font-black uppercase text-[10px]">Guardar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
