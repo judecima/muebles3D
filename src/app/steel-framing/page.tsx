@@ -31,14 +31,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { StructuralEngine } from '@/utils/steel/structuralEngine';
 
-const EDGE_MARGIN = 400; 
+const EDGE_MARGIN_EXTERIOR = 400; 
+const EDGE_MARGIN_INTERNAL = 50; // Margen mínimo para permitir montantes de unión
 const DEFAULT_SILL = 900; 
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
-  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2000, position: EDGE_MARGIN }], studSpacing: 400 },
-  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
+  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2000, position: EDGE_MARGIN_EXTERIOR }], studSpacing: 400 },
+  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
   { id: 'w3', length: w, height: h, thickness: 100, x: w/2, z: l/2, rotation: 180, openings: [], studSpacing: 400 },
-  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
+  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
 ];
 
 const INITIAL_CONFIG: SteelHouseConfig = {
@@ -80,7 +81,6 @@ export default function SteelFramingPage() {
   
   const viewerRef = useRef<{ enterWalkMode: () => void, exitWalkMode: () => void }>(null);
 
-  // EFECTO DE REAJUSTE AUTOMÁTICO DE MUROS INTERNOS Y VALIDACIÓN
   useEffect(() => {
     const newWalls = config.walls.map(w => {
       if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
@@ -90,7 +90,6 @@ export default function SteelFramingPage() {
       return w;
     });
 
-    // Recortar muros internos que se salgan del nuevo tamaño
     const newInternalWalls = config.internalWalls.map(iw => {
       const parent = newWalls.find(w => w.id === iw.parentWallId);
       if (!parent) return iw;
@@ -102,7 +101,15 @@ export default function SteelFramingPage() {
       const adjustedLength = Math.min(iw.length, maxLen);
       const adjustedX = Math.min(iw.xPosition, parent.length - 50);
 
-      return { ...iw, length: adjustedLength, xPosition: adjustedX };
+      // Reajustar aberturas internas si el muro se acorta
+      const adjustedOpenings = (iw.openings || []).map(op => {
+        const margin = EDGE_MARGIN_INTERNAL;
+        const finalW = Math.min(op.width, adjustedLength - margin * 2);
+        const finalP = Math.max(margin, Math.min(op.position, adjustedLength - finalW - margin));
+        return { ...op, width: finalW, position: finalP };
+      });
+
+      return { ...iw, length: adjustedLength, xPosition: adjustedX, openings: adjustedOpenings };
     });
     
     const hasChanges = newWalls.some((w, i) => 
@@ -115,7 +122,6 @@ export default function SteelFramingPage() {
       setConfig(prev => ({ ...prev, walls: newWalls, internalWalls: newInternalWalls }));
     }
 
-    // Auditoría estructural
     setStructuralAlerts(StructuralEngine.validateStructure(config));
 
   }, [config.width, config.length]);
@@ -214,18 +220,26 @@ export default function SteelFramingPage() {
     const p = parseInt(localOpeningData.position) || 0;
     
     if (selectedOpening.isInternal) {
+      const wall = config.internalWalls.find(iw => iw.id === selectedOpening.wallId);
+      if (!wall) return;
+
+      const margin = EDGE_MARGIN_INTERNAL;
+      const finalW = Math.min(w, wall.length - margin * 2);
+      const finalP = Math.max(margin, Math.min(p, wall.length - finalW - margin));
+
       setConfig(prev => ({
         ...prev,
         internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? {
           ...iw,
-          openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: w, position: p } : o)
+          openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o)
         } : iw)
       }));
     } else {
       const wall = config.walls.find(w => w.id === selectedOpening.wallId);
       if (!wall) return;
-      const finalW = Math.min(w, wall.length - EDGE_MARGIN * 2);
-      const finalP = Math.max(EDGE_MARGIN, Math.min(p, wall.length - finalW - EDGE_MARGIN));
+      const margin = EDGE_MARGIN_EXTERIOR;
+      const finalW = Math.min(w, wall.length - margin * 2);
+      const finalP = Math.max(margin, Math.min(p, wall.length - finalW - margin));
       
       const hasInternalWall = config.internalWalls.some(iw => 
         iw.parentWallId === wall.id && iw.xPosition >= finalP && iw.xPosition <= (finalP + finalW)
@@ -263,14 +277,24 @@ export default function SteelFramingPage() {
 
   const addDoorToInternalWall = () => {
     if (!wallActionChoice) return;
+    const doorWidth = 800;
+    const margin = EDGE_MARGIN_INTERNAL;
+    
+    // Validar si el muro es lo suficientemente largo
+    if (wallActionChoice.length < (doorWidth + margin * 2)) {
+      alert("El tabique es demasiado corto para una puerta estándar.");
+      return;
+    }
+
     const newDoor: SteelOpening = {
       id: Math.random().toString(36).substr(2, 9),
       type: 'door',
-      width: 800,
+      width: doorWidth,
       height: 2000,
-      position: Math.max(50, (wallActionChoice.length - 800) / 2),
+      position: Math.max(margin, (wallActionChoice.length - doorWidth) / 2),
       sillHeight: 0
     };
+
     setConfig(prev => ({
       ...prev,
       internalWalls: prev.internalWalls.map(iw => iw.id === wallActionChoice.id ? {
@@ -286,12 +310,16 @@ export default function SteelFramingPage() {
     const wall = config.walls.find(w => w.id === addingOpening.wallId);
     if (!wall) return;
 
+    const margin = EDGE_MARGIN_EXTERIOR;
+    const finalW = Math.min(newOpData.width, wall.length - margin * 2);
+    const finalP = Math.max(margin, Math.min(addingOpening.x - finalW / 2, wall.length - finalW - margin));
+
     const newOp: SteelOpening = {
       id: Math.random().toString(36).substr(2, 9),
       type: newOpData.type,
-      width: newOpData.width,
+      width: finalW,
       height: newOpData.height,
-      position: Math.max(EDGE_MARGIN, Math.min(addingOpening.x - newOpData.width / 2, wall.length - newOpData.width - EDGE_MARGIN)),
+      position: finalP,
       sillHeight: newOpData.type === 'window' ? newOpData.sill : 0
     };
 
@@ -388,13 +416,15 @@ export default function SteelFramingPage() {
           </Tabs>
         </div>
 
-        {/* DIALOGS IGUALES AL ANTERIOR PERO CON MEJORAS DE UX */}
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-blue-600">
                 <Settings2 className="w-5 h-5" /> Editar Vano {selectedOpening?.isInternal ? '(Interno)' : ''}
               </DialogTitle>
+              <DialogDescription className="text-[10px] uppercase font-bold text-slate-400">
+                La posición se calcula desde el extremo inicial del muro (Referencia 0).
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
