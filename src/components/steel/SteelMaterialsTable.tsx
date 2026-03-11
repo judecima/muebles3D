@@ -9,7 +9,8 @@ import {
   Weight, 
   Package, 
   Settings2,
-  AlertCircle
+  AlertCircle,
+  Ruler
 } from 'lucide-react';
 
 interface SteelMaterialsTableProps {
@@ -29,7 +30,7 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-none border-slate-200 bg-slate-50/50">
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Peso Acero Estimado</CardTitle>
@@ -37,7 +38,21 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
           </CardHeader>
           <CardContent className="py-2 px-4">
             <div className="text-2xl font-black text-slate-800">{estimate.totalSteelWeightKg} <span className="text-xs font-bold text-slate-400">KG</span></div>
-            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">Peso total de perfiles PGC/PGU 100mm</p>
+            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">PGC/PGU Galvanizado</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-none border-slate-200 bg-slate-50/50">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Metraje Lineal Total</CardTitle>
+            <Ruler className="w-4 h-4 text-green-500" />
+          </CardHeader>
+          <CardContent className="py-2 px-4">
+            <div className="text-2xl font-black text-slate-800">
+              {estimate.items.filter(i => i.category === 'perfileria').reduce((acc, curr) => acc + curr.quantity, 0).toFixed(1)} 
+              <span className="text-xs font-bold text-slate-400"> M</span>
+            </div>
+            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">Sumatoria de Perfiles</p>
           </CardContent>
         </Card>
 
@@ -56,7 +71,7 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
       <Card className="shadow-none border-slate-200 overflow-hidden">
         <CardHeader className="bg-slate-900 text-white py-3 px-4">
           <CardTitle className="text-xs font-bold flex items-center gap-2">
-            <ClipboardList className="w-4 h-4" /> Cómputo Métrico de Materiales
+            <ClipboardList className="w-4 h-4" /> Cómputo Métrico Industrial (Steel Framing)
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -65,17 +80,17 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
               <TableRow className="h-9 hover:bg-transparent">
                 <TableHead className="text-[10px] font-black uppercase">Material</TableHead>
                 <TableHead className="text-[10px] font-black uppercase">Categoría</TableHead>
-                <TableHead className="text-[10px] font-black uppercase text-right">Cant.</TableHead>
-                <TableHead className="text-[10px] font-black uppercase text-center">Und.</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-right">Cantidad</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-center">Unidad</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {estimate.items.map((item, idx) => (
-                <TableRow key={idx} className="h-10 hover:bg-slate-50 transition-colors">
+                <TableRow key={idx} className="h-12 hover:bg-slate-50 transition-colors">
                   <TableCell className="py-2">
                     <div className="flex flex-col">
                       <span className="text-[11px] font-bold text-slate-700">{item.name}</span>
-                      <span className="text-[9px] text-slate-400 italic line-clamp-1">{item.description}</span>
+                      <span className="text-[9px] text-slate-400 italic leading-tight">{item.description}</span>
                     </div>
                   </TableCell>
                   <TableCell className="py-2">
@@ -84,7 +99,7 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right text-[11px] font-black text-slate-900 py-2">
-                    {item.quantity.toLocaleString()}
+                    {item.quantity.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-center text-[10px] font-bold text-slate-400 py-2 uppercase">
                     {item.unit}
@@ -96,10 +111,10 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
         </CardContent>
       </Card>
 
-      <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3">
-        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-[10px] text-amber-700 leading-relaxed font-medium">
-          <strong>Nota Técnica:</strong> Este cómputo es una estimación automatizada basada en el modelo 3D. Incluye un margen de desperdicio del 5% al 15% según el rubro. No sustituye el cálculo estructural definitivo realizado por un profesional habilitado.
+      <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+        <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
+          <strong>Nota Técnica:</strong> Los perfiles PGU se calculan linealmente sumando soleras superiores e inferiores por cada muro. Se incluye un factor de desperdicio técnico para optimizar la compra de barras comerciales de 6 metros.
         </p>
       </div>
     </div>
