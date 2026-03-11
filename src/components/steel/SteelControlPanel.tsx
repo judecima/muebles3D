@@ -14,24 +14,17 @@ import {
   Home, 
   Layout,
   DoorOpen,
-  Box,
   Layers,
   Maximize2,
-  Mountain,
-  Ruler,
-  Maximize,
-  ChevronDown,
   Camera
 } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
 
-// NUEVAS CONSTANTES NORMATIVAS
-const EDGE_MARGIN = 400; // Distancia lateral mínima (400 mm)
-const HEADER_SPACE = 300; // Dintel mínimo superior (300 mm)
-const MIN_SPACE_BETWEEN = 600; // Distancia entre aberturas (600 mm)
-const DEFAULT_SILL = 900; // Antepecho ventana estándar (900 mm)
+const EDGE_MARGIN = 400; 
+const HEADER_SPACE = 300; 
+const MIN_SPACE_BETWEEN = 600; 
+const DEFAULT_SILL = 900; 
 
 interface SteelControlPanelProps {
   config: SteelHouseConfig;
@@ -150,27 +143,20 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
     updateWall(wallId, 'openings', wall.openings.filter(op => op.id !== opId));
   };
 
-  const updateRoof = (field: string, value: any) => {
-    onConfigChange({
-      ...config,
-      roof: { ...config.roof, [field]: value }
-    });
-  };
-
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
       <CardHeader className="bg-slate-900 text-white py-4 sticky top-0 z-10 shadow-sm">
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Home className="w-5 h-5 text-blue-400" /> 
-            <span>Steel Framing v2.9</span>
+            <span>Steel Framing Structural</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Ingeniería Estructural</span>
+          <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Muros y Vanos</span>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="p-0 pb-20">
-        <Accordion type="multiple" defaultValue={['global', 'layers', 'roof']} className="w-full">
+        <Accordion type="multiple" defaultValue={['global', 'layers', 'walls']} className="w-full">
           
           <AccordionItem value="global" className="border-b px-4">
             <AccordionTrigger className="hover:no-underline py-4">
@@ -208,67 +194,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                   onChange={(e) => onConfigChange({ ...config, globalWallHeight: parseInt(e.target.value) || 0 })}
                   className="h-9 border-slate-200"
                 />
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="roof" className="border-b px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2">
-                <Mountain className="w-4 h-4 text-amber-500" />
-                <span className="text-xs font-black uppercase tracking-tighter">Sistema de Techo</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4 pb-4">
-              <div className="space-y-3 p-3 bg-amber-50/30 rounded-xl border border-amber-100/50">
-                <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase text-amber-700">Tipo de Cubierta</Label>
-                  <Select value={config.roof.type} onValueChange={(v) => updateRoof('type', v)}>
-                    <SelectTrigger className="h-8 text-xs bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin Techo</SelectItem>
-                      <SelectItem value="one-side">Una Agua (Shed)</SelectItem>
-                      <SelectItem value="two-sides">Dos Aguas (Gable)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase text-amber-700">Diseño de Cercha</Label>
-                  <Select value={config.roof.trussType} onValueChange={(v) => updateRoof('trussType', v)}>
-                    <SelectTrigger className="h-8 text-xs bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kingPost">King Post (Simple)</SelectItem>
-                      <SelectItem value="fink">Fink (Reforzada)</SelectItem>
-                      <SelectItem value="mono">Mono (Un Agua)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-amber-700">Pendiente (°)</Label>
-                    <Input 
-                      type="number" 
-                      value={config.roof.pitch} 
-                      onChange={(e) => updateRoof('pitch', parseInt(e.target.value) || 0)}
-                      className="h-8 text-xs bg-white"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-amber-700">Voladizo (mm)</Label>
-                    <Input 
-                      type="number" 
-                      value={config.roof.overhang} 
-                      onChange={(e) => updateRoof('overhang', parseInt(e.target.value) || 0)}
-                      className="h-8 text-xs bg-white"
-                    />
-                  </div>
-                </div>
               </div>
             </AccordionContent>
           </AccordionItem>

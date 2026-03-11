@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
+import { StructuralEngine } from '../utils/steel/structuralEngine';
 
 export class SteelSceneManager {
   private scene: THREE.Scene;
@@ -21,7 +22,6 @@ export class SteelSceneManager {
   private moveRight = false;
   private isShiftPressed = false;
   private joystickMove = new THREE.Vector2(0, 0);
-  private joystickLook = new THREE.Vector2(0, 0);
   private velocity = new THREE.Vector3();
   private direction = new THREE.Vector3();
   private prevTime = performance.now();
@@ -108,7 +108,6 @@ export class SteelSceneManager {
   }
 
   public updateJoystickMove(x: number, y: number) { this.joystickMove.set(x, y); }
-  public updateJoystickLook(x: number, y: number) { this.joystickLook.set(x, y); }
 
   public enterWalkMode() {
     this.isWalkModeActive = true;
@@ -186,7 +185,7 @@ export class SteelSceneManager {
       }
 
       if (config.layers.steelProfiles) {
-        this.generateWallStructure(wall, wallGroup, config.layers);
+        this.generateWallStructure(wall, wallGroup, config.layers, config);
       }
       this.createOpeningTriggers(wall);
     });
@@ -201,7 +200,7 @@ export class SteelSceneManager {
     this.houseGroup.add(floor);
   }
 
-  private generateWallStructure(wall: SteelWall, group: THREE.Group, layers: LayerVisibility) {
+  private generateWallStructure(wall: SteelWall, group: THREE.Group, layers: LayerVisibility, config: SteelHouseConfig) {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
@@ -215,7 +214,9 @@ export class SteelSceneManager {
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
-      const isTripleHeader = op.width > 1200;
+      
+      // Cálculo de ingeniería para el dintel
+      const headerSolution = StructuralEngine.calculateHeader(op, config);
 
       // King Studs (Altura completa)
       structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
@@ -226,11 +227,24 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      // Dintel (Header PGC) - Requisito: PGC Simple o Triple
-      const headerColor = isTripleHeader ? this.colors.headerTriple : this.colors.header;
-      const headerCount = isTripleHeader ? 3 : 1;
-      for (let i = 0; i < headerCount; i++) {
-        structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', headerColor, i * 10));
+      // Dintel (Header) - Lógica visual según solución
+      const headerColor = headerSolution.type === 'triple' || headerSolution.type === 'truss' ? this.colors.headerTriple : this.colors.header;
+      
+      if (headerSolution.type === 'truss') {
+        // Viga reticulada Warren para vanos gigantes
+        const trussH = 300;
+        const diagCount = Math.ceil(op.width / 300);
+        const diagW = op.width / diagCount;
+        for (let i = 0; i < diagCount; i++) {
+          // Cordón superior e inferior ya cubiertos por la caja del header? Dibujamos representativo
+          structuralGroup.add(this.createProfile(diagW, op.position + i * diagW, headerH, 0, 'PGC', headerColor));
+          structuralGroup.add(this.createProfile(diagW, op.position + i * diagW, headerH + trussH, 0, 'PGC', headerColor));
+        }
+      } else {
+        const headerCount = headerSolution.type === 'triple' ? 3 : (headerSolution.type === 'double' ? 2 : 1);
+        for (let i = 0; i < headerCount; i++) {
+          structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', headerColor, i * 10));
+        }
       }
 
       // Umbral (Window Sill PGU)

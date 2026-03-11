@@ -3,7 +3,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
-import { SteelJoystick } from '@/components/steel/SteelJoystick';
 import { SteelMaterialsTable } from '@/components/steel/SteelMaterialsTable';
 import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
 import { Button } from '@/components/ui/button';
@@ -13,31 +12,22 @@ import {
   Home, 
   Download,
   Layout,
-  Move,
   Settings2,
   Compass,
-  Keyboard,
-  ArrowUp,
-  ArrowDown,
-  Zap,
-  Gamepad2,
-  MousePointer,
   Box,
   ClipboardList,
   ChevronRight,
-  Ruler
+  MousePointer
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { useIsMobile } from '@/hooks/use-mobile';
 
-// NUEVAS CONSTANTES NORMATIVAS
-const EDGE_MARGIN = 400; // Distancia lateral mínima (400 mm)
-const HEADER_SPACE = 300; // Dintel mínimo superior (300 mm)
-const MIN_SPACE_BETWEEN = 600; // Distancia entre aberturas (600 mm)
-const DEFAULT_SILL = 900; // Antepecho ventana estándar (900 mm)
+const EDGE_MARGIN = 400; 
+const HEADER_SPACE = 300; 
+const MIN_SPACE_BETWEEN = 600; 
+const DEFAULT_SILL = 900; 
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
   { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2000, position: EDGE_MARGIN }], studSpacing: 400 },
@@ -60,14 +50,7 @@ const INITIAL_CONFIG: SteelHouseConfig = {
     lintels: true,
     reinforcements: true
   },
-  structuralMode: false,
-  roof: {
-    type: 'two-sides',
-    pitch: 30,
-    overhang: 300,
-    trussSpacing: 600,
-    trussType: 'fink'
-  }
+  structuralMode: false
 };
 
 export default function SteelFramingPage() {
@@ -80,8 +63,7 @@ export default function SteelFramingPage() {
   const viewerRef = useRef<{ 
     enterWalkMode: () => void, 
     setMovement: (dir: string, active: boolean) => void,
-    updateJoystickMove: (x: number, y: number) => void,
-    updateJoystickLook: (x: number, y: number) => void
+    updateJoystickMove: (x: number, y: number) => void
   }>(null);
 
   useEffect(() => {
@@ -217,7 +199,7 @@ export default function SteelFramingPage() {
             </Sheet>
             <div className="flex items-center gap-1.5">
               <Home className="w-4 h-4 text-blue-600" />
-              <span className="text-[10px] font-black uppercase text-slate-800 tracking-tighter">ARQUIMAX STEEL v2.9</span>
+              <span className="text-[10px] font-black uppercase text-slate-800 tracking-tighter">ARQUIMAX WALL ENGINE</span>
             </div>
           </div>
 
@@ -225,7 +207,7 @@ export default function SteelFramingPage() {
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="h-8">
               <TabsList className="bg-slate-100 h-8 p-1 rounded-lg">
                 <TabsTrigger value="3d" className="text-[10px] font-bold uppercase h-6 px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  <Box className="w-3 h-3 mr-1.5" /> Diseño 3D
+                  <Box className="w-3 h-3 mr-1.5" /> Estructura 3D
                 </TabsTrigger>
                 <TabsTrigger value="materials" className="text-[10px] font-bold uppercase h-6 px-3 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <ClipboardList className="w-3 h-3 mr-1.5" /> Listado Materiales
@@ -269,7 +251,7 @@ export default function SteelFramingPage() {
               <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
                 {!isWalkModeActive && (
                   <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-left">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">PROYECTO ACTIVO</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">PROYECTO ESTRUCTURAL</span>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1">
                         <Layout className="w-3 h-3 text-blue-500" />
@@ -277,7 +259,7 @@ export default function SteelFramingPage() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-[9px] font-black text-slate-600 uppercase">Motor Estructural OK</span>
+                        <span className="text-[9px] font-black text-slate-600 uppercase">Motor de Vanos OK</span>
                       </div>
                     </div>
                   </div>
