@@ -4,6 +4,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
 import { StructuralEngine } from '../utils/steel/structuralEngine';
+import { InputController } from '@/engine/player/InputController';
+import { CollisionSystem } from '@/engine/player/CollisionSystem';
+import { PlayerController } from '@/engine/player/PlayerController';
+import { ThirdPersonCamera } from '@/engine/player/ThirdPersonCamera';
 
 export class SteelSceneManager {
   private scene: THREE.Scene;
@@ -16,16 +20,14 @@ export class SteelSceneManager {
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
-  private moveForward = false;
-  private moveBackward = false;
-  private moveLeft = false;
-  private moveRight = false;
-  private isShiftPressed = false;
-  private joystickMove = new THREE.Vector2(0, 0);
-  private velocity = new THREE.Vector3();
-  private direction = new THREE.Vector3();
-  private prevTime = performance.now();
+  // Player System
+  private input: InputController;
+  private collisions: CollisionSystem;
+  private player: PlayerController;
+  private tpCamera: ThirdPersonCamera;
   private isWalkModeActive = false;
+
+  private prevTime = performance.now();
 
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
   private onWalkModeLock?: (locked: boolean) => void;
@@ -35,7 +37,7 @@ export class SteelSceneManager {
     steel: 0x9ca3af, 
     header: 0x2563eb,
     headerTriple: 0x1e40af,
-    headerTube: 0x0f172a, // Azul muy oscuro para tubos
+    headerTube: 0x0f172a,
     king: 0xef4444,
     jack: 0xf59e0b,
     grid: 0xd1d5db,
@@ -75,6 +77,15 @@ export class SteelSceneManager {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
+    // Initialize Player Systems
+    this.input = new InputController();
+    this.collisions = new CollisionSystem();
+    this.player = new PlayerController(this.scene, this.input, this.collisions);
+    this.tpCamera = new ThirdPersonCamera(this.camera, this.player.mesh, this.input);
+    
+    // Hide player initially
+    this.player.mesh.visible = false;
+
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     this.scene.add(ambientLight);
 
@@ -99,23 +110,25 @@ export class SteelSceneManager {
   }
 
   public setMovement(direction: string, active: boolean) {
-    switch (direction) {
-      case 'forward': this.moveForward = active; break;
-      case 'backward': this.moveBackward = active; break;
-      case 'left': this.moveLeft = active; break;
-      case 'right': this.moveRight = active; break;
-      case 'sprint': this.isShiftPressed = active; break;
-    }
+    // Legacy support for manual calls, now handled by InputController keys
   }
 
-  public updateJoystickMove(x: number, y: number) { this.joystickMove.set(x, y); }
+  public updateJoystickMove(x: number, y: number) { this.input.joystickMove.set(x, y); }
+  public updateJoystickLook(x: number, y: number) { this.input.joystickLook.set(x, y); }
 
   public enterWalkMode() {
     this.isWalkModeActive = true;
     this.controls.enabled = false;
+    this.player.mesh.visible = true;
+    this.player.mesh.position.set(0, 0, 0);
     if (this.onWalkModeLock) this.onWalkModeLock(true);
-    this.camera.position.set(0, 1700, 0);
-    this.camera.rotation.set(0, 0, 0);
+  }
+
+  public exitWalkMode() {
+    this.isWalkModeActive = false;
+    this.controls.enabled = true;
+    this.player.mesh.visible = false;
+    if (this.onWalkModeLock) this.onWalkModeLock(false);
   }
 
   private onWindowResize = () => {
@@ -126,6 +139,8 @@ export class SteelSceneManager {
   };
 
   private onDoubleClick = (event: MouseEvent) => {
+    if (this.isWalkModeActive) return; // Prevent editing in walk mode
+    
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -143,23 +158,12 @@ export class SteelSceneManager {
     const delta = (time - this.prevTime) / 1000;
 
     if (this.isWalkModeActive) {
-      this.velocity.x -= this.velocity.x * 10.0 * delta;
-      this.velocity.z -= this.velocity.z * 10.0 * delta;
-      this.direction.z = Number(this.moveForward) - Number(this.moveBackward);
-      this.direction.x = Number(this.moveRight) - Number(this.moveLeft);
-      if (this.joystickMove.lengthSq() > 0) {
-        this.direction.z = this.joystickMove.y;
-        this.direction.x = this.joystickMove.x;
-      }
-      this.direction.normalize();
-      const speed = this.isShiftPressed ? 8000.0 : 4000.0;
-      if (this.direction.z !== 0) this.velocity.z -= this.direction.z * speed * delta;
-      if (this.direction.x !== 0) this.velocity.x -= this.direction.x * speed * delta;
-      this.controls.moveForward(-this.velocity.z * delta);
-      this.controls.moveRight(this.velocity.x * delta);
+      this.player.update(delta, this.tpCamera.rotationY);
+      this.tpCamera.update(delta);
     } else {
       this.controls.update();
     }
+    
     this.prevTime = time;
     this.renderer.render(this.scene, this.camera);
   };
@@ -174,6 +178,8 @@ export class SteelSceneManager {
       this.openingsGroup.remove(this.openingsGroup.children[0]);
     }
 
+    this.collisions.clear();
+
     config.walls.forEach(wall => {
       const wallGroup = new THREE.Group();
       wallGroup.position.set(wall.x, 0, wall.z);
@@ -181,8 +187,16 @@ export class SteelSceneManager {
       this.houseGroup.add(wallGroup);
 
       if (!config.structuralMode) {
-        if (config.layers.exteriorPanels) wallGroup.add(this.createPanelMesh(wall, 'exterior'));
-        if (config.layers.interiorPanels) wallGroup.add(this.createPanelMesh(wall, 'interior'));
+        if (config.layers.exteriorPanels) {
+          const mesh = this.createPanelMesh(wall, 'exterior');
+          wallGroup.add(mesh);
+          this.collisions.registerWall(mesh);
+        }
+        if (config.layers.interiorPanels) {
+          const mesh = this.createPanelMesh(wall, 'interior');
+          wallGroup.add(mesh);
+          this.collisions.registerWall(mesh);
+        }
       }
 
       if (config.layers.steelProfiles) {
@@ -211,35 +225,26 @@ export class SteelSceneManager {
 
     const studHeight = wall.height - (this.profileFlange * 2);
 
-    // 2. Estructura de Aberturas (Framing de Vanos Inteligente)
+    // 2. Estructura de Aberturas
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
       
-      // Inteligencia Estructural: Selección de dintel
       const headerAnalysis = StructuralEngine.calculateHeader(op, config);
 
-      // King Studs (Altura completa)
       structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
       structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king));
 
-      // Jack Studs (Apoyo de dintel)
       const jackH = headerH - this.profileFlange;
       structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      // Representación Visual del Dintel
       if (headerAnalysis.type === 'truss') {
-        // Viga Reticulada Warren (300mm de peralte)
         const trussH = 300;
         const diagCount = Math.max(2, Math.ceil(op.width / 400));
         const diagW = op.width / diagCount;
-        
-        // Cordones superior e inferior
         structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.headerTriple));
         structuralGroup.add(this.createProfile(op.width, op.position, headerH + trussH, 0, 'PGC', this.colors.headerTriple));
-        
-        // Diagonales (Warren)
         for (let i = 0; i < diagCount; i++) {
           const diagLen = Math.sqrt(Math.pow(diagW, 2) + Math.pow(trussH, 2));
           const angle = Math.atan2(trussH, diagW);
@@ -249,12 +254,10 @@ export class SteelSceneManager {
           structuralGroup.add(mesh);
         }
       } else if (headerAnalysis.type === 'tube') {
-        // Tubo Estructural (Boxed Header)
         const tubeMesh = this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.headerTube);
-        tubeMesh.scale.y = 2.5; // Visualmente más grueso
+        tubeMesh.scale.y = 2.5; 
         structuralGroup.add(tubeMesh);
       } else {
-        // Ensambles PGC (Simple, Doble, Triple)
         const count = headerAnalysis.type === 'triple' ? 3 : (headerAnalysis.type === 'double' ? 2 : 1);
         const color = count === 3 ? this.colors.headerTriple : this.colors.header;
         for (let i = 0; i < count; i++) {
@@ -262,12 +265,10 @@ export class SteelSceneManager {
         }
       }
 
-      // Umbral (Window Sill PGU)
       if (op.type === 'window') {
         structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       }
 
-      // Cripple Studs
       const crippleSpacing = wall.studSpacing;
       for (let x = op.position + crippleSpacing; x < op.position + op.width; x += crippleSpacing) {
         const topSpace = wall.height - headerH - (headerAnalysis.type === 'truss' ? 350 : this.profileFlange * 2);
@@ -280,7 +281,6 @@ export class SteelSceneManager {
       }
     });
 
-    // 3. Montantes de Campo (Standard Studs PGC) - Evitar aberturas
     const addStud = (x: number) => {
       const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
       if (!inOpening) {
