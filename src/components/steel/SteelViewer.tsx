@@ -12,6 +12,7 @@ interface SteelViewerProps {
   onOpeningDoubleClick?: (wallId: string, opening: SteelOpening, isInternal?: boolean) => void;
   onInternalWallDoubleClick?: (iw: InternalWall, x: number) => void;
   onWallDoubleClick?: (wallId: string, x: number, side: 'exterior' | 'interior') => void;
+  onFloorDoubleClick?: (x: number, z: number) => void;
   onWalkModeLock?: (locked: boolean) => void;
 }
 
@@ -20,6 +21,7 @@ export const SteelViewer = forwardRef(({
   onOpeningDoubleClick, 
   onInternalWallDoubleClick,
   onWallDoubleClick, 
+  onFloorDoubleClick,
   onWalkModeLock 
 }: SteelViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,7 +43,6 @@ export const SteelViewer = forwardRef(({
     }
   }));
 
-  // Inicialización ÚNICA del manager
   useEffect(() => {
     if (containerRef.current && !managerRef.current) {
       managerRef.current = new SteelSceneManager(containerRef.current);
@@ -55,20 +56,19 @@ export const SteelViewer = forwardRef(({
     };
   }, []);
 
-  // Actualización de callbacks sin re-crear el manager
   useEffect(() => {
     if (managerRef.current) {
       managerRef.current.onOpeningDoubleClick = onOpeningDoubleClick || null;
       managerRef.current.onWallDoubleClick = onWallDoubleClick || null;
       managerRef.current.onInternalWallDoubleClick = onInternalWallDoubleClick || null;
+      managerRef.current.onFloorDoubleClick = onFloorDoubleClick || null;
       managerRef.current.onWalkModeLock = (locked) => {
         setIsWalkMode(locked);
         if (onWalkModeLock) onWalkModeLock(locked);
       };
     }
-  }, [onOpeningDoubleClick, onWallDoubleClick, onInternalWallDoubleClick, onWalkModeLock]);
+  }, [onOpeningDoubleClick, onWallDoubleClick, onInternalWallDoubleClick, onFloorDoubleClick, onWalkModeLock]);
 
-  // Actualización de la casa
   useEffect(() => {
     if (managerRef.current) {
       managerRef.current.buildHouse(config);

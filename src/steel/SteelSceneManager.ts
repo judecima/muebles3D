@@ -21,6 +21,7 @@ export class SteelSceneManager {
   private houseGroup: THREE.Group;
   private openingsGroup: THREE.Group;
   private internalWallsGroup: THREE.Group;
+  private floorMesh: THREE.Mesh | null = null;
   
   private container: HTMLElement;
   private raycaster = new THREE.Raycaster();
@@ -38,6 +39,7 @@ export class SteelSceneManager {
   public onWallDoubleClick: ((wallId: string, x: number, side: 'exterior' | 'interior') => void) | null = null;
   public onWalkModeLock: ((locked: boolean) => void) | null = null;
   public onInternalWallDoubleClick: ((iw: InternalWall, x: number) => void) | null = null;
+  public onFloorDoubleClick: ((x: number, z: number) => void) | null = null;
 
   private colors = {
     background: 0xf1f5f9,
@@ -131,12 +133,14 @@ export class SteelSceneManager {
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
+
     const openingIntersects = this.raycaster.intersectObjects(this.openingsGroup.children);
     if (openingIntersects.length > 0) {
       const { wallId, opening, isInternal } = openingIntersects[0].object.userData;
       if (this.onOpeningDoubleClick) this.onOpeningDoubleClick(wallId, opening, isInternal);
       return;
     }
+
     const internalIntersects = this.raycaster.intersectObjects(this.internalWallsGroup.children, true);
     if (internalIntersects.length > 0) {
       let object = internalIntersects[0].object;
@@ -148,12 +152,22 @@ export class SteelSceneManager {
         return;
       }
     }
+
     const wallIntersects = this.raycaster.intersectObjects(this.houseGroup.children, true);
     const wallHit = wallIntersects.find(i => i.object.userData.isWall);
     if (wallHit) {
       const { wallId, side } = wallHit.object.userData;
       const localPoint = wallHit.object.worldToLocal(wallHit.point.clone());
       if (this.onWallDoubleClick) this.onWallDoubleClick(wallId, localPoint.x, side);
+      return;
+    }
+
+    // Detección de clic en suelo para "Generar Ambiente"
+    if (this.floorMesh) {
+      const floorIntersects = this.raycaster.intersectObject(this.floorMesh);
+      if (floorIntersects.length > 0 && this.onFloorDoubleClick) {
+        this.onFloorDoubleClick(floorIntersects[0].point.x, floorIntersects[0].point.z);
+      }
     }
   };
 
@@ -181,6 +195,7 @@ export class SteelSceneManager {
       }
     });
     this.collisions.clear();
+
     config.walls.forEach(wall => {
       const wallGroup = new THREE.Group();
       wallGroup.position.set(wall.x, 0, wall.z);
@@ -201,25 +216,48 @@ export class SteelSceneManager {
       if (config.layers.steelProfiles) this.generateWallStructure(wall, wallGroup, config.layers, config);
       this.createOpeningTriggers(wall.id, wall.length, wall.height, wall.rotation, wall.x, wall.z, wall.openings, false, config);
     });
+
     config.internalWalls.forEach(iw => {
-      const parent = config.walls.find(w => w.id === iw.parentWallId);
-      if (!parent) return;
       const iwGroup = new THREE.Group();
       iwGroup.userData = { isInternalWall: true, internalWall: iw };
-      const parentMatrix = new THREE.Matrix4().makeRotationY((parent.rotation * Math.PI) / 180).setPosition(parent.x, 0, parent.z);
-      const pos = new THREE.Vector3(iw.xPosition, 0, 50).applyMatrix4(parentMatrix);
-      iwGroup.position.copy(pos);
+      
+      // Cálculo de posición global basado en padre (Sea SteelWall o InternalWall)
+      const globalPos = this.calculateGlobalPosition(iw, config);
+      iwGroup.position.copy(globalPos);
       iwGroup.rotation.y = (iw.rotation * Math.PI) / 180;
+      
       this.internalWallsGroup.add(iwGroup);
       iwGroup.updateMatrixWorld(true);
       this.generateInternalWall(iw, iwGroup, config);
       this.createOpeningTriggers(iw.id, iw.length, iw.height, iw.rotation, iwGroup.position.x, iwGroup.position.z, iw.openings || [], true, config);
     });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000), new THREE.MeshStandardMaterial({ color: this.colors.floor }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -5;
-    floor.receiveShadow = true;
-    this.houseGroup.add(floor);
+
+    const floorGeom = new THREE.PlaneGeometry(40000, 40000);
+    const floorMat = new THREE.MeshStandardMaterial({ color: this.colors.floor });
+    this.floorMesh = new THREE.Mesh(floorGeom, floorMat);
+    this.floorMesh.rotation.x = -Math.PI / 2;
+    this.floorMesh.position.y = -5;
+    this.floorMesh.receiveShadow = true;
+    this.houseGroup.add(this.floorMesh);
+  }
+
+  private calculateGlobalPosition(iw: InternalWall, config: SteelHouseConfig): THREE.Vector3 {
+    // Buscar en paredes exteriores
+    const extParent = config.walls.find(w => w.id === iw.parentWallId);
+    if (extParent) {
+      const parentMatrix = new THREE.Matrix4().makeRotationY((extParent.rotation * Math.PI) / 180).setPosition(extParent.x, 0, extParent.z);
+      return new THREE.Vector3(iw.xPosition, 0, 50).applyMatrix4(parentMatrix);
+    }
+    
+    // Buscar en paredes internas
+    const intParent = config.internalWalls.find(w => w.id === iw.parentWallId);
+    if (intParent) {
+      const parentGlobal = this.calculateGlobalPosition(intParent, config);
+      const parentMatrix = new THREE.Matrix4().makeRotationY((intParent.rotation * Math.PI) / 180).setPosition(parentGlobal.x, 0, parentGlobal.z);
+      return new THREE.Vector3(iw.xPosition, 0, 0).applyMatrix4(parentMatrix);
+    }
+
+    return new THREE.Vector3();
   }
 
   private generateInternalWall(iw: InternalWall, group: THREE.Group, config: SteelHouseConfig) {
@@ -227,6 +265,7 @@ export class SteelSceneManager {
     const height = iw.height;
     const len = iw.length;
     const openings = iw.openings || [];
+    
     if (config.layers.steelProfiles) {
       const panels = StructuralEngine.calculateWallPanels(iw, config);
       const studHeight = height - this.profileFlange * 2;
@@ -239,34 +278,29 @@ export class SteelSceneManager {
         }
         if (panel.isWallEnd) group.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
       });
+
       openings.forEach(op => {
-        const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
         const analysis = StructuralEngine.calculateHeader(op, iw.length, config, iw.height);
-        const headerBottom = sill + op.height;
+        const headerBottom = op.height;
         const headerHeight = analysis.actualHeight;
-        const headerColor = analysis.type === 'truss' ? this.colors.header_truss : this.colors.header;
         
         group.add(this.createProfile(studHeight, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         
-        if (analysis.type === 'truss') {
-          this.drawTrussHeader(group, op.position, headerBottom, op.width, headerHeight, thickness);
-        } else {
-          group.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, thickness, headerHeight));
-        }
+        group.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', this.colors.header, 0, thickness, headerHeight));
         
         StructuralEngine.calculateCrippleStuds(iw, op, config).forEach(c => {
           group.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness));
         });
       });
     }
+
     if (!config.structuralMode && config.layers.interiorPanels) {
       const shape = new THREE.Shape();
       shape.moveTo(0, 0); shape.lineTo(len, 0); shape.lineTo(len, height); shape.lineTo(0, height); shape.lineTo(0, 0);
       openings.forEach(op => {
         const hole = new THREE.Path();
-        const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-        hole.moveTo(op.position, sill); hole.lineTo(op.position + op.width, sill); hole.lineTo(op.position + op.width, sill + op.height); hole.lineTo(op.position, sill + op.height); hole.lineTo(op.position, sill);
+        hole.moveTo(op.position, 0); hole.lineTo(op.position + op.width, 0); hole.lineTo(op.position + op.width, op.height); hole.lineTo(op.position, op.height); hole.lineTo(op.position, 0);
         shape.holes.push(hole);
       });
       const panelGeom = new THREE.ExtrudeGeometry(shape, { depth: 12.5, beveled: false });
@@ -283,6 +317,7 @@ export class SteelSceneManager {
     group.add(structuralGroup);
     const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - (this.profileFlange * 2);
+    
     panels.forEach(panel => {
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
@@ -294,13 +329,16 @@ export class SteelSceneManager {
       }
       if (panel.isWallEnd) { for (let i = 0; i < 3; i++) structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner)); }
     });
+
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wall.id) {
         structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange/2, this.profileFlange, 90, 'PGC', this.colors.junction));
         StructuralEngine.calculateLadderBacking(wall.height).forEach(l => structuralGroup.add(this.createProfile(l.xEnd - l.xStart, iw.xPosition + l.xStart, l.y, 0, 'PGU', this.colors.ladder)));
       }
     });
+
     if (layers.horizontalBlocking) StructuralEngine.calculateBlocking(wall).forEach(b => structuralGroup.add(this.createProfile(b.xEnd - b.xStart, b.xStart, b.y, 0, 'PGU', this.colors.blocking)));
+    
     wall.openings.forEach(op => {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
@@ -362,7 +400,6 @@ export class SteelSceneManager {
     const width = customWidth || this.profileWidth;
     const flangeHeight = customHeight || this.profileFlange;
     const isVertical = rotZ === 90;
-    
     const geomH = isVertical ? len : flangeHeight;
     const geomW = isVertical ? this.profileFlange : len;
     
@@ -370,7 +407,6 @@ export class SteelSceneManager {
       new THREE.BoxGeometry(geomW, geomH, width), 
       new THREE.MeshStandardMaterial({ color: color || this.colors.steel, metalness: 0.8, roughness: 0.2 })
     );
-    
     mesh.position.set(x + geomW / 2, y + geomH / 2, zOffset);
     mesh.castShadow = mesh.receiveShadow = true; 
     return mesh;

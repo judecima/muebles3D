@@ -13,7 +13,7 @@ export interface SteelOpening {
 
 export interface InternalWall {
   id: string;
-  parentWallId: string;
+  parentWallId: string; // Puede ser ID de SteelWall o de otra InternalWall
   xPosition: number; // Posición a lo largo del muro padre
   length: number;
   height: number;
