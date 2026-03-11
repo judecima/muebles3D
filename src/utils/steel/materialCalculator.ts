@@ -1,9 +1,8 @@
 import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall } from '@/lib/steel/types';
 
 /**
- * Calculador de Materiales para Steel Framing v1.1
- * Basado en estándares de construcción en seco y la configuración del modelo 3D.
- * Optimizado para cálculo lineal estricto de soleras y montantes.
+ * Calculador de Materiales para Steel Framing v1.2
+ * Optimizado para cálculo por UNIDAD COMERCIAL (Barra de 6 metros).
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -13,9 +12,10 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   let totalInteriorAreaMM2 = 0;
   let totalBracingLenMM = 0;
 
+  const BAR_LENGTH_M = 6;
+
   config.walls.forEach(wall => {
     // 1. Soleras (PGU) - Superior e Inferior (Cálculo Lineal Estricto)
-    // 2 soleras por muro: una base y una de cierre superior.
     totalPGULenMM += (wall.length * 2);
 
     // 2. Montantes (PGC)
@@ -84,33 +84,35 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   const totalExteriorAreaM2 = totalExteriorAreaMM2 / 1000000;
   const totalInteriorAreaM2 = totalInteriorAreaMM2 / 1000000;
 
-  // Agregar Items al listado final con factor de desperdicio comercial (5-10%)
-  
+  // 1. PGU por unidad de 6m
   const pguWaste = 1.05;
-  const pguFinalM = totalPGULenM * pguWaste;
+  const pguTotalM = totalPGULenM * pguWaste;
+  const pguUnits = Math.ceil(pguTotalM / BAR_LENGTH_M);
   items.push({
     name: 'Perfil PGU 100x0.9mm (Soleras)',
     category: 'perfileria',
-    unit: 'm',
-    quantity: parseFloat(pguFinalM.toFixed(2)),
-    description: `Incluye soleras sup/inf y vanos. Estimado: ${Math.ceil(pguFinalM / 6)} barras de 6m.`
+    unit: 'un',
+    quantity: pguUnits,
+    description: `Barras de 6m. Incluye soleras y vanos. (Total: ${pguTotalM.toFixed(1)}m lin.)`
   });
 
+  // 2. PGC por unidad de 6m
   const pgcWaste = 1.08;
-  const pgcFinalM = totalPGCLenM * pgcWaste;
+  const pgcTotalM = totalPGCLenM * pgcWaste;
+  const pgcUnits = Math.ceil(pgcTotalM / BAR_LENGTH_M);
   items.push({
     name: 'Perfil PGC 100x0.9mm (Montantes)',
     category: 'perfileria',
-    unit: 'm',
-    quantity: parseFloat(pgcFinalM.toFixed(2)),
-    description: `Montantes estructurales y refuerzos. Estimado: ${Math.ceil(pgcFinalM / 6)} barras de 6m.`
+    unit: 'un',
+    quantity: pgcUnits,
+    description: `Barras de 6m. Montantes y refuerzos. (Total: ${pgcTotalM.toFixed(1)}m lin.)`
   });
 
   items.push({
     name: 'Placa OSB 12mm (Exterior)',
     category: 'paneles',
     unit: 'm2',
-    quantity: parseFloat((totalExteriorAreaM2 * 1.10).toFixed(2)), // 10% desperdicio placas
+    quantity: parseFloat((totalExteriorAreaM2 * 1.10).toFixed(2)),
     description: 'Revestimiento exterior estructural.'
   });
 
@@ -135,7 +137,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'aislacion',
     unit: 'm2',
     quantity: parseFloat(totalExteriorAreaM2.toFixed(2)),
-    description: 'Aislamiento termoacústico para el alma de los muros.'
+    description: 'Aislamiento termoacústico.'
   });
 
   items.push({
@@ -143,10 +145,9 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'perfileria',
     unit: 'm',
     quantity: parseFloat(totalBracingLenM.toFixed(2)),
-    description: 'Rigidización lateral mediante cruces de San Andrés.'
+    description: 'Cruces de San Andrés.'
   });
 
-  // Peso estimado (PGC/PGU aprox 1.2kg/m)
   const totalWeight = (totalPGCLenM + totalPGULenM) * 1.2;
 
   return {
