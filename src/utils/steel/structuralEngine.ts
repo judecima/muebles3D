@@ -46,29 +46,68 @@ export class StructuralEngine {
     return 'none';
   }
 
+  /**
+   * Divide el muro en paneles evitando que las uniones caigan dentro de aberturas.
+   */
   static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): WallPanelData[] {
     const panels: WallPanelData[] = [];
     const maxPanelWidth = 4000; 
-    let numPanels = Math.ceil(wall.length / maxPanelWidth);
-    const panelWidth = wall.length / numPanels;
+    const minPanelWidth = 600;
+    const openings = wall.openings || [];
+    
+    let currentX = 0;
+    let panelIndex = 0;
 
-    for (let i = 0; i < numPanels; i++) {
-      const xStart = i * panelWidth;
-      const xEnd = (i + 1) * panelWidth;
-      const loads = this.calculatePanelLoads(panelWidth, wall.height, config);
-      const needsBracing = (loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * panelWidth / 1000) || (i === 0 || i === numPanels - 1);
+    while (currentX < wall.length) {
+      let targetX = Math.min(currentX + maxPanelWidth, wall.length);
+      
+      // Si no es el final del muro, validar interferencia con aberturas
+      if (targetX < wall.length) {
+        for (const op of openings) {
+          const opStart = op.position;
+          const opEnd = op.position + op.width;
+          
+          // Si el punto de unión cae dentro de una abertura
+          if (targetX > opStart && targetX < opEnd) {
+            // Mover la unión al inicio de la abertura (posición más segura)
+            targetX = opStart - 10; 
+            
+            // Si el panel resultante es demasiado pequeño, intentar mover al final de la abertura
+            if (targetX - currentX < minPanelWidth) {
+              targetX = opEnd + 10;
+            }
+            break;
+          }
+        }
+      }
 
-      panels.push({
-        id: `${wall.id}-p${i}`,
-        xStart,
-        xEnd,
-        width: panelWidth,
-        isWallStart: i === 0,
-        isWallEnd: i === numPanels - 1,
-        needsBracing,
-        loads
-      });
+      // Asegurar que no nos pasamos del largo total
+      targetX = Math.min(targetX, wall.length);
+      const width = targetX - currentX;
+
+      if (width > 0) {
+        const loads = this.calculatePanelLoads(width, wall.height, config);
+        const needsBracing = (loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * width / 1000) || (currentX === 0 || targetX === wall.length);
+
+        panels.push({
+          id: `${wall.id}-p${panelIndex}`,
+          xStart: currentX,
+          xEnd: targetX,
+          width: width,
+          isWallStart: currentX === 0,
+          isWallEnd: targetX === wall.length,
+          needsBracing,
+          loads
+        });
+      }
+
+      currentX = targetX;
+      panelIndex++;
+      
+      // Evitar bucles infinitos
+      if (panelIndex > 50) break;
     }
+
     return panels;
   }
 
@@ -98,7 +137,7 @@ export class StructuralEngine {
       type = 'truss';
       status = L > 3500 ? 'error' : 'warning';
       trussData = {
-        height: 400, // Altura estándar de viga reticulada
+        height: 400, 
         numDiagonals: Math.ceil(L / 400),
         chordThickness: 1.25
       };
@@ -115,23 +154,26 @@ export class StructuralEngine {
     return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, trussData };
   }
 
+  /**
+   * Calcula los cripple studs asegurando que siempre haya desplazamiento de fuerzas
+   * desde la solera superior al dintel y del antepecho a la solera inferior.
+   */
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
-    const analysis = this.calculateHeader(opening, wall.length, config);
-    // Si es reticulada o viga tubo masiva, los cripples superiores son reemplazados por el cuerpo de la viga
-    if (analysis.type === 'truss' || analysis.type === 'tube') return [];
-
     const cripples: CrippleData[] = [];
     const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
     const wallH = wall.height;
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerTop = sill + opening.height;
 
+    // Cripples SUPERIORES (Desplazamiento de carga desde techo a dintel)
+    // Se generan siempre para mantener el camino de carga, incluso sobre trusses
     for (let x = spacing; x < wall.length; x += spacing) {
       if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
         cripples.push({ x, yStart: headerTop, yEnd: wallH - 40, type: 'upper' });
       }
     }
 
+    // Cripples INFERIORES (Solo ventanas)
     if (opening.type === 'window') {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
