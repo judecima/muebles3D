@@ -18,6 +18,7 @@ export interface InternalWall {
   rotation: number;
   x: number;
   z: number;
+  openings: SteelOpening[];
 }
 
 export interface SteelWall {

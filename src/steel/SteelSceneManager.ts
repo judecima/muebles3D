@@ -32,7 +32,7 @@ export class SteelSceneManager {
   private prevTime = performance.now();
 
   // Callbacks dinámicos
-  public onOpeningDoubleClick: ((wallId: string, opening: SteelOpening) => void) | null = null;
+  public onOpeningDoubleClick: ((wallId: string, opening: SteelOpening, isInternal?: boolean) => void) | null = null;
   public onWallDoubleClick: ((wallId: string, x: number, side: 'exterior' | 'interior') => void) | null = null;
   public onWalkModeLock: ((locked: boolean) => void) | null = null;
   public onInternalWallDoubleClick: ((iw: InternalWall) => void) | null = null;
@@ -142,8 +142,8 @@ export class SteelSceneManager {
     // 1. Detección de aberturas
     const openingIntersects = this.raycaster.intersectObjects(this.openingsGroup.children);
     if (openingIntersects.length > 0) {
-      const { wallId, opening } = openingIntersects[0].object.userData;
-      if (this.onOpeningDoubleClick) this.onOpeningDoubleClick(wallId, opening);
+      const { wallId, opening, isInternal } = openingIntersects[0].object.userData;
+      if (this.onOpeningDoubleClick) this.onOpeningDoubleClick(wallId, opening, isInternal);
       return;
     }
 
@@ -158,7 +158,7 @@ export class SteelSceneManager {
       }
     }
 
-    // 3. Detección de muros perimetrales (Optimizado sin duplicación)
+    // 3. Detección de muros perimetrales
     const wallIntersects = this.raycaster.intersectObjects(this.houseGroup.children, true);
     const wallHit = wallIntersects.find(i => i.object.userData.isWall);
     if (wallHit) {
@@ -220,7 +220,7 @@ export class SteelSceneManager {
       if (config.layers.steelProfiles) {
         this.generateWallStructure(wall, wallGroup, config.layers, config);
       }
-      this.createOpeningTriggers(wall);
+      this.createOpeningTriggers(wall.id, wall.length, wall.height, wall.rotation, wall.x, wall.z, wall.openings, false);
     });
 
     // Muros Internos
@@ -243,6 +243,7 @@ export class SteelSceneManager {
       iwGroup.updateMatrixWorld(true);
 
       this.generateInternalWall(iw, iwGroup, config);
+      this.createOpeningTriggers(iw.id, iw.length, iw.height, iw.rotation, iwGroup.position.x, iwGroup.position.z, iw.openings || [], true);
     });
 
     const floor = new THREE.Mesh(
@@ -259,6 +260,7 @@ export class SteelSceneManager {
     const thickness = this.drywallProfileWidth;
     const height = iw.height;
     const len = iw.length;
+    const openings = iw.openings || [];
 
     if (config.layers.steelProfiles) {
       group.add(this.createProfile(len, 0, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
@@ -266,20 +268,42 @@ export class SteelSceneManager {
 
       for (let x = 0; x <= len; x += 400) {
         const finalX = Math.min(x, len - this.profileFlange);
-        group.add(this.createProfile(height - this.profileFlange * 2, finalX, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
+        const inOpening = openings.some(op => finalX >= (op.position - 10) && finalX <= (op.position + op.width + 10));
+        if (!inOpening) {
+          group.add(this.createProfile(height - this.profileFlange * 2, finalX, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
+        }
       }
+
+      // Estructura de vanos internos
+      openings.forEach(op => {
+        const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+        const headerH = sill + op.height;
+        group.add(this.createProfile(height - this.profileFlange * 2, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
+        group.add(this.createProfile(height - this.profileFlange * 2, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
+        group.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.header, 0, thickness));
+      });
     }
 
     if (!config.structuralMode && config.layers.interiorPanels) {
-      const panelGeom = new THREE.BoxGeometry(len, height, 12.5);
+      const shape = new THREE.Shape();
+      shape.moveTo(0, 0); shape.lineTo(len, 0); shape.lineTo(len, height); shape.lineTo(0, height); shape.lineTo(0, 0);
+      
+      openings.forEach(op => {
+        const hole = new THREE.Path();
+        const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+        hole.moveTo(op.position, sill); hole.lineTo(op.position + op.width, sill); hole.lineTo(op.position + op.width, sill + op.height); hole.lineTo(op.position, sill + op.height); hole.lineTo(op.position, sill);
+        shape.holes.push(hole);
+      });
+
+      const panelGeom = new THREE.ExtrudeGeometry(shape, { depth: 12.5, beveled: false });
       const panelMat = new THREE.MeshStandardMaterial({ color: this.colors.panel_int });
       
       const p1 = new THREE.Mesh(panelGeom, panelMat);
-      p1.position.set(len/2, height/2, thickness/2 + 6.25);
+      p1.position.z = thickness/2;
       group.add(p1);
 
       const p2 = new THREE.Mesh(panelGeom, panelMat);
-      p2.position.set(len/2, height/2, -thickness/2 - 6.25);
+      p2.position.z = -thickness/2 - 12.5;
       group.add(p2);
       
       this.collisions.registerWall(p1);
@@ -380,18 +404,18 @@ export class SteelSceneManager {
     return mesh;
   }
 
-  private createOpeningTriggers(wall: SteelWall) {
-    wall.openings.forEach(op => {
+  private createOpeningTriggers(wallId: string, length: number, height: number, rotation: number, x: number, z: number, openings: SteelOpening[], isInternal: boolean) {
+    openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(op.width, op.height, 120),
         new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
       );
-      const matrix = new THREE.Matrix4().makeRotationY((wall.rotation * Math.PI) / 180).setPosition(wall.x, 0, wall.z);
+      const matrix = new THREE.Matrix4().makeRotationY((rotation * Math.PI) / 180).setPosition(x, 0, z);
       const pos = new THREE.Vector3(op.position + op.width / 2, sill + op.height / 2, 0).applyMatrix4(matrix);
       mesh.position.copy(pos);
-      mesh.rotation.y = (wall.rotation * Math.PI) / 180;
-      mesh.userData = { wallId: wall.id, opening: op };
+      mesh.rotation.y = (rotation * Math.PI) / 180;
+      mesh.userData = { wallId, opening: op, isInternal };
       this.openingsGroup.add(mesh);
     });
   }
