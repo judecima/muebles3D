@@ -241,18 +241,18 @@ export class SteelSceneManager {
       });
       openings.forEach(op => {
         const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-        const headerBottom = sill + op.height;
         const analysis = StructuralEngine.calculateHeader(op, iw.length, config, iw.height);
+        const headerBottom = sill + op.height;
+        const headerHeight = analysis.actualHeight;
         const headerColor = analysis.type === 'truss' ? this.colors.header_truss : this.colors.header;
         
         group.add(this.createProfile(studHeight, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         
         if (analysis.type === 'truss') {
-          this.drawTrussHeader(group, op.position, headerBottom, op.width, analysis.trussData?.height || 400, thickness);
+          this.drawTrussHeader(group, op.position, headerBottom, op.width, headerHeight, thickness);
         } else {
-          // Dintel estándar de 100mm de alto
-          group.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, thickness, 100));
+          group.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, thickness, headerHeight));
         }
         
         StructuralEngine.calculateCrippleStuds(iw, op, config).forEach(c => {
@@ -305,6 +305,7 @@ export class SteelSceneManager {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerBottom = sill + op.height;
+      const headerHeight = analysis.actualHeight;
       const fusion = analysis.isFusedWithCorner;
       const fusedL = fusion === 'left'; const fusedR = fusion === 'right';
 
@@ -318,24 +319,21 @@ export class SteelSceneManager {
       if (!fusedR) structuralGroup.add(this.createProfile(headerBottom - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
       if (analysis.type === 'truss') {
-        this.drawTrussHeader(structuralGroup, op.position, headerBottom, op.width, analysis.trussData?.height || 400, this.profileWidth);
+        this.drawTrussHeader(structuralGroup, op.position, headerBottom, op.width, headerHeight, this.profileWidth);
       } else {
         const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
         const finalHeaderW = fusedL || fusedR ? op.width + 50 : op.width;
         const finalHeaderX = fusedL ? op.position - 50 : op.position;
-        // Dintel estándar de 100mm de alto
-        structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerBottom, 0, 'PGC', headerColor, 0, this.profileWidth, 100));
+        structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerBottom, 0, 'PGC', headerColor, 0, this.profileWidth, headerHeight));
       }
       
-      if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
+      if (op.type === 'window' && sill > 80) structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       StructuralEngine.calculateCrippleStuds(wall, op, config).forEach(c => structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple)));
     });
   }
 
   private drawTrussHeader(group: THREE.Group, x: number, y: number, w: number, h: number, thickness: number) {
-    // Cordón inferior
     group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    // Cordón superior (ajustado para no sobresalir)
     group.add(this.createProfile(w, x, y + h - 40, 0, 'PGC', this.colors.header_truss, 0, thickness));
     
     const numDivisions = Math.ceil(w / 400);
@@ -343,20 +341,16 @@ export class SteelSceneManager {
     
     for (let i = 0; i <= numDivisions; i++) {
       const posX = x + (i * divW);
-      // Montantes internos
-      group.add(this.createProfile(h - 80, posX - 20, y + 40, 90, 'PGC', this.colors.header_truss, 0, thickness));
+      if (posX >= x + w - 5) break;
+      group.add(this.createProfile(h - 80, posX, y + 40, 90, 'PGC', this.colors.header_truss, 0, thickness));
       
       if (i < numDivisions) {
         const diagH = h - 80;
         const diagLen = Math.sqrt(divW * divW + diagH * diagH);
         const angle = Math.atan2(diagH, divW);
-        
-        // Perfil para diagonal
         const diagGeom = new THREE.BoxGeometry(diagLen, 15, thickness - 10);
         const diagMat = new THREE.MeshStandardMaterial({ color: this.colors.header_truss, metalness: 0.8 });
         const diagMesh = new THREE.Mesh(diagGeom, diagMat);
-        
-        // Posicionamiento preciso de la diagonal
         diagMesh.position.set(posX + divW/2, y + h/2, 0);
         diagMesh.rotation.z = i % 2 === 0 ? angle : -angle;
         group.add(diagMesh);

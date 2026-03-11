@@ -9,6 +9,7 @@ export interface HeaderAnalysis {
   requiredIx: number;
   status: 'ok' | 'warning' | 'error';
   isFusedWithCorner: 'none' | 'left' | 'right';
+  actualHeight: number; // Altura real ocupada por el dintel
   trussData?: {
     height: number;
     numDiagonals: number;
@@ -117,34 +118,38 @@ export class StructuralEngine {
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
     const fusion = this.analyzeOpeningFusion(opening, wallLen);
     
-    let type: HeaderAnalysis['type'] = 'single';
-    let status: HeaderAnalysis['status'] = 'ok';
-    let trussData: HeaderAnalysis['trussData'] = undefined;
-
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-    
-    const availableHeightForTruss = Math.max(0, wallHeight - headerBottom - 40);
+    const availableHeight = Math.max(0, wallHeight - headerBottom - 40);
+
+    let type: HeaderAnalysis['type'] = 'single';
+    let status: HeaderAnalysis['status'] = 'ok';
+    let actualHeight = Math.min(100, availableHeight);
+    let trussData: HeaderAnalysis['trussData'] = undefined;
 
     if (L > 2500 || requiredIx > this.TUBE_IX) {
       type = 'truss';
       status = L > 3500 ? 'error' : 'warning';
+      actualHeight = availableHeight;
       trussData = {
-        height: Math.max(400, availableHeightForTruss),
+        height: availableHeight,
         numDiagonals: Math.ceil(L / 400),
         chordThickness: 1.25
       };
     } else if (requiredIx > (this.PGC_IX_SINGLE * 3)) {
       type = 'tube';
+      actualHeight = Math.min(100, availableHeight);
     } else if (requiredIx > (this.PGC_IX_SINGLE * 2)) {
       type = 'triple';
+      actualHeight = Math.min(100, availableHeight);
     } else if (requiredIx > this.PGC_IX_SINGLE) {
       type = 'double';
+      actualHeight = Math.min(100, availableHeight);
     }
 
     if (L > 3500) status = 'error'; 
 
-    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, trussData };
+    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData };
   }
 
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
@@ -155,24 +160,22 @@ export class StructuralEngine {
     const headerBottom = sill + opening.height;
 
     const analysis = this.calculateHeader(opening, wall.length, config, wallH);
-    // Header estándar tiene 100mm de alto
-    const headerHeight = analysis.type === 'truss' ? (analysis.trussData?.height || 400) : 100;
+    const headerHeight = analysis.actualHeight;
     const headerTop = headerBottom + headerHeight;
 
-    const isFullTruss = analysis.type === 'truss' && (headerTop >= wallH - 50);
+    // Solo generamos cripples si queda espacio libre sobre el dintel
+    const spaceAbove = (wallH - 40) - headerTop;
 
-    // Cripples SUPERIORES: Conectan la cara superior del header con la solera superior
-    if (!isFullTruss) {
+    if (spaceAbove > 10) {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-          // Aseguramos que el cripple empiece exactamente donde termina el header
           cripples.push({ x, yStart: headerTop, yEnd: wallH - 40, type: 'upper' });
         }
       }
     }
 
     // Cripples INFERIORES: Ventanas
-    if (opening.type === 'window') {
+    if (opening.type === 'window' && sill > 80) {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
           cripples.push({ x, yStart: 40, yEnd: sill - 40, type: 'lower' });
@@ -197,7 +200,7 @@ export class StructuralEngine {
         const xEnd = x + studSpacing; 
         const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-          const top = sill + op.height + 100; // Considerar el header en la intersección
+          const top = sill + op.height + 100;
           return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
         });
         if (!intersects) blockings.push({ xStart, xEnd, y });

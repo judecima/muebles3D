@@ -173,7 +173,7 @@ export default function SteelFramingPage() {
     if (selectedOpening.isInternal) {
       setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : iw) }));
     } else {
-      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : w) }));
+      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : w) } : w) }));
     }
     setSelectedOpening(null);
   };
@@ -240,7 +240,6 @@ export default function SteelFramingPage() {
     const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
     if (!parent) return;
 
-    // Lógica 2D de intersección real (Ray-casting)
     const parentRad = (parent.rotation * Math.PI) / 180;
     const parentDir = { x: Math.cos(parentRad), z: -Math.sin(parentRad) };
     const perpDir = { x: Math.sin(parentRad), z: Math.cos(parentRad) };
@@ -252,8 +251,6 @@ export default function SteelFramingPage() {
     
     const iwRad = (editingInternalWall.rotation * Math.PI) / 180;
     const iwDir = { x: Math.cos(iwRad), z: -Math.sin(iwRad) };
-
-    let minLen = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
 
     const getIntersection = (rayP: {x:number, z:number}, rayD: {x:number, z:number}, segA: {x:number, z:number}, segB: {x:number, z:number}) => {
       const x1 = rayP.x, z1 = rayP.z;
@@ -268,6 +265,8 @@ export default function SteelFramingPage() {
       return null;
     };
 
+    const distances: number[] = [];
+
     // Escanear contra muros exteriores
     config.walls.forEach(w => {
       const wRad = (w.rotation * Math.PI) / 180;
@@ -275,7 +274,7 @@ export default function SteelFramingPage() {
       const A = { x: w.x, z: w.z };
       const B = { x: w.x + wD.x * w.length, z: w.z + wD.z * w.length };
       const dist = getIntersection(p0, iwDir, A, B);
-      if (dist !== null) minLen = Math.min(minLen, dist);
+      if (dist !== null) distances.push(dist);
     });
 
     // Escanear contra otros tabiques internos
@@ -294,10 +293,22 @@ export default function SteelFramingPage() {
       const oIDir = { x: Math.cos(oIRad), z: -Math.sin(oIRad) };
       const end = { x: start.x + oIDir.x * other.length, z: start.z + oIDir.z * other.length };
       const dist = getIntersection(p0, iwDir, start, end);
-      if (dist !== null) minLen = Math.min(minLen, dist);
+      if (dist !== null) distances.push(dist);
     });
 
-    setLocalIWData(prev => prev ? { ...prev, length: Math.round(minLen).toString() } : null);
+    // Lógica secuencial: buscar el siguiente punto más lejano que el actual
+    const currentLen = parseInt(localIWData?.length || "0") || editingInternalWall.length;
+    const furtherDistances = distances.filter(d => d > currentLen + 10).sort((a, b) => a - b);
+    
+    let targetLen: number;
+    if (furtherDistances.length > 0) {
+      targetLen = furtherDistances[0];
+    } else {
+      // Si ya llegamos al final, reiniciamos al primer encuentro para permitir rotación
+      targetLen = Math.min(...distances);
+    }
+
+    setLocalIWData(prev => prev ? { ...prev, length: Math.round(targetLen).toString() } : null);
   };
 
   const createOpening = () => {
@@ -453,7 +464,7 @@ export default function SteelFramingPage() {
                 <Label className="text-right text-[10px] font-black uppercase">Largo (mm)</Label>
                 <div className="col-span-3 flex gap-2">
                   <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChange()} className="flex-1" />
-                  <Button variant="outline" size="icon" onClick={extendToNextWall} title="Extender hasta próxima pared"><ArrowRightToLine className="w-4 h-4" /></Button>
+                  <Button variant="outline" size="icon" onClick={extendToNextWall} title="Proyectar a próxima pared"><ArrowRightToLine className="w-4 h-4" /></Button>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
