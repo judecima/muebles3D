@@ -7,6 +7,7 @@ export interface HeaderAnalysis {
   maxAllowableDeflection: number;
   requiredIx: number;
   status: 'ok' | 'warning' | 'error';
+  isFusedWithCorner: 'none' | 'left' | 'right';
 }
 
 export interface BlockingData {
@@ -20,35 +21,36 @@ export class StructuralEngine {
   private static readonly PGC_IX_SINGLE = 185000; 
   private static readonly TUBE_IX = 1200000; 
   
-  // Criterios de diseño (Norma AISI / IRAM Argentina)
-  private static readonly DEAD_LOAD_KPA = 0.5; // kN/m2
+  // Umbrales de seguridad y normativa
+  public static readonly CORNER_FUSION_THRESHOLD = 200; // mm
+  private static readonly DEAD_LOAD_KPA = 0.5; 
   private static readonly LIVE_LOAD_ROOF_KPA = 1.0; 
   private static readonly WIND_PRESSURE_KPA = 0.8; 
   private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; 
 
   /**
-   * Divide un muro en paneles estructurales de 3 a 4 metros según estándar industrial.
+   * Analiza la fusión de una abertura con los montantes de esquina
+   */
+  static analyzeOpeningFusion(op: SteelOpening, wallLen: number): 'none' | 'left' | 'right' {
+    if (op.position < this.CORNER_FUSION_THRESHOLD) return 'left';
+    if ((wallLen - (op.position + op.width)) < this.CORNER_FUSION_THRESHOLD) return 'right';
+    return 'none';
+  }
+
+  /**
+   * Divide un muro en paneles estructurales industriales (3m a 4m)
    */
   static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): WallPanelData[] {
     const panels: WallPanelData[] = [];
-    const minPanelWidth = 3000;
     const maxPanelWidth = 4000; 
     
-    // Determinamos número de paneles para que caigan en el rango 3-4m
     let numPanels = Math.ceil(wall.length / maxPanelWidth);
-    if (wall.length > maxPanelWidth && (wall.length / numPanels) < minPanelWidth) {
-      // Ajuste para no tener paneles mini
-      numPanels = Math.max(1, Math.floor(wall.length / minPanelWidth));
-    }
-    
     const panelWidth = wall.length / numPanels;
 
     for (let i = 0; i < numPanels; i++) {
       const xStart = i * panelWidth;
       const xEnd = (i + 1) * panelWidth;
-      
       const loads = this.calculatePanelLoads(panelWidth, wall.height, config);
-      // Rigidización necesaria si supera capacidad o es extremo de muro
       const needsBracing = (loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * panelWidth / 1000) || (i === 0 || i === numPanels - 1);
 
       panels.push({
@@ -80,7 +82,7 @@ export class StructuralEngine {
     };
   }
 
-  static calculateHeader(opening: SteelOpening, config: SteelHouseConfig): HeaderAnalysis {
+  static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig): HeaderAnalysis {
     const L = opening.width;
     const tributaryWidth = config.length / 2; 
     const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; 
@@ -89,6 +91,7 @@ export class StructuralEngine {
     const maxAllowableDeflection = L / 360;
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
 
+    const fusion = this.analyzeOpeningFusion(opening, wallLen);
     let type: HeaderAnalysis['type'] = 'single';
     let status: HeaderAnalysis['status'] = 'ok';
 
@@ -105,7 +108,15 @@ export class StructuralEngine {
 
     if (L > 3500) status = 'error'; 
 
-    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status };
+    return { 
+      type, 
+      loadNmm, 
+      deflectionMm: 0, 
+      maxAllowableDeflection, 
+      requiredIx, 
+      status,
+      isFusedWithCorner: fusion
+    };
   }
 
   static calculateBlocking(wall: SteelWall | InternalWall): BlockingData[] {
@@ -122,7 +133,7 @@ export class StructuralEngine {
         const xStart = x;
         const xEnd = x + studSpacing;
 
-        const intersects = wall.openings.some(op => {
+        const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
           const top = sill + op.height;
           return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
@@ -141,12 +152,19 @@ export class StructuralEngine {
 
     config.walls.forEach(wall => {
       wall.openings.forEach(op => {
-        const analysis = this.calculateHeader(op, config);
+        const analysis = this.calculateHeader(op, wall.length, config);
         if (analysis.status !== 'ok') {
           alerts.push({ 
             wallId: wall.id, 
             status: analysis.status, 
             message: `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico - Viga Laminada' : 'Refuerzo Especial'}` 
+          });
+        }
+        if (analysis.isFusedWithCorner !== 'none') {
+          alerts.push({
+            wallId: wall.id,
+            status: 'ok',
+            message: `Vano fusionado con esquina ${analysis.isFusedWithCorner === 'left' ? 'izquierda' : 'derecha'}.`
           });
         }
       });

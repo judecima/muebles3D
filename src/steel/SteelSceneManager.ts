@@ -53,7 +53,8 @@ export class SteelSceneManager {
     highlight: 0xae1ae2,
     status_ok: 0x22c55e,
     status_warning: 0xf59e0b,
-    status_error: 0xef4444
+    status_error: 0xef4444,
+    node: 0xae1ae2
   };
 
   private profileWidth = 100; 
@@ -261,8 +262,7 @@ export class SteelSceneManager {
         group.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
         group.add(this.createProfile(panel.width, panel.xStart, height - this.profileFlange, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
 
-        // Refuerzos de unión entre paneles internos
-        const startStuds = panel.isWallStart ? 2 : 2; 
+        const startStuds = 2; 
         for (let i = 0; i < startStuds; i++) {
           group.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', this.colors.junction, 0, thickness));
         }
@@ -274,11 +274,6 @@ export class SteelSceneManager {
 
         if (panel.isWallEnd) {
           group.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.junction, 0, thickness));
-        }
-
-        // Cruces de San Andrés en tabiques largos (>3m)
-        if (config.layers.bracing && panel.width > 2500 && openings.length === 0) {
-          this.addBracing(group, panel.xStart, panel.xEnd, height, thickness);
         }
       });
 
@@ -329,7 +324,6 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
 
-      // ESQUINAS L Y UNIONES DE PANEL
       const startStudsCount = panel.isWallStart ? 3 : 2; 
       const junctionColor = panel.isWallStart ? this.colors.corner : this.colors.junction;
       
@@ -348,13 +342,11 @@ export class SteelSceneManager {
         }
       }
 
-      // Cruces de San Andrés en muros exteriores
       if (layers.bracing && panel.needsBracing && wall.openings.length === 0) {
         this.addBracing(structuralGroup, panel.xStart, panel.xEnd, wall.height, this.profileWidth);
       }
     });
 
-    // UNIONES T (Backing Studs para Tabiques Internos)
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wall.id) {
         structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange / 2, this.profileFlange, 90, 'PGC', this.colors.junction));
@@ -370,17 +362,33 @@ export class SteelSceneManager {
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
-      const analysis = StructuralEngine.calculateHeader(op, config);
+      const analysis = StructuralEngine.calculateHeader(op, wall.length, config);
       const opColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
 
-      structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
-      structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king));
-      
-      const jackH = headerH - this.profileFlange;
-      structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
-      structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
+      // Fusión con esquina
+      const fusedL = analysis.isFusedWithCorner === 'left';
+      const fusedR = analysis.isFusedWithCorner === 'right';
 
-      structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', opColor));
+      if (!fusedL) {
+        structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
+        structuralGroup.add(this.createProfile(headerH - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
+      } else {
+        // En fusión, el jack stud se apoya directamente en la solera de esquina
+        structuralGroup.add(this.createProfile(headerH - this.profileFlange, op.position, this.profileFlange, 90, 'PGC', this.colors.jack));
+      }
+
+      if (!fusedR) {
+        structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king));
+        structuralGroup.add(this.createProfile(headerH - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
+      } else {
+        structuralGroup.add(this.createProfile(headerH - this.profileFlange, op.position + op.width - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
+      }
+
+      // Dintel extendido si hay fusión
+      const finalHeaderW = fusedL || fusedR ? op.width + 50 : op.width;
+      const finalHeaderX = fusedL ? op.position - 50 : op.position;
+      structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerH, 0, 'PGC', opColor));
+      
       if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
     });
   }
@@ -439,7 +447,7 @@ export class SteelSceneManager {
   private createOpeningTriggers(wallId: string, length: number, height: number, rotation: number, x: number, z: number, openings: SteelOpening[], isInternal: boolean, config: SteelHouseConfig) {
     openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      const analysis = StructuralEngine.calculateHeader(op, config);
+      const analysis = StructuralEngine.calculateHeader(op, length, config);
       const opColor = analysis.status === 'error' ? 0xff0000 : (analysis.status === 'warning' ? 0xffff00 : 0x00ff00);
 
       const mesh = new THREE.Mesh(
