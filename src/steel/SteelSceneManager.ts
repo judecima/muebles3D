@@ -54,8 +54,8 @@ export class SteelSceneManager {
     bracing: 0xef4444, 
     blocking: 0xd97706, // Rigidizadores
     lintel: 0x2563eb,  
-    panel_ext: 0x94a3b8,
-    panel_int: 0xe2e8f0
+    panel_ext: 0x94a3b8, // Slate 400
+    panel_int: 0xe2e8f0  // Slate 200
   };
 
   private profileWidth = 100; 
@@ -365,6 +365,7 @@ export class SteelSceneManager {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
+    // Soleras PGU
     structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
     structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
 
@@ -530,7 +531,9 @@ export class SteelSceneManager {
     const material = new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geometry, material);
     
-    const zPos = side === 'exterior' ? (this.profileWidth / 2) : (-this.profileWidth / 2 - 15);
+    // Invertido: En la arquitectura actual, +Z local es el interior de la casa.
+    // Exterior debe estar en -Z relativo al centro del perfil.
+    const zPos = side === 'exterior' ? (-this.profileWidth / 2 - 15) : (this.profileWidth / 2);
     mesh.position.set(0, 0, zPos);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
