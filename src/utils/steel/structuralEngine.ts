@@ -16,30 +16,30 @@ export interface BlockingData {
   y: number;
 }
 
+export interface CrippleData {
+  x: number;
+  yStart: number;
+  yEnd: number;
+  type: 'upper' | 'lower';
+}
+
 export class StructuralEngine {
   private static readonly STEEL_MODULUS = 203000; 
   private static readonly PGC_IX_SINGLE = 185000; 
   private static readonly TUBE_IX = 1200000; 
   
-  // Umbrales de seguridad y normativa
-  public static readonly CORNER_FUSION_THRESHOLD = 200; // mm
+  public static readonly CORNER_FUSION_THRESHOLD = 200; 
   private static readonly DEAD_LOAD_KPA = 0.5; 
   private static readonly LIVE_LOAD_ROOF_KPA = 1.0; 
   private static readonly WIND_PRESSURE_KPA = 0.8; 
   private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; 
 
-  /**
-   * Analiza la fusión de una abertura con los montantes de esquina
-   */
   static analyzeOpeningFusion(op: SteelOpening, wallLen: number): 'none' | 'left' | 'right' {
     if (op.position < this.CORNER_FUSION_THRESHOLD) return 'left';
     if ((wallLen - (op.position + op.width)) < this.CORNER_FUSION_THRESHOLD) return 'right';
     return 'none';
   }
 
-  /**
-   * Divide un muro en paneles estructurales industriales (3m a 4m)
-   */
   static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): WallPanelData[] {
     const panels: WallPanelData[] = [];
     const maxPanelWidth = 4000; 
@@ -119,6 +119,48 @@ export class StructuralEngine {
     };
   }
 
+  /**
+   * Calcula Cripple Studs para aberturas (continuidad de carga vertical)
+   */
+  static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening): CrippleData[] {
+    const cripples: CrippleData[] = [];
+    const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
+    const wallH = wall.height;
+    const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
+    const headerTop = sill + opening.height;
+
+    // Cripples Superiores (entre dintel y solera superior)
+    for (let x = spacing; x < wall.length; x += spacing) {
+      if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
+        cripples.push({
+          x,
+          yStart: headerTop,
+          yEnd: wallH - 40, // 40mm es el ala de la solera PGU
+          type: 'upper'
+        });
+      }
+    }
+
+    // Cripples Inferiores (entre solera inferior y antepecho - solo ventanas)
+    if (opening.type === 'window') {
+      for (let x = spacing; x < wall.length; x += spacing) {
+        if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
+          cripples.push({
+            x,
+            yStart: 40,
+            yEnd: sill - 40,
+            type: 'lower'
+          });
+        }
+      }
+    }
+
+    return cripples;
+  }
+
+  /**
+   * Calcula Blocking horizontal alineado exactamente entre montantes
+   */
   static calculateBlocking(wall: SteelWall | InternalWall): BlockingData[] {
     const blockings: BlockingData[] = [];
     const numRows = wall.height > 2400 ? (wall.height > 3000 ? 2 : 1) : 0;
@@ -129,13 +171,16 @@ export class StructuralEngine {
 
     for (let row = 1; row <= numRows; row++) {
       const y = row * rowSpacing;
-      for (let x = 0; x < wall.length - studSpacing; x += studSpacing) {
-        const xStart = x;
-        const xEnd = x + studSpacing;
+      // Recorremos la modulación del muro
+      for (let x = 0; x <= wall.length - studSpacing; x += studSpacing) {
+        const xStart = x + 40; // Empieza después del ala del montante anterior
+        const xEnd = x + studSpacing; 
 
+        // Verificar si este segmento de blocking choca con alguna abertura
         const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
           const top = sill + op.height;
+          // Si el punto central del blocking está dentro del área del vano
           return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
         });
 
@@ -158,13 +203,6 @@ export class StructuralEngine {
             wallId: wall.id, 
             status: analysis.status, 
             message: `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico - Viga Laminada' : 'Refuerzo Especial'}` 
-          });
-        }
-        if (analysis.isFusedWithCorner !== 'none') {
-          alerts.push({
-            wallId: wall.id,
-            status: 'ok',
-            message: `Vano fusionado con esquina ${analysis.isFusedWithCorner === 'left' ? 'izquierda' : 'derecha'}.`
           });
         }
       });

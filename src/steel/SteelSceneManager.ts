@@ -43,6 +43,7 @@ export class SteelSceneManager {
     header: 0x2563eb,
     king: 0xef4444,
     jack: 0xf59e0b,
+    cripple: 0x8b5cf6, // Color distintivo para cripples
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
     panel_int: 0xd1d5db,
@@ -50,11 +51,9 @@ export class SteelSceneManager {
     junction: 0x3b82f6,   
     corner: 0xef4444,     
     bracing: 0xf59e0b,
-    highlight: 0xae1ae2,
     status_ok: 0x22c55e,
     status_warning: 0xf59e0b,
-    status_error: 0xef4444,
-    node: 0xae1ae2
+    status_error: 0xef4444
   };
 
   private profileWidth = 100; 
@@ -117,7 +116,6 @@ export class SteelSceneManager {
     this.isWalkModeActive = true;
     this.controls.enabled = false;
     this.player.mesh.visible = true;
-    this.player.mesh.position.set(0, 0, 0);
     if (this.onWalkModeLock) this.onWalkModeLock(true);
   }
 
@@ -262,19 +260,11 @@ export class SteelSceneManager {
         group.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
         group.add(this.createProfile(panel.width, panel.xStart, height - this.profileFlange, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
 
-        const startStuds = 2; 
-        for (let i = 0; i < startStuds; i++) {
-          group.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', this.colors.junction, 0, thickness));
-        }
-
-        for (let x = panel.xStart + 400; x < panel.xEnd - 50; x += 400) {
+        for (let x = panel.xStart; x < panel.xEnd - 10; x += 400) {
           const inOpening = openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
           if (!inOpening) group.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
         }
-
-        if (panel.isWallEnd) {
-          group.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.junction, 0, thickness));
-        }
+        if (panel.isWallEnd) group.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
       });
 
       openings.forEach(op => {
@@ -283,6 +273,11 @@ export class SteelSceneManager {
         group.add(this.createProfile(studHeight, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.header, 0, thickness));
+        
+        // Cripples para tabiques internos
+        StructuralEngine.calculateCrippleStuds(iw, op).forEach(c => {
+          group.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness));
+        });
       });
 
       if (config.layers.horizontalBlocking) {
@@ -325,13 +320,11 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
 
       const startStudsCount = panel.isWallStart ? 3 : 2; 
-      const junctionColor = panel.isWallStart ? this.colors.corner : this.colors.junction;
-      
       for (let i = 0; i < startStudsCount; i++) {
-        structuralGroup.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', junctionColor));
+        structuralGroup.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', panel.isWallStart ? this.colors.corner : this.colors.junction));
       }
 
-      for (let x = panel.xStart + wall.studSpacing; x < panel.xEnd - 50; x += wall.studSpacing) {
+      for (let x = panel.xStart + wall.studSpacing; x < panel.xEnd - 10; x += wall.studSpacing) {
         const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
         if (!inOpening) structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
       }
@@ -340,16 +333,6 @@ export class SteelSceneManager {
         for (let i = 0; i < 3; i++) {
           structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner));
         }
-      }
-
-      if (layers.bracing && panel.needsBracing && wall.openings.length === 0) {
-        this.addBracing(structuralGroup, panel.xStart, panel.xEnd, wall.height, this.profileWidth);
-      }
-    });
-
-    config.internalWalls.forEach(iw => {
-      if (iw.parentWallId === wall.id) {
-        structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange / 2, this.profileFlange, 90, 'PGC', this.colors.junction));
       }
     });
 
@@ -365,7 +348,6 @@ export class SteelSceneManager {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config);
       const opColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
 
-      // Fusión con esquina
       const fusedL = analysis.isFusedWithCorner === 'left';
       const fusedR = analysis.isFusedWithCorner === 'right';
 
@@ -373,7 +355,6 @@ export class SteelSceneManager {
         structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
         structuralGroup.add(this.createProfile(headerH - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       } else {
-        // En fusión, el jack stud se apoya directamente en la solera de esquina
         structuralGroup.add(this.createProfile(headerH - this.profileFlange, op.position, this.profileFlange, 90, 'PGC', this.colors.jack));
       }
 
@@ -384,34 +365,19 @@ export class SteelSceneManager {
         structuralGroup.add(this.createProfile(headerH - this.profileFlange, op.position + op.width - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       }
 
-      // Dintel extendido si hay fusión
       const finalHeaderW = fusedL || fusedR ? op.width + 50 : op.width;
       const finalHeaderX = fusedL ? op.position - 50 : op.position;
       structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerH, 0, 'PGC', opColor));
       
-      if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
+      if (op.type === 'window') {
+        structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
+      }
+
+      // CRIpple Studs (Modulación continua sobre y bajo el vano)
+      StructuralEngine.calculateCrippleStuds(wall, op).forEach(c => {
+        structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple));
+      });
     });
-  }
-
-  private addBracing(group: THREE.Group, x1: number, x2: number, h: number, width: number) {
-    const angle = Math.atan2(h, x2 - x1);
-    const len = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(h, 2));
-    
-    const strap1 = new THREE.Mesh(
-      new THREE.BoxGeometry(len, 2, 35),
-      new THREE.MeshStandardMaterial({ color: this.colors.bracing })
-    );
-    strap1.position.set((x1 + x2) / 2, h / 2, 0);
-    strap1.rotation.z = angle;
-    group.add(strap1);
-
-    const strap2 = new THREE.Mesh(
-      new THREE.BoxGeometry(len, 2, 35),
-      new THREE.MeshStandardMaterial({ color: this.colors.bracing })
-    );
-    strap2.position.set((x1 + x2) / 2, h / 2, 0);
-    strap2.rotation.z = -angle;
-    group.add(strap2);
   }
 
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number): THREE.Mesh {

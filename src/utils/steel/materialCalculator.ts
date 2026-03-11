@@ -2,8 +2,9 @@ import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall, InternalWa
 import { StructuralEngine } from './structuralEngine';
 
 /**
- * Motor de Cómputo Métrico Industrial ArquiMax v12.0
+ * Motor de Cómputo Métrico Industrial ArquiMax v13.0
  * Basado en normas AISI S240 y estándares de obra reales.
+ * Incluye Cripple Studs, Sill Plates y Blocking optimizado.
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -30,7 +31,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - 80; 
     
-    pgu100Len += wall.length * 2;
+    pgu100Len += wall.length * 2; // Soleras superior e inferior
     totalConnections += (wall.length / wall.studSpacing) * 4;
 
     panels.forEach(p => {
@@ -41,30 +42,34 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     });
 
     const blockings = StructuralEngine.calculateBlocking(wall);
-    pgu100Len += blockings.length * wall.studSpacing;
-    totalConnections += blockings.length * 2;
+    blockings.forEach(b => {
+      pgu100Len += (b.xEnd - b.xStart);
+      totalConnections += 2;
+    });
 
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
       
-      // King studs (Solo si no hay fusión)
       if (fusion === 'none') {
-        pgc100Len += 2 * studHeight;
+        pgc100Len += 2 * studHeight; // Kings
       } else {
         pgc100Len += 1 * studHeight; // Comparte uno con la esquina
       }
 
-      // Jack studs siempre existen
-      pgc100Len += 2 * (sill + op.height - 40); 
+      pgc100Len += 2 * (sill + op.height - 40); // Jacks
+      pgc100Len += op.width; // Header (PGC)
+      if (op.type === 'window') pgu100Len += op.width; // Sill Plate (PGU)
       
-      pgc100Len += op.width;       
-      if (op.type === 'window') pgu100Len += op.width; 
-      
-      totalConnections += 16;
-      
-      const opArea = (op.width * op.height) / 1000000;
-      areaExteriorNet -= opArea;
+      // Cripples (Montantes de reparto)
+      const cripples = StructuralEngine.calculateCrippleStuds(wall, op);
+      cripples.forEach(c => {
+        pgc100Len += (c.yEnd - c.yStart);
+        totalConnections += 4;
+      });
+
+      totalConnections += 20;
+      areaExteriorNet -= (op.width * op.height) / 1000000;
     });
 
     config.internalWalls.forEach(iw => {
@@ -75,7 +80,6 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     });
 
     totalAnchors += Math.ceil(wall.length / 600) + (panels.length * 2);
-
     const wallArea = (wall.length * wall.height) / 1000000;
     areaExteriorGross += wallArea;
     areaExteriorNet += wallArea;
@@ -94,7 +98,14 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     (iw.openings || []).forEach(op => {
       pgc70Len += 2 * studHeight; // Kings
       pgc70Len += op.width; // Header
-      totalConnections += 12;
+      
+      const cripples = StructuralEngine.calculateCrippleStuds(iw, op);
+      cripples.forEach(c => {
+        pgc70Len += (c.yEnd - c.yStart);
+        totalConnections += 4;
+      });
+      
+      totalConnections += 16;
     });
 
     const wallArea = (iw.length * iw.height) / 1000000;
@@ -107,14 +118,14 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((pgc100Len / BAR_LEN) * WASTE_STEEL),
-    description: 'Montantes estructurales, King studs y dinteles.'
+    description: 'Montantes estructurales, Kings, Jacks y Cripples.'
   });
   items.push({
     name: 'Perfiles PGU 100x0.90mm (6m)',
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((pgu100Len / BAR_LEN) * WASTE_STEEL),
-    description: 'Soleras superior/inferior y bloqueos.'
+    description: 'Soleras superior/inferior, Sills y Bloqueos.'
   });
   if (pgc70Len > 0) {
     items.push({
