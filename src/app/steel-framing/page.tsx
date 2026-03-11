@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
 import { SteelMaterialsTable } from '@/components/steel/SteelMaterialsTable';
-import { SteelHouseConfig, SteelWall, SteelOpening } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelWall, SteelOpening, OpeningType } from '@/lib/steel/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -18,12 +18,14 @@ import {
   ClipboardList,
   ChevronRight,
   MousePointer,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const EDGE_MARGIN = 400; 
 const HEADER_SPACE = 300; 
@@ -58,6 +60,10 @@ export default function SteelFramingPage() {
   const [config, setConfig] = useState<SteelHouseConfig>(INITIAL_CONFIG);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
+  const [addingOpening, setAddingOpening] = useState<{ wallId: string, x: number } | null>(null);
+  const [newOpData, setNewOpeningData] = useState<{ type: OpeningType, width: number, height: number, sill: number }>({
+    type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL
+  });
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
   
@@ -90,6 +96,10 @@ export default function SteelFramingPage() {
     setSelectedOpening({ wallId, opening });
   }, []);
 
+  const handleWallDoubleClick = useCallback((wallId: string, x: number) => {
+    setAddingOpening({ wallId, x });
+  }, []);
+
   const handleWalkModeLock = useCallback((locked: boolean) => {
     setIsWalkModeActive(locked);
   }, []);
@@ -103,32 +113,6 @@ export default function SteelFramingPage() {
       const endB = o.position + o.width;
       return (startA < endB && endA > startB);
     });
-  };
-
-  const updateOpeningPosition = (val: number) => {
-    if (!selectedOpening) return;
-    const safeVal = isNaN(val) ? 0 : val;
-    const wall = config.walls.find(w => w.id === selectedOpening.wallId);
-    if (!wall) return;
-
-    const maxPos = wall.length - selectedOpening.opening.width - EDGE_MARGIN;
-    let newPos = Math.max(EDGE_MARGIN, Math.min(safeVal, maxPos));
-
-    if (checkOverlap(wall, selectedOpening.opening.id, newPos, selectedOpening.opening.width)) {
-      return;
-    }
-
-    const newWalls = config.walls.map(w => {
-      if (w.id === selectedOpening.wallId) {
-        return {
-          ...w,
-          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, position: newPos } : o)
-        };
-      }
-      return w;
-    });
-    setConfig({ ...config, walls: newWalls });
-    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, position: newPos } });
   };
 
   const updateOpeningDim = (field: keyof SteelOpening, val: number) => {
@@ -167,6 +151,44 @@ export default function SteelFramingPage() {
     });
     setConfig({ ...config, walls: newWalls });
     setSelectedOpening({ ...selectedOpening, opening: newOpening });
+  };
+
+  const createOpening = () => {
+    if (!addingOpening) return;
+    const wall = config.walls.find(w => w.id === addingOpening.wallId);
+    if (!wall) return;
+
+    const width = newOpData.width;
+    const height = newOpData.height;
+    const sill = newOpData.type === 'door' ? 0 : newOpData.sill;
+
+    // Calcular posición centrada en el clic
+    let pos = addingOpening.x - width / 2;
+    
+    // Validar bordes
+    pos = Math.max(EDGE_MARGIN, Math.min(pos, wall.length - width - EDGE_MARGIN));
+
+    // Validar superposición
+    if (checkOverlap(wall, 'new', pos, width)) {
+      alert("No hay espacio suficiente en esta zona. Respete la separación de 600mm entre aberturas.");
+      return;
+    }
+
+    const newOp: SteelOpening = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: newOpData.type,
+      width,
+      height,
+      position: pos,
+      sillHeight: sill
+    };
+
+    const newWalls = config.walls.map(w => 
+      w.id === wall.id ? { ...w, openings: [...w.openings, newOp] } : w
+    );
+
+    setConfig({ ...config, walls: newWalls });
+    setAddingOpening(null);
   };
 
   return (
@@ -242,6 +264,7 @@ export default function SteelFramingPage() {
                 ref={viewerRef}
                 config={config} 
                 onOpeningDoubleClick={handleOpeningDoubleClick}
+                onWallDoubleClick={handleWallDoubleClick}
                 onWalkModeLock={handleWalkModeLock}
               />
               
@@ -278,8 +301,9 @@ export default function SteelFramingPage() {
 
               {!isWalkModeActive && (
                 <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-200 shadow-sm pointer-events-none">
-                  <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                    <MousePointer className="w-3 h-3 text-blue-500" /> DOBLE CLICK EN VANOS PARA EDITAR
+                  <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex flex-col gap-1 items-end">
+                    <span className="flex items-center gap-2"><MousePointer className="w-3 h-3 text-blue-500" /> DOBLE CLICK EN VANOS PARA EDITAR</span>
+                    <span className="flex items-center gap-2"><Plus className="w-3 h-3 text-green-500" /> DOBLE CLICK EN MURO PARA AÑADIR</span>
                   </p>
                 </div>
               )}
@@ -306,6 +330,7 @@ export default function SteelFramingPage() {
           </Tabs>
         </div>
 
+        {/* Modal para EDITAR abertura */}
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -315,16 +340,6 @@ export default function SteelFramingPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="position" className="text-right text-[10px] font-black uppercase text-slate-500">Posición</Label>
-                <Input
-                  id="position"
-                  type="number"
-                  value={selectedOpening?.opening.position ?? 0}
-                  onChange={(e) => updateOpeningPosition(parseInt(e.target.value) || 0)}
-                  className="col-span-3 h-9 font-bold"
-                />
-              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="width" className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
                 <Input
@@ -362,6 +377,69 @@ export default function SteelFramingPage() {
               <Button onClick={() => setSelectedOpening(null)} className="w-full bg-blue-600 hover:bg-blue-700 font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-200 h-11">
                 Confirmar Cambios
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal para CREAR abertura */}
+        <Dialog open={!!addingOpening} onOpenChange={(open) => !open && setAddingOpening(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-green-600">
+                <Plus className="w-5 h-5" />
+                Nueva Abertura
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black uppercase text-slate-500">Tipo</Label>
+                <Select value={newOpData.type} onValueChange={(v: OpeningType) => setNewOpeningData({ ...newOpData, type: v })}>
+                  <SelectTrigger className="col-span-3 h-9 font-bold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="window">Ventana</SelectItem>
+                    <SelectItem value="door">Puerta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
+                <Input
+                  type="number"
+                  value={newOpData.width}
+                  onChange={(e) => setNewOpeningData({ ...newOpData, width: parseInt(e.target.value) || 0 })}
+                  className="col-span-3 h-9 font-bold"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black uppercase text-slate-500">Alto</Label>
+                <Input
+                  type="number"
+                  value={newOpData.height}
+                  onChange={(e) => setNewOpeningData({ ...newOpData, height: parseInt(e.target.value) || 0 })}
+                  className="col-span-3 h-9 font-bold"
+                />
+              </div>
+              {newOpData.type === 'window' && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right text-[10px] font-black uppercase text-slate-500">Antepecho</Label>
+                  <Input
+                    type="number"
+                    value={newOpData.sill}
+                    onChange={(e) => setNewOpeningData({ ...newOpData, sill: parseInt(e.target.value) || 0 })}
+                    className="col-span-3 h-9 font-bold"
+                  />
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex flex-col gap-2">
+              <Button onClick={createOpening} className="w-full bg-green-600 hover:bg-green-700 font-black uppercase text-xs tracking-widest shadow-lg shadow-green-200 h-11">
+                Insertar Vano
+              </Button>
+              <p className="text-[9px] text-slate-400 italic text-center">
+                Se aplicarán márgenes normativos de 400mm y 600mm.
+              </p>
             </DialogFooter>
           </DialogContent>
         </Dialog>

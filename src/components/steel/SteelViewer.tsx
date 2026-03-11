@@ -9,10 +9,11 @@ import { SteelJoystick } from './SteelJoystick';
 interface SteelViewerProps {
   config: SteelHouseConfig;
   onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void;
+  onWallDoubleClick?: (wallId: string, x: number) => void;
   onWalkModeLock?: (locked: boolean) => void;
 }
 
-export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkModeLock }: SteelViewerProps, ref) => {
+export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWallDoubleClick, onWalkModeLock }: SteelViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SteelSceneManager | null>(null);
   const [isWalkMode, setIsWalkMode] = React.useState(false);
@@ -37,6 +38,7 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
       managerRef.current = new SteelSceneManager(
         containerRef.current, 
         onOpeningDoubleClick,
+        onWallDoubleClick,
         (locked) => {
           setIsWalkMode(locked);
           if (onWalkModeLock) onWalkModeLock(locked);
@@ -50,7 +52,7 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
         managerRef.current = null;
       }
     };
-  }, [onOpeningDoubleClick, onWalkModeLock]);
+  }, [onOpeningDoubleClick, onWallDoubleClick, onWalkModeLock]);
 
   useEffect(() => {
     if (managerRef.current) {

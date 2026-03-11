@@ -30,6 +30,7 @@ export class SteelSceneManager {
   private prevTime = performance.now();
 
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
+  private onWallDoubleClickCallback?: (wallId: string, x: number) => void;
   private onWalkModeLock?: (locked: boolean) => void;
 
   private colors = {
@@ -52,10 +53,12 @@ export class SteelSceneManager {
   constructor(
     container: HTMLElement, 
     onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void,
+    onWallDoubleClick?: (wallId: string, x: number) => void,
     onWalkModeLock?: (locked: boolean) => void
   ) {
     this.container = container;
     this.onOpeningDoubleClickCallback = onOpeningDoubleClick;
+    this.onWallDoubleClickCallback = onWallDoubleClick;
     this.onWalkModeLock = onWalkModeLock;
     
     this.scene = new THREE.Scene();
@@ -140,10 +143,32 @@ export class SteelSceneManager {
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.openingsGroup.children);
-    if (intersects.length > 0) {
-      const { wallId, opening } = intersects[0].object.userData;
+
+    // 1. Priorizar aberturas existentes
+    const openingIntersects = this.raycaster.intersectObjects(this.openingsGroup.children);
+    if (openingIntersects.length > 0) {
+      const { wallId, opening } = openingIntersects[0].object.userData;
       if (this.onOpeningDoubleClickCallback) this.onOpeningDoubleClickCallback(wallId, opening);
+      return;
+    }
+
+    // 2. Si no es abertura, buscar muros para agregar
+    const wallMeshes: THREE.Object3D[] = [];
+    this.houseGroup.traverse(child => {
+      if (child.userData && child.userData.isWall) {
+        wallMeshes.push(child);
+      }
+    });
+
+    const wallIntersects = this.raycaster.intersectObjects(wallMeshes);
+    if (wallIntersects.length > 0) {
+      const intersect = wallIntersects[0];
+      const { wallId } = intersect.object.userData;
+      const localPoint = intersect.object.worldToLocal(intersect.point.clone());
+      // En ExtrudeGeometry el eje X local es el largo del muro
+      if (this.onWallDoubleClickCallback) {
+        this.onWallDoubleClickCallback(wallId, localPoint.x);
+      }
     }
   };
 
@@ -312,6 +337,7 @@ export class SteelSceneManager {
       new THREE.MeshStandardMaterial({ color: side === 'exterior' ? this.colors.panel_ext : this.colors.panel_int })
     );
     mesh.position.z = side === 'exterior' ? -65 : 50;
+    mesh.userData = { wallId: wall.id, isWall: true };
     return mesh;
   }
 
