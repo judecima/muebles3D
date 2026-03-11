@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility, InternalWall } from '@/lib/steel/types';
 import { StructuralEngine } from '@/utils/steel/structuralEngine';
 import { InputController } from '@/engine/player/InputController';
 import { CollisionSystem } from '@/engine/player/CollisionSystem';
@@ -29,12 +29,13 @@ export class SteelSceneManager {
   private prevTime = performance.now();
 
   private onOpeningDoubleClickCallback?: (wallId: string, opening: SteelOpening) => void;
-  private onWallDoubleClickCallback?: (wallId: string, x: number) => void;
+  private onWallDoubleClickCallback?: (wallId: string, x: number, side: 'exterior' | 'interior') => void;
   private onWalkModeLock?: (locked: boolean) => void;
 
   private colors = {
     background: 0xf1f5f9,
     steel: 0x9ca3af,      
+    steelDrywall: 0x64748b, 
     header: 0x2563eb,
     headerTriple: 0x1e40af,
     headerTube: 0x0f172a,
@@ -51,12 +52,13 @@ export class SteelSceneManager {
   };
 
   private profileWidth = 100; 
+  private drywallProfileWidth = 70;
   private profileFlange = 40;  
 
   constructor(
     container: HTMLElement, 
     onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void,
-    onWallDoubleClick?: (wallId: string, x: number) => void,
+    onWallDoubleClick?: (wallId: string, x: number, side: 'exterior' | 'interior') => void,
     onWalkModeLock?: (locked: boolean) => void
   ) {
     this.container = container;
@@ -75,9 +77,6 @@ export class SteelSceneManager {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.shadowMap.enabled = true;
 
-    while (this.container.firstChild) {
-      this.container.removeChild(this.container.firstChild);
-    }
     this.container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -97,10 +96,6 @@ export class SteelSceneManager {
     dirLight.position.set(5000, 10000, 7500);
     dirLight.castShadow = true;
     this.scene.add(dirLight);
-
-    const grid = new THREE.GridHelper(40000, 80, this.colors.grid, this.colors.grid);
-    grid.position.y = -0.5;
-    this.scene.add(grid);
 
     this.houseGroup = new THREE.Group();
     this.scene.add(this.houseGroup);
@@ -161,9 +156,9 @@ export class SteelSceneManager {
     const wallIntersects = this.raycaster.intersectObjects(wallMeshes);
     if (wallIntersects.length > 0) {
       const intersect = wallIntersects[0];
-      const { wallId } = intersect.object.userData;
+      const { wallId, side } = intersect.object.userData;
       const localPoint = intersect.object.worldToLocal(intersect.point.clone());
-      if (this.onWallDoubleClickCallback) this.onWallDoubleClickCallback(wallId, localPoint.x);
+      if (this.onWallDoubleClickCallback) this.onWallDoubleClickCallback(wallId, localPoint.x, side);
     }
   };
 
@@ -195,6 +190,7 @@ export class SteelSceneManager {
 
     this.collisions.clear();
 
+    // Muros Perimetrales
     config.walls.forEach(wall => {
       const wallGroup = new THREE.Group();
       wallGroup.position.set(wall.x, 0, wall.z);
@@ -210,7 +206,6 @@ export class SteelSceneManager {
         if (config.layers.interiorPanels) {
           const mesh = this.createPanelMesh(wall, 'interior');
           wallGroup.add(mesh);
-          // Los paneles internos no necesitan colisiones para el jugador normalmente
         }
       }
 
@@ -218,6 +213,22 @@ export class SteelSceneManager {
         this.generateWallStructure(wall, wallGroup, config.layers, config);
       }
       this.createOpeningTriggers(wall);
+    });
+
+    // Muros Internos (Drywall)
+    config.internalWalls.forEach(iw => {
+      const parent = config.walls.find(w => w.id === iw.parentWallId);
+      if (!parent) return;
+
+      const iwGroup = new THREE.Group();
+      const parentMatrix = new THREE.Matrix4().makeRotationY((parent.rotation * Math.PI) / 180).setPosition(parent.x, 0, parent.z);
+      const pos = new THREE.Vector3(iw.xPosition, 0, 50).applyMatrix4(parentMatrix);
+      
+      iwGroup.position.copy(pos);
+      iwGroup.rotation.y = (iw.rotation * Math.PI) / 180;
+      this.houseGroup.add(iwGroup);
+
+      this.generateInternalWall(iw, iwGroup, config);
     });
 
     const floor = new THREE.Mesh(
@@ -230,6 +241,42 @@ export class SteelSceneManager {
     this.houseGroup.add(floor);
   }
 
+  private generateInternalWall(iw: InternalWall, group: THREE.Group, config: SteelHouseConfig) {
+    const thickness = this.drywallProfileWidth;
+    const height = iw.height;
+    const len = iw.length;
+
+    // Estructura Drywall
+    if (config.layers.steelProfiles) {
+      // Soleras Drywall
+      group.add(this.createProfile(len, 0, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
+      group.add(this.createProfile(len, 0, height - this.profileFlange, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
+
+      // Montantes Drywall (cada 400)
+      for (let x = 0; x <= len; x += 400) {
+        const finalX = Math.min(x, len - this.profileFlange);
+        group.add(this.createProfile(height - this.profileFlange * 2, finalX, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
+      }
+    }
+
+    // Paneles Drywall (Yeso)
+    if (!config.structuralMode && config.layers.interiorPanels) {
+      const panelGeom = new THREE.BoxGeometry(len, height, 12.5);
+      const panelMat = new THREE.MeshStandardMaterial({ color: this.colors.panel_int });
+      
+      const p1 = new THREE.Mesh(panelGeom, panelMat);
+      p1.position.set(len/2, height/2, thickness/2 + 6.25);
+      group.add(p1);
+
+      const p2 = new THREE.Mesh(panelGeom, panelMat);
+      p2.position.set(len/2, height/2, -thickness/2 - 6.25);
+      group.add(p2);
+      
+      this.collisions.registerWall(p1);
+      this.collisions.registerWall(p2);
+    }
+  }
+
   private generateWallStructure(wall: SteelWall, group: THREE.Group, layers: LayerVisibility, config: SteelHouseConfig) {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
@@ -238,11 +285,9 @@ export class SteelSceneManager {
     const studHeight = wall.height - (this.profileFlange * 2);
 
     panels.forEach(panel => {
-      // 1. SOLERAS (PGU)
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
 
-      // 2. MONTANTES (PGC)
       const junctionColor = panel.isWallStart ? this.colors.corner : this.colors.junction;
       const startStudCount = panel.isWallStart ? 3 : 2;
       
@@ -263,7 +308,6 @@ export class SteelSceneManager {
         }
       }
 
-      // 3. RIGIDIZACIÓN (Cruces de San Andrés - Eje Z centrado)
       if (layers.bracing && panel.needsBracing) {
         const opInPanel = wall.openings.some(op => op.position < panel.xEnd && (op.position + op.width) > panel.xStart);
         if (!opInPanel) {
@@ -272,7 +316,6 @@ export class SteelSceneManager {
       }
     });
 
-    // 4. BLOQUEOS HORIZONTALES (Verde)
     if (layers.horizontalBlocking) {
       const blocks = StructuralEngine.calculateBlocking(wall);
       blocks.forEach(b => {
@@ -280,13 +323,11 @@ export class SteelSceneManager {
       });
     }
 
-    // 5. VANOS, DINTELES Y UMBRALES
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
       const headerAnalysis = StructuralEngine.calculateHeader(op, config);
 
-      // King & Jack Studs
       structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
       structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king));
       
@@ -294,7 +335,6 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      // Dintel (Transferencia de carga superior)
       if (headerAnalysis.type === 'truss') {
         this.createTrussHeader(structuralGroup, op.position, headerH, op.width);
       } else if (headerAnalysis.type === 'tube') {
@@ -308,7 +348,6 @@ export class SteelSceneManager {
         }
       }
 
-      // Umbral (Bajo ventana)
       if (op.type === 'window') {
         structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       }
@@ -318,14 +357,10 @@ export class SteelSceneManager {
   private createBracingCross(group: THREE.Group, x: number, y: number, w: number, h: number) {
     const angle = Math.atan2(h, w);
     const length = Math.sqrt(w*w + h*h);
-    
-    // Diagonal 1: / (Z centrado para no chocar con OSB)
     const d1 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, 5);
     d1.rotation.z = angle;
     d1.position.set(x + w/2, y + h/2, 5);
     group.add(d1);
-
-    // Diagonal 2: \
     const d2 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, -5);
     d2.rotation.z = -angle;
     d2.position.set(x + w/2, y + h/2, -5);
@@ -336,7 +371,6 @@ export class SteelSceneManager {
     const trussH = 300;
     group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.headerTriple));
     group.add(this.createProfile(w, x, y + trussH, 0, 'PGC', this.colors.headerTriple));
-    
     const count = Math.max(2, Math.ceil(w / 400));
     const step = w / count;
     for (let i = 0; i < count; i++) {
@@ -349,9 +383,10 @@ export class SteelSceneManager {
     }
   }
 
-  private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0): THREE.Mesh {
+  private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number): THREE.Mesh {
+    const width = customWidth || this.profileWidth;
     const isVertical = rotZ === 90;
-    const geom = new THREE.BoxGeometry(isVertical ? this.profileFlange : len, isVertical ? len : this.profileFlange, this.profileWidth);
+    const geom = new THREE.BoxGeometry(isVertical ? this.profileFlange : len, isVertical ? len : this.profileFlange, width);
     const mat = new THREE.MeshStandardMaterial({ color: color || this.colors.steel, metalness: 0.8, roughness: 0.2 });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(x + (isVertical ? this.profileFlange / 2 : len / 2), y + (isVertical ? len / 2 : this.profileFlange / 2), zOffset);
@@ -374,7 +409,7 @@ export class SteelSceneManager {
       new THREE.MeshStandardMaterial({ color: side === 'exterior' ? this.colors.panel_ext : this.colors.panel_int })
     );
     mesh.position.z = side === 'exterior' ? -65 : 55;
-    mesh.userData = { wallId: wall.id, isWall: true };
+    mesh.userData = { wallId: wall.id, isWall: true, side: side };
     return mesh;
   }
 

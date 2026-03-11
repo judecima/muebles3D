@@ -9,7 +9,7 @@ import { SteelJoystick } from './SteelJoystick';
 interface SteelViewerProps {
   config: SteelHouseConfig;
   onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void;
-  onWallDoubleClick?: (wallId: string, x: number) => void;
+  onWallDoubleClick?: (wallId: string, x: number, side: 'exterior' | 'interior') => void;
   onWalkModeLock?: (locked: boolean) => void;
 }
 
@@ -71,17 +71,6 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWallDou
           </div>
           <div className="absolute bottom-8 right-8 z-50">
             <SteelJoystick label="CÁMARA" onMove={(v) => managerRef.current?.updateJoystickLook(v.x, v.y)} />
-          </div>
-          
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none text-center">
-            <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 shadow-2xl">
-              <p className="text-[10px] font-black text-white/90 uppercase tracking-[0.2em] mb-1">Controles de Inspección</p>
-              <div className="flex gap-4 items-center">
-                <span className="text-[9px] font-bold text-white/60 bg-white/10 px-2 py-0.5 rounded">WASD: MOVER</span>
-                <span className="text-[9px] font-bold text-white/60 bg-white/10 px-2 py-0.5 rounded">MOUSE: GIRAR</span>
-                <span className="text-[9px] font-bold text-white/60 bg-white/10 px-2 py-0.5 rounded">SHIFT: CORRER</span>
-              </div>
-            </div>
           </div>
         </>
       )}

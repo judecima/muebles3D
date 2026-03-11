@@ -9,6 +9,17 @@ export interface SteelOpening {
   sillHeight?: number; 
 }
 
+export interface InternalWall {
+  id: string;
+  parentWallId: string;
+  xPosition: number; // Posición a lo largo del muro padre
+  length: number;
+  height: number;
+  rotation: number;
+  x: number;
+  z: number;
+}
+
 export interface SteelWall {
   id: string;
   length: number;
@@ -28,7 +39,7 @@ export interface LayerVisibility {
   horizontalBlocking: boolean;
   lintels: boolean;
   reinforcements: boolean;
-  bracing: boolean; // Restaurado para control de Cruces de San Andrés
+  bracing: boolean;
 }
 
 export interface SteelHouseConfig {
@@ -36,6 +47,7 @@ export interface SteelHouseConfig {
   length: number;
   globalWallHeight: number;
   walls: SteelWall[];
+  internalWalls: InternalWall[];
   layers: LayerVisibility;
   structuralMode: boolean;
 }
@@ -53,11 +65,10 @@ export interface MaterialEstimate {
   totalSteelWeightKg: number;
 }
 
-// Tipos para el Modelo Estructural Jerárquico
 export interface PanelLoads {
-  verticalLoadN: number;   // Carga vertical total (N)
-  shearForceN: number;     // Fuerza de corte lateral (N)
-  overturningMomentNm: number; // Momento de volcamiento
+  verticalLoadN: number;
+  shearForceN: number;
+  overturningMomentNm: number;
 }
 
 export interface WallPanelData {
