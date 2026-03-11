@@ -23,7 +23,8 @@ import {
   LayoutTemplate,
   UnfoldHorizontal,
   MoveLeft,
-  MoveRight
+  MoveRight,
+  LogOut
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -104,11 +105,8 @@ export default function SteelFramingPage() {
     
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wallId) boundaries.push(iw.xPosition);
-      // Detección de cruce completo (la otra pared pasa a través de esta)
-      const otherWallId = iw.parentWallId;
-      const otherParent = config.walls.find(w => w.id === otherWallId) || config.internalWalls.find(w => w.id === otherWallId);
-      if (otherParent && iw.id === wallId) {
-        // En este caso, la intersección es en iw.xPosition
+      if (iw.id === wallId) {
+        // En caso de intersecciones cruzadas complejas
       }
     });
 
@@ -170,6 +168,8 @@ export default function SteelFramingPage() {
     const parent = config.walls.find(w => w.id === wallId);
     if (!parent) return;
 
+    const bounds = getWallSegments(wallId, x, parent.length, false);
+
     if (side === 'exterior') {
       setAddingOpening({ wallId, x, isInternal: false });
       setNewOpeningData({ type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL });
@@ -181,7 +181,7 @@ export default function SteelFramingPage() {
       setEditingInternalWall(newIW);
       setLocalIWData({ length: newIW.length.toString(), xPosition: Math.round(x).toString() });
     }
-  }, [config.walls, config.globalWallHeight, config.width, config.length]);
+  }, [config.walls, config.globalWallHeight, config.width, config.length, getWallSegments]);
 
   const commitInternalWallChange = () => {
     if (!editingInternalWall || !localIWData) return;
@@ -219,32 +219,33 @@ export default function SteelFramingPage() {
     setRoomGenerator(null);
   };
 
-  const getWallGlobalSegment = (wall: SteelWall | InternalWall) => {
-    if ('rotation' in wall && !('parentWallId' in wall)) {
-      const sw = wall as SteelWall;
-      const angle = (sw.rotation * Math.PI) / 180;
-      return {
-        p1: { x: sw.x, z: sw.z },
-        p2: { x: sw.x + Math.cos(angle) * sw.length, z: sw.z - Math.sin(angle) * sw.length }
-      };
-    }
-    const iw = wall as InternalWall;
-    const parent = config.walls.find(w => w.id === iw.parentWallId) || config.internalWalls.find(w => w.id === iw.parentWallId);
-    if (!parent) return { p1: {x:0, z:0}, p2: {x:0, z:0} };
-    const parentSeg = getWallGlobalSegment(parent);
-    const parentAngle = (parent.rotation * Math.PI) / 180;
-    const startX = parentSeg.p1.x + Math.cos(parentAngle) * iw.xPosition;
-    const startZ = parentSeg.p1.z - Math.sin(parentAngle) * iw.xPosition;
-    const angle = (iw.rotation * Math.PI) / 180;
-    return {
-      p1: { x: startX, z: startZ },
-      p2: { x: startX + Math.cos(angle) * iw.length, z: startZ - Math.sin(angle) * iw.length }
-    };
-  };
-
   const extendToNextWall = () => {
     if (!editingInternalWall || !localIWData) return;
     const currentLength = parseInt(localIWData.length) || editingInternalWall.length;
+    
+    const getWallGlobalSegment = (wall: SteelWall | InternalWall) => {
+      if ('rotation' in wall && !('parentWallId' in wall)) {
+        const sw = wall as SteelWall;
+        const angle = (sw.rotation * Math.PI) / 180;
+        return {
+          p1: { x: sw.x, z: sw.z },
+          p2: { x: sw.x + Math.cos(angle) * sw.length, z: sw.z - Math.sin(angle) * sw.length }
+        };
+      }
+      const iw = wall as InternalWall;
+      const parent = config.walls.find(w => w.id === iw.parentWallId) || config.internalWalls.find(w => w.id === iw.parentWallId);
+      if (!parent) return { p1: {x:0, z:0}, p2: {x:0, z:0} };
+      const parentSeg = getWallGlobalSegment(parent);
+      const parentAngle = (parent.rotation * Math.PI) / 180;
+      const startX = parentSeg.p1.x + Math.cos(parentAngle) * iw.xPosition;
+      const startZ = parentSeg.p1.z - Math.sin(parentAngle) * iw.xPosition;
+      const angle = (iw.rotation * Math.PI) / 180;
+      return {
+        p1: { x: startX, z: startZ },
+        p2: { x: startX + Math.cos(angle) * iw.length, z: startZ - Math.sin(angle) * iw.length }
+      };
+    };
+
     const seg = getWallGlobalSegment(editingInternalWall);
     const dir = { x: Math.cos((editingInternalWall.rotation * Math.PI) / 180), z: -Math.sin((editingInternalWall.rotation * Math.PI) / 180) };
     
@@ -286,12 +287,10 @@ export default function SteelFramingPage() {
     if (side === 'left') target = sorted.reverse().find(iw => iw.xPosition < editingInternalWall.xPosition) || null;
     else target = sorted.find(iw => iw.xPosition > editingInternalWall.xPosition) || null;
 
-    // Si no hay tabique paralelo, buscamos la pared exterior
     let dist = 0;
     if (target) {
       dist = Math.abs(editingInternalWall.xPosition - target.xPosition);
     } else {
-      // Si no hay target interno, tomamos la distancia al extremo del padre
       dist = side === 'left' ? editingInternalWall.xPosition : (parent.length - editingInternalWall.xPosition);
     }
 
@@ -352,6 +351,16 @@ export default function SteelFramingPage() {
           </div>
         </header>
 
+        {isWalkModeActive && (
+          <Button 
+            variant="destructive" 
+            className="absolute top-4 right-4 z-[60] font-black uppercase text-[10px] shadow-2xl h-10 px-6 rounded-full border-4 border-white"
+            onClick={() => viewerRef.current?.exitWalkMode()}
+          >
+            <LogOut className="w-4 h-4 mr-2" /> Salir de Inspección
+          </Button>
+        )}
+
         <div className="flex-1 relative overflow-hidden">
           <Tabs value={activeTab} className="w-full h-full">
             <TabsContent value="3d" className="w-full h-full m-0 p-0 relative">
@@ -369,7 +378,6 @@ export default function SteelFramingPage() {
           </Tabs>
         </div>
 
-        {/* Diálogo Generar Ambiente */}
         <Dialog open={!!roomGenerator} onOpenChange={(open) => !open && setRoomGenerator(null)}>
           <DialogContent className="sm:max-w-[400px]">
             <DialogHeader>
@@ -384,7 +392,6 @@ export default function SteelFramingPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Diálogo Editar Tabique */}
         <Dialog open={!!editingInternalWall} onOpenChange={(open) => !open && setEditingInternalWall(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader><DialogTitle className="uppercase font-black text-purple-600">Editar Tabique Interno</DialogTitle></DialogHeader>
@@ -419,7 +426,6 @@ export default function SteelFramingPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Diálogo Editar Vano */}
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader><DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-blue-600"><Settings2 className="w-5 h-5" /> Editar Vano {selectedOpening?.isInternal ? '(Interno)' : ''}</DialogTitle></DialogHeader>

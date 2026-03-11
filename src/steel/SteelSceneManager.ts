@@ -116,6 +116,11 @@ export class SteelSceneManager {
     this.isWalkModeActive = false;
     this.controls.enabled = true;
     this.player.mesh.visible = false;
+    // Recalcular el centro para la cámara orbital
+    const box = new THREE.Box3().setFromObject(this.houseGroup);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    this.controls.target.copy(center);
     if (this.onWalkModeLock) this.onWalkModeLock(false);
   }
 
@@ -133,7 +138,6 @@ export class SteelSceneManager {
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // Priorizamos aberturas existentes para edición
     const openingIntersects = this.raycaster.intersectObjects(this.openingsGroup.children);
     if (openingIntersects.length > 0) {
       const { wallId, opening, isInternal } = openingIntersects[0].object.userData;
@@ -141,7 +145,6 @@ export class SteelSceneManager {
       return;
     }
 
-    // Si no es apertura, buscamos tabiques internos
     const internalIntersects = this.raycaster.intersectObjects(this.internalWallsGroup.children, true);
     if (internalIntersects.length > 0) {
       let object = internalIntersects[0].object;
@@ -154,7 +157,6 @@ export class SteelSceneManager {
       }
     }
 
-    // Finalmente paredes exteriores
     const wallIntersects = this.raycaster.intersectObjects(this.houseGroup.children, true);
     const wallHit = wallIntersects.find(i => i.object.userData.isWall);
     if (wallHit) {
@@ -203,17 +205,12 @@ export class SteelSceneManager {
       wallGroup.rotation.y = (wall.rotation * Math.PI) / 180;
       this.houseGroup.add(wallGroup);
       wallGroup.updateMatrixWorld(true);
+      
       if (!config.structuralMode) {
-        if (config.layers.exteriorPanels) {
-          const mesh = this.createPanelMesh(wall, 'exterior', config);
-          wallGroup.add(mesh);
-          this.collisions.registerWall(mesh);
-        }
-        if (config.layers.interiorPanels) {
-          const mesh = this.createPanelMesh(wall, 'interior', config);
-          wallGroup.add(mesh);
-        }
+        if (config.layers.exteriorPanels) wallGroup.add(this.createPanelMesh(wall, 'exterior', config));
+        if (config.layers.interiorPanels) wallGroup.add(this.createPanelMesh(wall, 'interior', config));
       }
+      
       if (config.layers.steelProfiles) this.generateWallStructure(wall, wallGroup, config.layers, config);
       this.createOpeningTriggers(wall.id, wall.length, wall.height, wall.rotation, wall.x, wall.z, wall.openings, false, config, 100);
     });
@@ -226,6 +223,7 @@ export class SteelSceneManager {
       iwGroup.rotation.y = (iw.rotation * Math.PI) / 180;
       this.internalWallsGroup.add(iwGroup);
       iwGroup.updateMatrixWorld(true);
+      
       this.generateInternalWall(iw, iwGroup, config);
       this.createOpeningTriggers(iw.id, iw.length, iw.height, iw.rotation, iwGroup.position.x, iwGroup.position.z, iw.openings || [], true, config, 70);
     });
@@ -259,9 +257,17 @@ export class SteelSceneManager {
     const height = iw.height;
     const len = iw.length;
     const openings = iw.openings || [];
+    const panels = StructuralEngine.calculateWallPanels(iw, config);
+
+    // Registro de colisiones por panel (Permite pasar por puertas)
+    panels.forEach(p => {
+      const collMesh = new THREE.Mesh(new THREE.BoxGeometry(p.width, height, thickness + 20), new THREE.MeshBasicMaterial({ visible: false }));
+      collMesh.position.set(p.xStart + p.width/2, height/2, 0);
+      group.add(collMesh);
+      this.collisions.registerWall(collMesh);
+    });
     
     if (config.layers.steelProfiles) {
-      const panels = StructuralEngine.calculateWallPanels(iw, config);
       const studHeight = height - this.profileFlange * 2;
       panels.forEach(panel => {
         group.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
@@ -299,7 +305,6 @@ export class SteelSceneManager {
       p1.position.z = thickness/2; group.add(p1);
       const p2 = new THREE.Mesh(panelGeom, new THREE.MeshStandardMaterial({ color: this.colors.panel_int }));
       p2.position.z = -thickness/2 - 12.5; group.add(p2);
-      this.collisions.registerWall(p1); this.collisions.registerWall(p2);
     }
   }
 
@@ -309,6 +314,14 @@ export class SteelSceneManager {
     const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - (this.profileFlange * 2);
     
+    // Registro de colisiones por panel segmentado
+    panels.forEach(p => {
+      const collMesh = new THREE.Mesh(new THREE.BoxGeometry(p.width, wall.height, wall.thickness + 20), new THREE.MeshBasicMaterial({ visible: false }));
+      collMesh.position.set(p.xStart + p.width/2, wall.height/2, 0);
+      group.add(collMesh);
+      this.collisions.registerWall(collMesh);
+    });
+
     panels.forEach(panel => {
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
@@ -408,7 +421,6 @@ export class SteelSceneManager {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const analysis = StructuralEngine.calculateHeader(op, length, config, height);
       const opColor = analysis.status === 'error' ? 0xff0000 : (analysis.status === 'warning' ? 0xffff00 : 0x00ff00);
-      // Reducimos el ancho del disparador para que no sobresalga lateralmente de la viga
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(op.width, op.height, thickness + 10), new THREE.MeshBasicMaterial({ color: opColor, transparent: true, opacity: 0.15 }));
       const matrix = new THREE.Matrix4().makeRotationY((rotation * Math.PI) / 180).setPosition(x, 0, z);
       const pos = new THREE.Vector3(op.position + op.width / 2, sill + op.height / 2, 0).applyMatrix4(matrix);
