@@ -31,7 +31,6 @@ export class SteelSceneManager {
 
   private prevTime = performance.now();
 
-  // Callbacks dinámicos
   public onOpeningDoubleClick: ((wallId: string, opening: SteelOpening, isInternal?: boolean) => void) | null = null;
   public onWallDoubleClick: ((wallId: string, x: number, side: 'exterior' | 'interior') => void) | null = null;
   public onWalkModeLock: ((locked: boolean) => void) | null = null;
@@ -50,6 +49,7 @@ export class SteelSceneManager {
     blocking: 0x22c55e,   
     junction: 0x3b82f6,   
     corner: 0xef4444,     
+    bracing: 0xf59e0b,
     highlight: 0xae1ae2,
     status_ok: 0x22c55e,
     status_warning: 0xf59e0b,
@@ -254,22 +254,47 @@ export class SteelSceneManager {
     const openings = iw.openings || [];
 
     if (config.layers.steelProfiles) {
-      group.add(this.createProfile(len, 0, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
-      group.add(this.createProfile(len, 0, height - this.profileFlange, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
+      const panels = StructuralEngine.calculateWallPanels(iw, config);
+      const studHeight = height - this.profileFlange * 2;
 
-      for (let x = 0; x <= len; x += 400) {
-        const finalX = Math.min(x, len - this.profileFlange);
-        const inOpening = openings.some(op => finalX >= (op.position - 10) && x <= (op.position + op.width + 10));
-        if (!inOpening) group.add(this.createProfile(height - this.profileFlange * 2, finalX, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
-      }
+      panels.forEach(panel => {
+        group.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
+        group.add(this.createProfile(panel.width, panel.xStart, height - this.profileFlange, 0, 'PGU', this.colors.steelDrywall, 0, thickness));
+
+        // Refuerzos de unión entre paneles internos
+        const startStuds = panel.isWallStart ? 2 : 2; 
+        for (let i = 0; i < startStuds; i++) {
+          group.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', this.colors.junction, 0, thickness));
+        }
+
+        for (let x = panel.xStart + 400; x < panel.xEnd - 50; x += 400) {
+          const inOpening = openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
+          if (!inOpening) group.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
+        }
+
+        if (panel.isWallEnd) {
+          group.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.junction, 0, thickness));
+        }
+
+        // Cruces de San Andrés en tabiques largos (>3m)
+        if (config.layers.bracing && panel.width > 2500 && openings.length === 0) {
+          this.addBracing(group, panel.xStart, panel.xEnd, height, thickness);
+        }
+      });
 
       openings.forEach(op => {
         const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
         const headerH = sill + op.height;
-        group.add(this.createProfile(height - this.profileFlange * 2, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
-        group.add(this.createProfile(height - this.profileFlange * 2, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.steelDrywall, 0, thickness));
+        group.add(this.createProfile(studHeight, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
+        group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.header, 0, thickness));
       });
+
+      if (config.layers.horizontalBlocking) {
+        StructuralEngine.calculateBlocking(iw).forEach(b => {
+          group.add(this.createProfile(b.xEnd - b.xStart, b.xStart, b.y, 0, 'PGU', this.colors.blocking, 0, thickness));
+        });
+      }
     }
 
     if (!config.structuralMode && config.layers.interiorPanels) {
@@ -304,8 +329,11 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
 
+      // ESQUINAS L Y UNIONES DE PANEL
+      const startStudsCount = panel.isWallStart ? 3 : 2; 
       const junctionColor = panel.isWallStart ? this.colors.corner : this.colors.junction;
-      for (let i = 0; i < (panel.isWallStart ? 3 : 2); i++) {
+      
+      for (let i = 0; i < startStudsCount; i++) {
         structuralGroup.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', junctionColor));
       }
 
@@ -315,12 +343,22 @@ export class SteelSceneManager {
       }
 
       if (panel.isWallEnd) {
-        for (let i = 0; i < 3; i++) structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner));
+        for (let i = 0; i < 3; i++) {
+          structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner));
+        }
+      }
+
+      // Cruces de San Andrés en muros exteriores
+      if (layers.bracing && panel.needsBracing && wall.openings.length === 0) {
+        this.addBracing(structuralGroup, panel.xStart, panel.xEnd, wall.height, this.profileWidth);
       }
     });
 
+    // UNIONES T (Backing Studs para Tabiques Internos)
     config.internalWalls.forEach(iw => {
-      if (iw.parentWallId === wall.id) structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange / 2, this.profileFlange, 90, 'PGC', this.colors.junction));
+      if (iw.parentWallId === wall.id) {
+        structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange / 2, this.profileFlange, 90, 'PGC', this.colors.junction));
+      }
     });
 
     if (layers.horizontalBlocking) {
@@ -345,6 +383,27 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', opColor));
       if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
     });
+  }
+
+  private addBracing(group: THREE.Group, x1: number, x2: number, h: number, width: number) {
+    const angle = Math.atan2(h, x2 - x1);
+    const len = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(h, 2));
+    
+    const strap1 = new THREE.Mesh(
+      new THREE.BoxGeometry(len, 2, 35),
+      new THREE.MeshStandardMaterial({ color: this.colors.bracing })
+    );
+    strap1.position.set((x1 + x2) / 2, h / 2, 0);
+    strap1.rotation.z = angle;
+    group.add(strap1);
+
+    const strap2 = new THREE.Mesh(
+      new THREE.BoxGeometry(len, 2, 35),
+      new THREE.MeshStandardMaterial({ color: this.colors.bracing })
+    );
+    strap2.position.set((x1 + x2) / 2, h / 2, 0);
+    strap2.rotation.z = -angle;
+    group.add(strap2);
   }
 
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number): THREE.Mesh {
