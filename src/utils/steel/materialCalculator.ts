@@ -2,9 +2,8 @@ import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall, InternalWa
 import { StructuralEngine } from './structuralEngine';
 
 /**
- * Motor de Cómputo Métrico Industrial ArquiMax v13.0
- * Basado en normas AISI S240 y estándares de obra reales.
- * Incluye Cripple Studs, Sill Plates y Blocking optimizado.
+ * Motor de Cómputo Métrico Industrial ArquiMax v14.0
+ * Incluye lógica de Ladder Backing y uniones de alta eficiencia.
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -31,7 +30,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - 80; 
     
-    pgu100Len += wall.length * 2; // Soleras superior e inferior
+    pgu100Len += wall.length * 2; 
     totalConnections += (wall.length / wall.studSpacing) * 4;
 
     panels.forEach(p => {
@@ -47,21 +46,32 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       totalConnections += 2;
     });
 
+    // Sumar Ladder Backing para uniones en T
+    config.internalWalls.forEach(iw => {
+      if (iw.parentWallId === wall.id) {
+        pgc100Len += studHeight; // Montante de respaldo
+        const ladders = StructuralEngine.calculateLadderBacking(wall.height);
+        ladders.forEach(l => {
+          pgu100Len += (l.xEnd - l.xStart);
+          totalConnections += 2;
+        });
+      }
+    });
+
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
       
       if (fusion === 'none') {
-        pgc100Len += 2 * studHeight; // Kings
+        pgc100Len += 2 * studHeight; 
       } else {
-        pgc100Len += 1 * studHeight; // Comparte uno con la esquina
+        pgc100Len += 1 * studHeight; 
       }
 
-      pgc100Len += 2 * (sill + op.height - 40); // Jacks
-      pgc100Len += op.width; // Header (PGC)
-      if (op.type === 'window') pgu100Len += op.width; // Sill Plate (PGU)
+      pgc100Len += 2 * (sill + op.height - 40); 
+      pgc100Len += op.width; 
+      if (op.type === 'window') pgu100Len += op.width; 
       
-      // Cripples (Montantes de reparto)
       const cripples = StructuralEngine.calculateCrippleStuds(wall, op);
       cripples.forEach(c => {
         pgc100Len += (c.yEnd - c.yStart);
@@ -70,13 +80,6 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
 
       totalConnections += 20;
       areaExteriorNet -= (op.width * op.height) / 1000000;
-    });
-
-    config.internalWalls.forEach(iw => {
-      if (iw.parentWallId === wall.id) {
-        pgc100Len += studHeight; // Backing stud
-        totalConnections += 4;
-      }
     });
 
     totalAnchors += Math.ceil(wall.length / 600) + (panels.length * 2);
@@ -96,8 +99,8 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     totalConnections += studCount * 4;
 
     (iw.openings || []).forEach(op => {
-      pgc70Len += 2 * studHeight; // Kings
-      pgc70Len += op.width; // Header
+      pgc70Len += 2 * studHeight; 
+      pgc70Len += op.width; 
       
       const cripples = StructuralEngine.calculateCrippleStuds(iw, op);
       cripples.forEach(c => {
@@ -118,14 +121,14 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((pgc100Len / BAR_LEN) * WASTE_STEEL),
-    description: 'Montantes estructurales, Kings, Jacks y Cripples.'
+    description: 'Montantes estructurales, Kings, Jacks y refuerzos de unión.'
   });
   items.push({
     name: 'Perfiles PGU 100x0.90mm (6m)',
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((pgu100Len / BAR_LEN) * WASTE_STEEL),
-    description: 'Soleras superior/inferior, Sills y Bloqueos.'
+    description: 'Soleras superior/inferior y Bloqueos de respaldo (Ladder).'
   });
   if (pgc70Len > 0) {
     items.push({

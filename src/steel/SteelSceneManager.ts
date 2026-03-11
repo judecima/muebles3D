@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as THREE from 'three';
@@ -54,7 +53,8 @@ export class SteelSceneManager {
     bracing: 0xf59e0b,
     status_ok: 0x22c55e,
     status_warning: 0xf59e0b,
-    status_error: 0xef4444
+    status_error: 0xef4444,
+    ladder: 0xec4899 // Rosa para destacar el sistema Ladder Backing
   };
 
   private profileWidth = 100; 
@@ -336,14 +336,18 @@ export class SteelSceneManager {
       }
     });
 
-    // BACKING STUDS: Detectar si un tabique interno se ancla aquí o termina aquí
     config.internalWalls.forEach(iw => {
-      // Caso 1: El tabique nace de este muro
       if (iw.parentWallId === wall.id) {
+        // Implementación de Ladder Backing (Escalera) en la unión T
+        // Proporciona fijación para placas sin bloquear la aislación térmica
         structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange/2, this.profileFlange, 90, 'PGC', this.colors.junction));
+        
+        // Bloqueos tipo Escalera
+        StructuralEngine.calculateLadderBacking(wall.height).forEach(l => {
+          structuralGroup.add(this.createProfile(l.xEnd - l.xStart, iw.xPosition + l.xStart, l.y, 0, 'PGU', this.colors.ladder));
+        });
       }
       
-      // Caso 2: El tabique es pasante y termina en este muro
       const parentOfIW = config.walls.find(w => w.id === iw.parentWallId);
       if (parentOfIW) {
         const isOpposite = (
@@ -357,6 +361,9 @@ export class SteelSceneManager {
           const maxInternal = (wall.id === 'w1' || wall.id === 'w3') ? config.length - 100 : config.width - 100;
           if (Math.abs(iw.length - maxInternal) < 5) {
             structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange/2, this.profileFlange, 90, 'PGC', this.colors.junction));
+            StructuralEngine.calculateLadderBacking(wall.height).forEach(l => {
+              structuralGroup.add(this.createProfile(l.xEnd - l.xStart, iw.xPosition + l.xStart, l.y, 0, 'PGU', this.colors.ladder));
+            });
           }
         }
       }

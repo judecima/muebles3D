@@ -23,6 +23,12 @@ export interface CrippleData {
   type: 'upper' | 'lower';
 }
 
+export interface JunctionNode {
+  type: 'T' | 'X' | 'L';
+  position: { x: number, z: number };
+  walls: string[];
+}
+
 export class StructuralEngine {
   private static readonly STEEL_MODULUS = 203000; 
   private static readonly PGC_IX_SINGLE = 185000; 
@@ -42,7 +48,7 @@ export class StructuralEngine {
 
   static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): WallPanelData[] {
     const panels: WallPanelData[] = [];
-    const maxPanelWidth = 4000; 
+    const maxPanelWidth = 4000; // Máximo ancho por panel transportable (Norma Argentina)
     
     let numPanels = Math.ceil(wall.length / maxPanelWidth);
     const panelWidth = wall.length / numPanels;
@@ -119,9 +125,6 @@ export class StructuralEngine {
     };
   }
 
-  /**
-   * Calcula Cripple Studs para aberturas (continuidad de carga vertical)
-   */
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening): CrippleData[] {
     const cripples: CrippleData[] = [];
     const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
@@ -129,19 +132,17 @@ export class StructuralEngine {
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerTop = sill + opening.height;
 
-    // Cripples Superiores (entre dintel y solera superior)
     for (let x = spacing; x < wall.length; x += spacing) {
       if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
         cripples.push({
           x,
           yStart: headerTop,
-          yEnd: wallH - 40, // 40mm es el ala de la solera PGU
+          yEnd: wallH - 40,
           type: 'upper'
         });
       }
     }
 
-    // Cripples Inferiores (entre solera inferior y antepecho - solo ventanas)
     if (opening.type === 'window') {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
@@ -158,9 +159,6 @@ export class StructuralEngine {
     return cripples;
   }
 
-  /**
-   * Calcula Blocking horizontal alineado exactamente entre montantes
-   */
   static calculateBlocking(wall: SteelWall | InternalWall): BlockingData[] {
     const blockings: BlockingData[] = [];
     const numRows = wall.height > 2400 ? (wall.height > 3000 ? 2 : 1) : 0;
@@ -171,16 +169,13 @@ export class StructuralEngine {
 
     for (let row = 1; row <= numRows; row++) {
       const y = row * rowSpacing;
-      // Recorremos la modulación del muro
       for (let x = 0; x <= wall.length - studSpacing; x += studSpacing) {
-        const xStart = x + 40; // Empieza después del ala del montante anterior
+        const xStart = x + 40; 
         const xEnd = x + studSpacing; 
 
-        // Verificar si este segmento de blocking choca con alguna abertura
         const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
           const top = sill + op.height;
-          // Si el punto central del blocking está dentro del área del vano
           return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
         });
 
@@ -190,6 +185,25 @@ export class StructuralEngine {
       }
     }
     return blockings;
+  }
+
+  /**
+   * Calcula el sistema de Ladder Backing (Escalera) para uniones en T de tabiques internos.
+   * Proporciona soporte para placas y permite el paso de aislación.
+   */
+  static calculateLadderBacking(wallHeight: number): BlockingData[] {
+    const ladders: BlockingData[] = [];
+    const numBlocks = 4; // 4 bloques por altura de tabique para fijación segura
+    const spacing = wallHeight / (numBlocks + 1);
+
+    for (let i = 1; i <= numBlocks; i++) {
+      ladders.push({
+        xStart: -35, // Centrado sobre el eje
+        xEnd: 35,
+        y: i * spacing
+      });
+    }
+    return ladders;
   }
 
   static validateStructure(config: SteelHouseConfig): { wallId: string, status: 'ok' | 'warning' | 'error', message: string }[] {
