@@ -16,7 +16,12 @@ import {
   DoorOpen,
   Box,
   Layers,
-  Maximize2
+  Maximize2,
+  Mountain,
+  Ruler,
+  Maximize,
+  ChevronDown,
+  Camera
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -82,230 +87,270 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
     updateWall(wallId, 'openings', wall.openings.filter(op => op.id !== opId));
   };
 
+  const updateRoof = (field: string, value: any) => {
+    onConfigChange({
+      ...config,
+      roof: { ...config.roof, [field]: value }
+    });
+  };
+
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
       <CardHeader className="bg-slate-900 text-white py-4 sticky top-0 z-10 shadow-sm">
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Home className="w-5 h-5 text-blue-400" /> 
-            <span>Steel Framing v2.8</span>
+            <span>Steel Framing v2.9</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal">INGENIERÍA ESTRUCTURAL</span>
+          <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Ingeniería Estructural</span>
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="space-y-6 pt-6 px-4 pb-20">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Maximize2 className="w-4 h-4 text-blue-500" />
-            <Label className="text-xs font-bold uppercase text-slate-500">Dimensiones Globales (mm)</Label>
-          </div>
-          <div className="grid grid-cols-2 gap-3 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
-            <div className="space-y-1">
-              <Label className="text-[9px] font-black uppercase text-blue-600">Ancho (X)</Label>
-              <Input 
-                type="number" 
-                value={config.width} 
-                onChange={(e) => onConfigChange({ ...config, width: parseInt(e.target.value) || 0 })}
-                className="h-8 text-xs font-bold border-blue-200 focus:ring-blue-500"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[9px] font-black uppercase text-blue-600">Largo (Z)</Label>
-              <Input 
-                type="number" 
-                value={config.length} 
-                onChange={(e) => onConfigChange({ ...config, length: parseInt(e.target.value) || 0 })}
-                className="h-8 text-xs font-bold border-blue-200 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Layers className="w-4 h-4 text-primary" />
-            <Label className="text-xs font-bold uppercase text-slate-500">Capas de Visualización</Label>
-          </div>
+      <CardContent className="p-0 pb-20">
+        <Accordion type="multiple" defaultValue={['global', 'layers', 'roof']} className="w-full">
           
-          <div className="grid grid-cols-1 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase text-slate-600">Modo Estructural</span>
-              <Switch 
-                checked={config.structuralMode} 
-                onCheckedChange={(val) => onConfigChange({ ...config, structuralMode: val })} 
-              />
-            </div>
-            <Separator className="my-1" />
-            <div className="space-y-2">
+          {/* SECCIÓN: DIMENSIONES GLOBALES */}
+          <AccordionItem value="global" className="border-b px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2">
-                <Checkbox id="ext-pan" checked={config.layers.exteriorPanels} onCheckedChange={() => toggleLayer('exteriorPanels')} />
-                <Label htmlFor="ext-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Exteriores</Label>
+                <Maximize2 className="w-4 h-4 text-blue-500" />
+                <span className="text-xs font-black uppercase tracking-tighter">Dimensiones Base</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox id="int-pan" checked={config.layers.interiorPanels} onCheckedChange={() => toggleLayer('interiorPanels')} />
-                <Label htmlFor="int-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Interiores</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox id="profiles" checked={config.layers.steelProfiles} onCheckedChange={() => toggleLayer('steelProfiles')} />
-                <Label htmlFor="profiles" className="text-[10px] font-bold uppercase cursor-pointer">Perfilería (PGC/PGU)</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox id="bracing" checked={config.layers.crossBracing} onCheckedChange={() => toggleLayer('crossBracing')} />
-                <Label htmlFor="bracing" className="text-[10px] font-bold uppercase cursor-pointer text-red-500">Cruces San Andrés</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox id="blocking" checked={config.layers.horizontalBlocking} onCheckedChange={() => toggleLayer('horizontalBlocking')} />
-                <Label htmlFor="blocking" className="text-[10px] font-bold uppercase cursor-pointer text-amber-600">Rigidizadores / Blocking</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox id="lintels" checked={config.layers.lintels} onCheckedChange={() => toggleLayer('lintels')} />
-                <Label htmlFor="lintels" className="text-[10px] font-bold uppercase cursor-pointer text-blue-500">Dinteles y Refuerzos</Label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase text-slate-500">Altura Global Muros (mm)</Label>
-          <Input 
-            type="number" 
-            value={config.globalWallHeight} 
-            onChange={(e) => onConfigChange({ ...config, globalWallHeight: parseInt(e.target.value) || 0 })}
-            className="h-10 border-slate-200"
-          />
-        </div>
-
-        <div className="flex items-center justify-between mb-2">
-          <Label className="text-xs font-bold uppercase text-slate-500">Muros del Proyecto</Label>
-          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={addWall}>
-            <Plus className="w-3 h-3" /> AÑADIR MURO
-          </Button>
-        </div>
-
-        <Accordion type="single" collapsible className="w-full">
-          {config.walls.map((wall, idx) => (
-            <AccordionItem key={wall.id} value={wall.id} className="border rounded-lg mb-2 overflow-hidden bg-slate-50/50">
-              <AccordionTrigger className="px-4 hover:no-underline py-3">
-                <div className="flex items-center gap-2 text-left">
-                  <div className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
-                    {idx + 1}
-                  </div>
-                  <span className="text-xs font-bold text-slate-700">Muro {Math.round(wall.length)}mm</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold uppercase text-slate-400">Longitud (mm)</Label>
-                    <Input type="number" value={Math.round(wall.length)} onChange={(e) => updateWall(wall.id, 'length', parseInt(e.target.value))} className="h-8 text-xs" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold uppercase text-slate-400">Espaciado Mont.</Label>
-                    <Select value={wall.studSpacing.toString()} onValueChange={(val) => updateWall(wall.id, 'studSpacing', parseInt(val))}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="400">400 mm</SelectItem>
-                        <SelectItem value="600">600 mm</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold uppercase text-slate-400">Posición X</Label>
-                    <Input type="number" value={Math.round(wall.x)} onChange={(e) => updateWall(wall.id, 'x', parseInt(e.target.value))} className="h-8 text-xs" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold uppercase text-slate-400">Posición Z</Label>
-                    <Input type="number" value={Math.round(wall.z)} onChange={(e) => updateWall(wall.id, 'z', parseInt(e.target.value))} className="h-8 text-xs" />
-                  </div>
-                </div>
-
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="grid grid-cols-2 gap-3 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-bold uppercase text-slate-400">Rotación (°)</Label>
-                  <Input type="number" value={wall.rotation} onChange={(e) => updateWall(wall.id, 'rotation', parseInt(e.target.value))} className="h-8 text-xs" />
+                  <Label className="text-[9px] font-black uppercase text-blue-600">Ancho (X)</Label>
+                  <Input 
+                    type="number" 
+                    value={config.width} 
+                    onChange={(e) => onConfigChange({ ...config, width: parseInt(e.target.value) || 0 })}
+                    className="h-8 text-xs font-bold border-blue-200 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black uppercase text-blue-600">Largo (Z)</Label>
+                  <Input 
+                    type="number" 
+                    value={config.length} 
+                    onChange={(e) => onConfigChange({ ...config, length: parseInt(e.target.value) || 0 })}
+                    className="h-8 text-xs font-bold border-blue-200 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold uppercase text-slate-500">Altura Muros (mm)</Label>
+                <Input 
+                  type="number" 
+                  value={config.globalWallHeight} 
+                  onChange={(e) => onConfigChange({ ...config, globalWallHeight: parseInt(e.target.value) || 0 })}
+                  className="h-9 border-slate-200"
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* SECCIÓN: TECHO ESTRUCTURAL */}
+          <AccordionItem value="roof" className="border-b px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2">
+                <Mountain className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-black uppercase tracking-tighter">Sistema de Techo</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="space-y-3 p-3 bg-amber-50/30 rounded-xl border border-amber-100/50">
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase text-amber-700">Tipo de Cubierta</Label>
+                  <Select value={config.roof.type} onValueChange={(v) => updateRoof('type', v)}>
+                    <SelectTrigger className="h-8 text-xs bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin Techo</SelectItem>
+                      <SelectItem value="one-side">Una Agua (Shed)</SelectItem>
+                      <SelectItem value="two-sides">Dos Aguas (Gable)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <div className="pt-2 border-t space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase text-slate-500">Aberturas</span>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" className="h-6 w-6" title="Añadir Puerta" onClick={() => addOpening(wall.id, 'door')}>
-                        <DoorOpen className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-6 w-6" title="Añadir Ventana" onClick={() => addOpening(wall.id, 'window')}>
-                        <Layout className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase text-amber-700">Diseño de Cercha</Label>
+                  <Select value={config.roof.trussType} onValueChange={(v) => updateRoof('trussType', v)}>
+                    <SelectTrigger className="h-8 text-xs bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kingPost">King Post (Simple)</SelectItem>
+                      <SelectItem value="fink">Fink (Reforzada)</SelectItem>
+                      <SelectItem value="mono">Mono (Un Agua)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {wall.openings.map(op => (
-                    <div key={op.id} className="p-2 bg-white rounded border border-slate-200 relative group">
-                      <div className="flex items-center gap-2 mb-2">
-                        {op.type === 'door' ? <DoorOpen className="w-3 h-3 text-blue-500" /> : <Layout className="w-3 h-3 text-green-500" />}
-                        <span className="text-[10px] font-bold uppercase">{op.type === 'door' ? 'Puerta' : 'Ventana'}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-[8px] font-bold uppercase text-slate-400">Ancho</Label>
-                          <Input 
-                            type="number" 
-                            value={op.width} 
-                            onChange={(e) => {
-                              const newOps = wall.openings.map(o => o.id === op.id ? { ...o, width: parseInt(e.target.value) } : o);
-                              updateWall(wall.id, 'openings', newOps);
-                            }}
-                            className="h-7 text-[10px]"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[8px] font-bold uppercase text-slate-400">Pos. Izq</Label>
-                          <Input 
-                            type="number" 
-                            value={op.position} 
-                            onChange={(e) => {
-                              const newOps = wall.openings.map(o => o.id === op.id ? { ...o, position: parseInt(e.target.value) } : o);
-                              updateWall(wall.id, 'openings', newOps);
-                            }}
-                            className="h-7 text-[10px]"
-                          />
-                        </div>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600"
-                        onClick={() => removeOpening(wall.id, op.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-amber-700">Pendiente (°)</Label>
+                    <Input 
+                      type="number" 
+                      value={config.roof.pitch} 
+                      onChange={(e) => updateRoof('pitch', parseInt(e.target.value) || 0)}
+                      className="h-8 text-xs bg-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-amber-700">Voladizo (mm)</Label>
+                    <Input 
+                      type="number" 
+                      value={config.roof.overhang} 
+                      onChange={(e) => updateRoof('overhang', parseInt(e.target.value) || 0)}
+                      className="h-8 text-xs bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* SECCIÓN: CAPAS Y VISIBILIDAD */}
+          <AccordionItem value="layers" className="border-b px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-primary" />
+                <span className="text-xs font-black uppercase tracking-tighter">Capas Visuales</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-3 pb-4">
+              <div className="flex items-center justify-between p-2 bg-slate-900 text-white rounded-lg mb-2">
+                <span className="text-[9px] font-black uppercase tracking-widest">Estructura Pura</span>
+                <Switch 
+                  checked={config.structuralMode} 
+                  onCheckedChange={(val) => onConfigChange({ ...config, structuralMode: val })} 
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div className="space-y-2">
+                  {[
+                    { id: 'ext-pan', label: 'OSB Exterior', key: 'exteriorPanels' },
+                    { id: 'int-pan', label: 'Yeso Interior', key: 'interiorPanels' },
+                    { id: 'profiles', label: 'Perfilería Acero', key: 'steelProfiles' },
+                    { id: 'bracing', label: 'Cruces San Andrés', key: 'crossBracing', color: 'text-red-500' },
+                    { id: 'blocking', label: 'Blocking Horiz.', key: 'horizontalBlocking', color: 'text-amber-600' },
+                    { id: 'lintels', label: 'Dinteles/Vanos', key: 'lintels', color: 'text-blue-500' }
+                  ].map(layer => (
+                    <div key={layer.id} className="flex items-center gap-2">
+                      <Checkbox id={layer.id} checked={config.layers[layer.key as keyof LayerVisibility]} onCheckedChange={() => toggleLayer(layer.key as keyof LayerVisibility)} />
+                      <Label htmlFor={layer.id} className={`text-[10px] font-bold uppercase cursor-pointer ${layer.color || ''}`}>{layer.label}</Label>
                     </div>
                   ))}
                 </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
 
-                <Button variant="ghost" className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 text-[10px] font-bold h-8" onClick={() => removeWall(wall.id)}>
-                  <Trash2 className="w-3 h-3 mr-2" /> ELIMINAR MURO
-                </Button>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+          {/* SECCIÓN: MUROS */}
+          <AccordionItem value="walls" className="border-b px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2">
+                <Layout className="w-4 h-4 text-slate-600" />
+                <span className="text-xs font-black uppercase tracking-tighter">Plano de Muros</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <Button size="sm" variant="outline" className="w-full mb-4 h-8 text-[10px] gap-1 font-black" onClick={addWall}>
+                <Plus className="w-3 h-3" /> AÑADIR MURO NUEVO
+              </Button>
+
+              <div className="space-y-3">
+                {config.walls.map((wall, idx) => (
+                  <div key={wall.id} className="border rounded-xl p-3 bg-slate-50/50 space-y-3 relative group">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded bg-slate-200 flex items-center justify-center text-[9px] font-black text-slate-600">
+                          {idx + 1}
+                        </div>
+                        <span className="text-[10px] font-black uppercase text-slate-700">Muro Individual</span>
+                      </div>
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeWall(wall.id)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[8px] font-black uppercase text-slate-400">Largo (mm)</Label>
+                        <Input type="number" value={Math.round(wall.length)} onChange={(e) => updateWall(wall.id, 'length', parseInt(e.target.value) || 0)} className="h-7 text-[10px] font-bold" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[8px] font-black uppercase text-slate-400">Montantes</Label>
+                        <Select value={wall.studSpacing.toString()} onValueChange={(val) => updateWall(wall.id, 'studSpacing', parseInt(val))}>
+                          <SelectTrigger className="h-7 text-[9px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="400">400mm</SelectItem>
+                            <SelectItem value="600">600mm</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase text-slate-500">Vanos y Aberturas</span>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-6 w-6 hover:bg-blue-100" onClick={() => addOpening(wall.id, 'door')}>
+                            <DoorOpen className="w-3.5 h-3.5 text-blue-600" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 hover:bg-green-100" onClick={() => addOpening(wall.id, 'window')}>
+                            <Layout className="w-3.5 h-3.5 text-green-600" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {wall.openings.map(op => (
+                          <div key={op.id} className="p-2 bg-white rounded-lg border border-slate-200 relative group/op">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              {op.type === 'door' ? <DoorOpen className="w-3 h-3 text-blue-500" /> : <Layout className="w-3 h-3 text-green-500" />}
+                              <span className="text-[9px] font-black uppercase text-slate-600">{op.type === 'door' ? 'Puerta' : 'Ventana'}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-[7px] font-black uppercase text-slate-400">Ancho</Label>
+                                <Input type="number" value={op.width} onChange={(e) => {
+                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, width: parseInt(e.target.value) || 0 } : o);
+                                  updateWall(wall.id, 'openings', newOps);
+                                }} className="h-6 text-[9px]" />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[7px] font-black uppercase text-slate-400">Posición</Label>
+                                <Input type="number" value={op.position} onChange={(e) => {
+                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, position: parseInt(e.target.value) || 0 } : o);
+                                  updateWall(wall.id, 'openings', newOps);
+                                }} className="h-6 text-[9px]" />
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover/op:opacity-100 text-red-400" onClick={() => removeOpening(wall.id, op.id)}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
 
-        {config.walls.length === 0 && (
-          <div className="py-12 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-slate-400 text-center px-4">
-            <Box className="w-8 h-8 mb-2 opacity-20" />
-            <p className="text-[10px] font-bold uppercase tracking-widest">No hay muros definidos</p>
-            <Button variant="link" size="sm" onClick={addWall} className="text-[10px] font-bold">Comenzar trazado</Button>
-          </div>
-        )}
+        {/* ACCIONES RÁPIDAS PIE DE PANEL */}
+        <div className="p-4 bg-slate-50 border-t sticky bottom-0 z-20 space-y-2">
+          <Button variant="outline" className="w-full h-9 text-[10px] font-black uppercase tracking-widest gap-2 bg-white" onClick={() => onConfigChange({ ...config })}>
+            <Camera className="w-3.5 h-3.5 text-blue-600" /> Recentrar Cámara
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

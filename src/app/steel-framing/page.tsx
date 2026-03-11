@@ -53,7 +53,14 @@ const INITIAL_CONFIG: SteelHouseConfig = {
     lintels: true,
     reinforcements: true
   },
-  structuralMode: false
+  structuralMode: false,
+  roof: {
+    type: 'two-sides',
+    pitch: 30,
+    overhang: 300,
+    trussSpacing: 600,
+    trussType: 'fink'
+  }
 };
 
 export default function SteelFramingPage() {
@@ -104,12 +111,13 @@ export default function SteelFramingPage() {
    */
   const updateOpeningPosition = (val: number) => {
     if (!selectedOpening) return;
+    const safeVal = isNaN(val) ? 0 : val;
     const wall = config.walls.find(w => w.id === selectedOpening.wallId);
     if (!wall) return;
 
     // 1. Validar límites laterales del muro
     const maxPos = wall.length - selectedOpening.opening.width;
-    let newPos = Math.max(0, Math.min(val, maxPos));
+    let newPos = Math.max(0, Math.min(safeVal, maxPos));
 
     // 2. Validar solapamiento con otras aberturas en el mismo muro
     const otherOpenings = wall.openings.filter(o => o.id !== selectedOpening.opening.id);
@@ -138,11 +146,12 @@ export default function SteelFramingPage() {
 
   const updateOpeningDim = (field: 'width' | 'height', val: number) => {
     if (!selectedOpening) return;
+    const safeVal = isNaN(val) ? 0 : val;
     const wall = config.walls.find(w => w.id === selectedOpening.wallId);
     if (!wall) return;
 
     // Al cambiar dimensiones también validamos límites
-    let newWidth = field === 'width' ? val : selectedOpening.opening.width;
+    let newWidth = field === 'width' ? safeVal : selectedOpening.opening.width;
     if (newWidth + selectedOpening.opening.position > wall.length) {
       newWidth = wall.length - selectedOpening.opening.position;
     }
@@ -151,13 +160,13 @@ export default function SteelFramingPage() {
       if (w.id === selectedOpening.wallId) {
         return {
           ...w,
-          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, [field]: val, width: newWidth } : o)
+          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, [field]: safeVal, width: newWidth } : o)
         };
       }
       return w;
     });
     setConfig({ ...config, walls: newWalls });
-    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, [field]: val, width: newWidth } });
+    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, [field]: safeVal, width: newWidth } });
   };
 
   return (
@@ -301,8 +310,8 @@ export default function SteelFramingPage() {
                 <Input
                   id="position"
                   type="number"
-                  value={selectedOpening?.opening.position || 0}
-                  onChange={(e) => updateOpeningPosition(parseInt(e.target.value))}
+                  value={selectedOpening?.opening.position ?? 0}
+                  onChange={(e) => updateOpeningPosition(parseInt(e.target.value) || 0)}
                   className="col-span-3 h-9"
                 />
               </div>
@@ -311,8 +320,8 @@ export default function SteelFramingPage() {
                 <Input
                   id="width"
                   type="number"
-                  value={selectedOpening?.opening.width || 0}
-                  onChange={(e) => updateOpeningDim('width', parseInt(e.target.value))}
+                  value={selectedOpening?.opening.width ?? 0}
+                  onChange={(e) => updateOpeningDim('width', parseInt(e.target.value) || 0)}
                   className="col-span-3 h-9"
                 />
               </div>
