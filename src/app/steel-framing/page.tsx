@@ -34,6 +34,7 @@ import { StructuralEngine } from '@/utils/steel/structuralEngine';
 
 const EDGE_MARGIN_EXTERIOR = 400; 
 const EDGE_MARGIN_INTERNAL = 50; 
+const INTERSECTION_MARGIN = 100; // Margen de seguridad respecto a cruces de paredes
 const DEFAULT_SILL = 900; 
 const EXTERIOR_WALL_THICKNESS = 100;
 
@@ -224,6 +225,26 @@ export default function SteelFramingPage() {
     setEditingInternalWall(null);
   };
 
+  const getWallSegments = (wallId: string, clickX: number, totalLength: number, isInternal: boolean) => {
+    const baseMargin = isInternal ? EDGE_MARGIN_INTERNAL : EDGE_MARGIN_EXTERIOR;
+    
+    // Si es un muro exterior, buscamos tabiques internos que lo toquen
+    const intersections = config.internalWalls
+      .filter(iw => iw.parentWallId === wallId)
+      .map(iw => iw.xPosition);
+    
+    const boundaries = [0, ...intersections, totalLength].sort((a, b) => a - b);
+    
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      if (clickX >= boundaries[i] && clickX <= boundaries[i+1]) {
+        const segMin = boundaries[i] === 0 ? baseMargin : boundaries[i] + INTERSECTION_MARGIN;
+        const segMax = boundaries[i+1] === totalLength ? totalLength - baseMargin : boundaries[i+1] - INTERSECTION_MARGIN;
+        return { min: segMin, max: segMax };
+      }
+    }
+    return { min: baseMargin, max: totalLength - baseMargin };
+  };
+
   const commitOpeningChange = () => {
     if (!selectedOpening || !localOpeningData) return;
     
@@ -249,18 +270,10 @@ export default function SteelFramingPage() {
       const wall = config.walls.find(w => w.id === selectedOpening.wallId);
       if (!wall) return;
       
-      const margin = EDGE_MARGIN_EXTERIOR;
-      const finalW = Math.min(inputW, wall.length - margin * 2);
-      const finalP = Math.max(margin, Math.min(inputP, wall.length - finalW - margin));
+      const bounds = getWallSegments(wall.id, inputP + inputW/2, wall.length, false);
+      const finalW = Math.min(inputW, bounds.max - bounds.min);
+      const finalP = Math.max(bounds.min, Math.min(inputP, bounds.max - finalW));
       
-      const hasInternalWall = config.internalWalls.some(iw => 
-        iw.parentWallId === wall.id && iw.xPosition >= finalP && iw.xPosition <= (finalP + finalW)
-      );
-      if (hasInternalWall) {
-        alert("Interferencia con tabique interno.");
-        return;
-      }
-
       const newOpening = { ...selectedOpening.opening, width: finalW, position: finalP };
       setConfig({ ...config, walls: config.walls.map(w => 
         w.id === selectedOpening.wallId 
@@ -321,9 +334,9 @@ export default function SteelFramingPage() {
     const wall = config.walls.find(w => w.id === addingOpening.wallId);
     if (!wall) return;
 
-    const margin = EDGE_MARGIN_EXTERIOR;
-    const finalW = Math.min(newOpData.width, wall.length - margin * 2);
-    const finalP = Math.max(margin, Math.min(addingOpening.x - finalW / 2, wall.length - finalW - margin));
+    const bounds = getWallSegments(wall.id, addingOpening.x, wall.length, false);
+    const finalW = Math.min(newOpData.width, bounds.max - bounds.min);
+    const finalP = Math.max(bounds.min, Math.min(addingOpening.x - finalW / 2, bounds.max - finalW));
 
     const newOp: SteelOpening = {
       id: Math.random().toString(36).substr(2, 9),
@@ -334,14 +347,6 @@ export default function SteelFramingPage() {
       sillHeight: newOpData.type === 'window' ? newOpData.sill : 0
     };
 
-    const hasInternalWall = config.internalWalls.some(iw => 
-      iw.parentWallId === wall.id && iw.xPosition >= newOp.position && iw.xPosition <= (newOp.position + newOp.width)
-    );
-    if (hasInternalWall) {
-      alert("No se puede colocar una abertura sobre un tabique interno.");
-      return;
-    }
-
     const collision = wall.openings.some(op => {
       const start = op.position - 200;
       const end = op.position + op.width + 200;
@@ -349,7 +354,7 @@ export default function SteelFramingPage() {
     });
 
     if (collision) {
-      alert("Espacio insuficiente. Respete la separación mínima de 200mm entre vanos.");
+      alert("Espacio insuficiente entre vanos.");
       return;
     }
 
