@@ -196,7 +196,15 @@ export default function SteelFramingPage() {
     
     len = Math.max(100, Math.min(len, maxLen));
 
-    const updated: InternalWall = { ...editingInternalWall, length: len, xPosition: xPos };
+    // Ajustar aberturas del muro editado para que no excedan el nuevo largo
+    const adjustedOpenings = (editingInternalWall.openings || []).map(op => {
+      const margin = EDGE_MARGIN_INTERNAL;
+      const fw = Math.min(op.width, len - margin * 2);
+      const fp = Math.max(margin, Math.min(op.position, len - fw - margin));
+      return { ...op, width: fw, position: fp };
+    });
+
+    const updated: InternalWall = { ...editingInternalWall, length: len, xPosition: xPos, openings: adjustedOpenings };
     
     setConfig(prev => ({
       ...prev,
@@ -224,7 +232,9 @@ export default function SteelFramingPage() {
       if (!wall) return;
 
       const margin = EDGE_MARGIN_INTERNAL;
+      // Primero ajustamos el ancho si es mayor que el espacio disponible total
       const finalW = Math.min(w, wall.length - margin * 2);
+      // Luego ajustamos la posición: si excede el largo de la pared (considerando ancho), se clava al valor máximo válido
       const finalP = Math.max(margin, Math.min(p, wall.length - finalW - margin));
 
       setConfig(prev => ({
@@ -237,6 +247,7 @@ export default function SteelFramingPage() {
     } else {
       const wall = config.walls.find(w => w.id === selectedOpening.wallId);
       if (!wall) return;
+      
       const margin = EDGE_MARGIN_EXTERIOR;
       const finalW = Math.min(w, wall.length - margin * 2);
       const finalP = Math.max(margin, Math.min(p, wall.length - finalW - margin));
