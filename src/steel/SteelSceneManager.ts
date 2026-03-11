@@ -348,6 +348,14 @@ export class SteelSceneManager {
       }
     });
 
+    // REFUERZOS INTERNACIONALES: Montantes de respaldo (Backing Studs) para anclaje de tabiques internos
+    config.internalWalls.forEach(iw => {
+      if (iw.parentWallId === wall.id) {
+        // Añadimos un montante PGC adicional en el muro perimetral para el anclaje del tabique
+        structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange / 2, this.profileFlange, 90, 'PGC', this.colors.junction));
+      }
+    });
+
     if (layers.horizontalBlocking) {
       const blocks = StructuralEngine.calculateBlocking(wall);
       blocks.forEach(b => {

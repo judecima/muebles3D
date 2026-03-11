@@ -10,27 +10,30 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   let totalPGC70LenMM = 0;
   let totalNetAreaMM2 = 0;
   let totalInteriorAreaMM2 = 0;
-  let totalStudCount = 0;
 
   const BAR_LENGTH_M = 6;
   const STEEL_WASTE = 1.15; 
   const PANEL_AREA_M2 = 1.2 * 2.4; 
 
-  // Muros Perimetrales
+  // Muros Perimetrales (PGC/PGU 100mm)
   config.walls.forEach(wall => {
     const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - 80;
 
     panels.forEach(p => {
-      totalPGULenMM += (p.width * 2);
+      totalPGULenMM += (p.width * 2); // Soleras superior e inferior
       const startStuds = p.isWallStart ? 3 : 2;
       totalPGCLenMM += startStuds * studHeight;
       totalPGCLenMM += Math.floor(p.width / wall.studSpacing) * studHeight;
     });
 
+    // Sumar montantes de respaldo (Backing Studs) para tabiques internos
+    const anchorStudsCount = config.internalWalls.filter(iw => iw.parentWallId === wall.id).length;
+    totalPGCLenMM += anchorStudsCount * studHeight;
+
     wall.openings.forEach(op => {
-      totalPGULenMM += op.width * 2;
-      totalPGCLenMM += (6 * studHeight);
+      totalPGULenMM += op.width * 2; // Dinteles y umbrales (estimado PGU)
+      totalPGCLenMM += (6 * studHeight); // King studs y Jack studs (promedio 6 perfiles por vano)
     });
 
     const wallArea = wall.length * wall.height;
@@ -42,7 +45,13 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     totalPGU70LenMM += iw.length * 2;
     const studCount = Math.ceil(iw.length / 400) + 1;
     totalPGC70LenMM += studCount * iw.height;
-    totalInteriorAreaMM2 += (iw.length * iw.height * 2); // Dos caras
+    
+    // Sumar refuerzos de aberturas internas
+    (iw.openings || []).forEach(op => {
+      totalPGC70LenMM += (4 * iw.height); // Refuerzos laterales simplificados
+    });
+
+    totalInteriorAreaMM2 += (iw.length * iw.height * 2); // Dos caras por tabique
   });
 
   // Consolidación de Items
@@ -51,7 +60,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((totalPGULenMM / 1000 / BAR_LENGTH_M) * STEEL_WASTE),
-    description: `Estructura perimetral.`
+    description: `Estructura perimetral (Soleras y Dinteles).`
   });
 
   items.push({
@@ -59,7 +68,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((totalPGCLenMM / 1000 / BAR_LENGTH_M) * STEEL_WASTE),
-    description: `Montantes perimetrales.`
+    description: `Montantes perimetrales, refuerzos de esquina y respaldo.`
   });
 
   items.push({
@@ -91,7 +100,17 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'paneles',
     unit: 'un',
     quantity: Math.ceil(((totalNetAreaMM2 + totalInteriorAreaMM2) / 1000000 / PANEL_AREA_M2) * 1.12),
-    description: `Revestimiento interior total.`
+    description: `Revestimiento interior (Perímetro + Tabiques ambas caras).`
+  });
+
+  // Cálculo de fijaciones y anclajes
+  const totalPerimeterM = config.walls.reduce((sum, w) => sum + w.length, 0) / 1000;
+  items.push({
+    name: 'Anclaje Químico / Pernos 1/2"',
+    category: 'fijaciones',
+    unit: 'un',
+    quantity: Math.ceil(totalPerimeterM / 0.6) + (config.walls.length * 2),
+    description: `Anclaje de soleras inferiores a fundación.`
   });
 
   return {
