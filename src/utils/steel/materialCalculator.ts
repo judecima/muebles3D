@@ -1,9 +1,9 @@
 import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall } from '@/lib/steel/types';
 
 /**
- * Calculador de Materiales para Steel Framing v1.6
- * Optimizado para cálculo por UNIDAD COMERCIAL (Barra de 6 metros).
- * Garantiza cálculo lineal estricto sin desperdicio automático para máxima precisión solicitada.
+ * Calculador de Materiales para Steel Framing v1.7
+ * Optimizado para cálculo por UNIDADES COMERCIALES (Barras de 6m y Placas de 1.2x2.4m).
+ * Garantiza cálculo neto estricto para máxima precisión geométrica.
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -14,43 +14,35 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   let totalBracingLenMM = 0;
 
   const BAR_LENGTH_M = 6;
+  const PANEL_WIDTH_M = 1.2;
+  const PANEL_HEIGHT_M = 2.4;
+  const PANEL_AREA_M2 = PANEL_WIDTH_M * PANEL_HEIGHT_M; // 2.88 m2
   const PROFILE_FLANGE = 40; // 40mm para el ala del perfil
 
   config.walls.forEach(wall => {
     // --- 1. SOLERAS (PGU) ---
-    // Cada pared tiene obligatoriamente una solera superior y una inferior.
     const wallSolerasLinear = wall.length * 2;
     totalPGULenMM += wallSolerasLinear;
 
     // --- 2. MONTANTES (PGC) ---
     const studHeight = (wall.height - (PROFILE_FLANGE * 2));
-    
-    // Montantes por modulación (PGC)
-    // Usamos Math.ceil para asegurar que cubrimos todo el largo.
     const baseStudCount = Math.ceil(wall.length / wall.studSpacing) + 1;
     let wallStuds = baseStudCount;
 
-    // Refuerzos de encuentro (PGC) - Se añaden 2 montantes extra para esquinas/uniones
+    // Refuerzos de encuentro
     wallStuds += 2; 
 
     // Estructura de Vanos (Aberturas)
     wall.openings.forEach(op => {
-      const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      const opTop = (sill + op.height);
-      
-      // Refuerzos de vano: 2 King Studs y 2 Jack Studs (PGC)
-      wallStuds += 4;
-
-      // Dintel (PGU)
-      totalPGULenMM += op.width;
-      
-      // Umbral (PGU) - Solo en ventanas
+      wallStuds += 4; // 2 King + 2 Jack
+      totalPGULenMM += op.width; // Dintel
       if (op.type === 'window') {
-        totalPGULenMM += op.width;
+        totalPGULenMM += op.width; // Umbral
       }
 
-      // Cripples (Montantes cortos PGC sobre dintel y bajo umbral)
       const crippleCount = Math.max(1, Math.floor(op.width / wall.studSpacing));
+      const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+      const opTop = (sill + op.height);
       const upperCrippleH = Math.max(0, wall.height - opTop - PROFILE_FLANGE);
       const lowerCrippleH = sill > PROFILE_FLANGE ? (sill - PROFILE_FLANGE) : 0;
       
@@ -60,10 +52,9 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       }
     });
 
-    // Sumar montantes principales a la longitud total de PGC
     totalPGCLenMM += (wallStuds * studHeight);
 
-    // --- 3. PANELES (ÁREAS) ---
+    // --- 3. PANELES (ÁREAS NETAS) ---
     const wallArea = (wall.length * wall.height);
     let openingsArea = 0;
     wall.openings.forEach(op => {
@@ -77,55 +68,51 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     // --- 4. CRUCES DE SAN ANDRÉS ---
     if (wall.length > 2000) {
       const diag = Math.sqrt(Math.pow(wall.length, 2) + Math.pow(wall.height, 2));
-      totalBracingLenMM += (diag * 2); // Forma de X
+      totalBracingLenMM += (diag * 2);
     }
   });
 
-  // Conversión a Metros Lineales
   const totalPGULenM = totalPGULenMM / 1000;
   const totalPGCLenM = totalPGCLenMM / 1000;
-  const totalBracingLenM = totalBracingLenMM / 1000;
   const totalExteriorAreaM2 = totalExteriorAreaMM2 / 1000000;
   const totalInteriorAreaM2 = totalInteriorAreaMM2 / 1000000;
 
   // --- GENERACIÓN DE ÍTEMS COMERCIALES ---
 
   // PGU (Soleras, Dinteles, Umbrales)
-  // Ajuste: Desperdicio 0% para exactitud matemática solicitada (48m = 8 barras)
-  const pguUnits = Math.ceil(totalPGULenM / BAR_LENGTH_M);
   items.push({
     name: 'Perfil PGU 100x0.9mm (Soleras)',
     category: 'perfileria',
     unit: 'un',
-    quantity: pguUnits,
+    quantity: Math.ceil(totalPGULenM / BAR_LENGTH_M),
     description: `Barras de 6m. Cálculo neto: ${totalPGULenM.toFixed(1)}m lineales.`
   });
 
   // PGC (Montantes, Refuerzos, Cripples)
-  const pgcUnits = Math.ceil(totalPGCLenM / BAR_LENGTH_M);
   items.push({
     name: 'Perfil PGC 100x0.9mm (Montantes)',
     category: 'perfileria',
     unit: 'un',
-    quantity: pgcUnits,
+    quantity: Math.ceil(totalPGCLenM / BAR_LENGTH_M),
     description: `Barras de 6m. Cálculo neto: ${totalPGCLenM.toFixed(1)}m lineales.`
   });
 
-  // Paneles y Otros
+  // Placa OSB (Exterior)
   items.push({
     name: 'Placa OSB 12mm (Exterior)',
     category: 'paneles',
-    unit: 'm2',
-    quantity: parseFloat((totalExteriorAreaM2 * 1.10).toFixed(2)),
-    description: 'Área neta + 10% desperdicio por recortes.'
+    unit: 'un',
+    quantity: Math.ceil(totalExteriorAreaM2 / PANEL_AREA_M2),
+    description: `Placas de 1.2x2.4m (2.88m²). Área neta total: ${totalExteriorAreaM2.toFixed(1)}m².`
   });
 
+  // Placa de Yeso (Interior)
   items.push({
     name: 'Placa de Yeso 12.5mm (Interior)',
     category: 'paneles',
-    unit: 'm2',
-    quantity: parseFloat((totalInteriorAreaM2 * 1.10).toFixed(2)),
-    description: 'Revestimiento interior estándar.'
+    unit: 'un',
+    quantity: Math.ceil(totalInteriorAreaM2 / PANEL_AREA_M2),
+    description: `Placas de 1.2x2.4m (2.88m²). Área neta total: ${totalInteriorAreaM2.toFixed(1)}m².`
   });
 
   items.push({
@@ -148,7 +135,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     name: 'Cinta de Acero (Strap)',
     category: 'perfileria',
     unit: 'm',
-    quantity: parseFloat(totalBracingLenMM / 1000).toFixed(2) as any,
+    quantity: parseFloat((totalBracingLenMM / 1000).toFixed(2)) as any,
     description: 'Cruces de San Andrés para rigidez lateral.'
   });
 
