@@ -8,10 +8,9 @@ import {
   ClipboardList, 
   Weight, 
   Package, 
-  Settings2,
   AlertCircle,
-  Ruler,
-  Layers
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 
 interface SteelMaterialsTableProps {
@@ -29,46 +28,48 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
     otros: { label: 'Otros', color: 'bg-slate-50 text-slate-500' }
   };
 
-  const totalBars = estimate.items
-    .filter(i => i.category === 'perfileria' && i.unit === 'un')
-    .reduce((acc, curr) => acc + curr.quantity, 0);
+  const pguItem = estimate.items.find(i => i.name.includes('PGU'));
+  const pgcItem = estimate.items.find(i => i.name.includes('PGC'));
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-none border-slate-200 bg-slate-50/50">
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Peso Acero Estimado</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Peso Estructural</CardTitle>
             <Weight className="w-4 h-4 text-blue-500" />
           </CardHeader>
           <CardContent className="py-2 px-4">
             <div className="text-2xl font-black text-slate-800">{estimate.totalSteelWeightKg} <span className="text-xs font-bold text-slate-400">KG</span></div>
-            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">PGC/PGU Galvanizado</p>
+            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">Acero Galvanizado Total</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-none border-slate-200 bg-slate-50/50">
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Total Barras 6m</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Barras PGU (6m)</CardTitle>
             <Layers className="w-4 h-4 text-green-500" />
           </CardHeader>
           <CardContent className="py-2 px-4">
             <div className="text-2xl font-black text-slate-800">
-              {totalBars} 
+              {pguItem?.quantity || 0} 
               <span className="text-xs font-bold text-slate-400"> UN</span>
             </div>
-            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">Sumatoria PGC + PGU</p>
+            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">Soleras y Dinteles</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-none border-slate-200 bg-slate-50/50">
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Items en Cómputo</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Barras PGC (6m)</CardTitle>
             <Package className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent className="py-2 px-4">
-            <div className="text-2xl font-black text-slate-800">{estimate.items.length} <span className="text-xs font-bold text-slate-400">RUBROS</span></div>
-            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">Listado completo para acopio</p>
+            <div className="text-2xl font-black text-slate-800">
+              {pgcItem?.quantity || 0} 
+              <span className="text-xs font-bold text-slate-400"> UN</span>
+            </div>
+            <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">Montantes y Refuerzos</p>
           </CardContent>
         </Card>
       </div>
@@ -76,7 +77,7 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
       <Card className="shadow-none border-slate-200 overflow-hidden">
         <CardHeader className="bg-slate-900 text-white py-3 px-4">
           <CardTitle className="text-xs font-bold flex items-center gap-2">
-            <ClipboardList className="w-4 h-4" /> Cómputo Métrico Industrial (Steel Framing)
+            <ClipboardList className="w-4 h-4" /> Cómputo Métrico Detallado (Unidades de 6m)
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -118,9 +119,14 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
 
       <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
         <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-        <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
-          <strong>Nota Técnica:</strong> Los perfiles se calculan en unidades de <strong>barra comercial de 6 metros</strong>. El factor de desperdicio está incluido en la sumatoria total de cada ítem.
-        </p>
+        <div className="space-y-1">
+          <p className="text-[10px] text-blue-700 leading-relaxed font-bold uppercase">Nota Técnica de Cómputo:</p>
+          <p className="text-[10px] text-blue-600 leading-relaxed font-medium">
+            Las soleras (PGU) se calculan linealmente: (Largo pared x 2) + Dinteles + Umbrales. 
+            Para una casa de 6x6m sin aberturas, el total es 48m lineales, lo que equivale a 8 barras comerciales de 6 metros. 
+            El excedente mostrado incluye el factor de desperdicio por recortes.
+          </p>
+        </div>
       </div>
     </div>
   );
