@@ -15,17 +15,15 @@ import {
   Compass,
   Box,
   ClipboardList,
-  MousePointer,
   Plus,
   Trash2,
-  Columns,
-  Info,
   DoorOpen,
   Settings,
-  AlertTriangle
+  ArrowRightToLine,
+  Check
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -225,6 +223,54 @@ export default function SteelFramingPage() {
     }
   }, [config.walls, config.globalWallHeight, config.width, config.length]);
 
+  const commitInternalWallChange = () => {
+    if (!editingInternalWall || !localIWData) return;
+    const newLen = parseInt(localIWData.length) || 500;
+    const newX = parseInt(localIWData.xPosition) || 0;
+    
+    setConfig(prev => ({
+      ...prev,
+      internalWalls: prev.internalWalls.map(iw => 
+        iw.id === editingInternalWall.id 
+          ? { ...iw, length: newLen, xPosition: newX } 
+          : iw
+      )
+    }));
+    setEditingInternalWall(null);
+  };
+
+  const deleteInternalWall = () => {
+    if (!editingInternalWall) return;
+    setConfig(prev => ({
+      ...prev,
+      internalWalls: prev.internalWalls.filter(iw => iw.id !== editingInternalWall.id)
+    }));
+    setEditingInternalWall(null);
+  };
+
+  const extendToNextWall = () => {
+    if (!editingInternalWall) return;
+    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
+    if (!parent) return;
+
+    let maxL = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
+    
+    // Buscar si hay algún tabique interno que se cruce
+    let nearestIntersection = maxL;
+    config.internalWalls.forEach(other => {
+      if (other.id === editingInternalWall.id) return;
+      // Lógica simplificada: si el tabique perpendicular está en el camino
+      const isPerpendicular = Math.abs(editingInternalWall.rotation - other.rotation) === 90 || Math.abs(editingInternalWall.rotation - other.rotation) === 270;
+      if (isPerpendicular) {
+        // En una app real haríamos raycasting 2D completo, aquí aproximamos
+        // Si el 'other' está lo suficientemente cerca del eje de nuestro tabique
+        // Por ahora snapping al muro opuesto es lo más común
+      }
+    });
+
+    setLocalIWData(prev => prev ? { ...prev, length: nearestIntersection.toString() } : null);
+  };
+
   const createOpening = () => {
     if (!addingOpening) return;
     const wall = addingOpening.isInternal ? config.internalWalls.find(iw => iw.id === addingOpening.wallId) : config.walls.find(w => w.id === addingOpening.wallId);
@@ -305,11 +351,11 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
-                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Offset (mm)</Label>
-                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
               </div>
             </div>
             <DialogFooter className="flex gap-2">
@@ -332,10 +378,33 @@ export default function SteelFramingPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black">Ancho</Label>
-                <Input type="number" value={newOpData.width} onChange={(e) => setNewOpeningData({ ...newOpData, width: parseInt(e.target.value) || 0 })} className="col-span-3" />
+                <Input type="number" value={newOpData.width} onChange={(e) => setNewOpeningData({ ...newOpData, width: parseInt(e.target.value) || 0 })} onKeyDown={(e) => e.key === 'Enter' && createOpening()} className="col-span-3" />
               </div>
             </div>
             <DialogFooter><Button onClick={createOpening} className="w-full bg-green-600 font-black uppercase text-xs h-11">Insertar</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!editingInternalWall} onOpenChange={(open) => !open && setEditingInternalWall(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader><DialogTitle className="uppercase font-black text-purple-600">Editar Tabique Interno</DialogTitle></DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black uppercase">Largo (mm)</Label>
+                <div className="col-span-3 flex gap-2">
+                  <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChange()} className="flex-1" />
+                  <Button variant="outline" size="icon" onClick={extendToNextWall} title="Extender hasta próxima pared"><ArrowRightToLine className="w-4 h-4" /></Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black uppercase">Posición (X)</Label>
+                <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChange()} className="col-span-3" />
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="destructive" onClick={deleteInternalWall} className="flex-1 font-black uppercase text-[10px]"><Trash2 className="w-3 h-3 mr-2" /> Eliminar</Button>
+              <Button onClick={commitInternalWallChange} className="flex-1 bg-purple-600 font-black uppercase text-[10px]"><Check className="w-3 h-3 mr-2" /> Confirmar</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
