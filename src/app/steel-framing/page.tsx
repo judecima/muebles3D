@@ -107,15 +107,6 @@ export default function SteelFramingPage() {
       if (iw.parentWallId === wallId) boundaries.push(iw.xPosition);
     });
 
-    config.internalWalls.forEach(iw => {
-      const parent = config.walls.find(w => w.id === iw.parentWallId);
-      if (!parent) return;
-      const isOpposite = (parent.id === 'w1' && wallId === 'w3') || (parent.id === 'w3' && wallId === 'w1') || (parent.id === 'w2' && wallId === 'w4') || (parent.id === 'w4' && wallId === 'w2');
-      if (isOpposite && Math.abs(iw.length - (wallId === 'w1' || wallId === 'w3' ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS)) < 10) {
-        boundaries.push(iw.xPosition);
-      }
-    });
-
     const sortedBounds = Array.from(new Set([...boundaries, totalLength])).sort((a, b) => a - b);
     for (let i = 0; i < sortedBounds.length - 1; i++) {
       if (clickX >= sortedBounds[i] && clickX <= sortedBounds[i+1]) {
@@ -127,7 +118,7 @@ export default function SteelFramingPage() {
       }
     }
     return { start: 0, end: totalLength, min: baseMargin, max: totalLength - baseMargin };
-  }, [config.internalWalls, config.width, config.length, config.walls]);
+  }, [config.internalWalls]);
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening, isInternal?: boolean) => {
     const wall = isInternal ? config.internalWalls.find(iw => iw.id === wallId) : config.walls.find(w => w.id === wallId);
@@ -151,7 +142,7 @@ export default function SteelFramingPage() {
     if (selectedOpening.isInternal) {
       setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : iw) }));
     } else {
-      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : w) } : w) }));
+      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : w) }));
     }
     setSelectedOpening(null);
   };
@@ -199,19 +190,8 @@ export default function SteelFramingPage() {
   };
 
   const handleFloorDoubleClick = (x: number, z: number) => {
-    // Buscar si hay dos tabiques paralelos con extremos libres cerca del punto del clic
-    const candidates = config.internalWalls.filter(iw => {
-      // Un tabique se considera "libre" si no ha sido extendido hasta otra pared
-      const isShort = iw.length < (config.width - 200); 
-      return isShort;
-    });
-
+    const candidates = config.internalWalls.filter(iw => iw.length < (config.width - 200));
     if (candidates.length >= 2) {
-      // Encontrar los dos más cercanos al punto del clic
-      const sorted = candidates.sort((a,b) => {
-        // Distancia aproximada al extremo del tabique
-        return 0; // Simplificado para este MVP: tomamos los dos primeros libres
-      });
       setRoomGenerator({ x, z, p1: candidates[0], p2: candidates[1] });
     }
   };
@@ -233,31 +213,75 @@ export default function SteelFramingPage() {
     setRoomGenerator(null);
   };
 
+  // Función mejorada para obtener el segmento global de cualquier muro
+  const getWallGlobalSegment = (wall: SteelWall | InternalWall) => {
+    if ('rotation' in wall && !('parentWallId' in wall)) {
+      const sw = wall as SteelWall;
+      const angle = (sw.rotation * Math.PI) / 180;
+      return {
+        p1: { x: sw.x, z: sw.z },
+        p2: { x: sw.x + Math.cos(angle) * sw.length, z: sw.z - Math.sin(angle) * sw.length }
+      };
+    }
+    const iw = wall as InternalWall;
+    const parent = config.walls.find(w => w.id === iw.parentWallId) || config.internalWalls.find(w => w.id === iw.parentWallId);
+    if (!parent) return { p1: {x:0, z:0}, p2: {x:0, z:0} };
+    const parentSeg = getWallGlobalSegment(parent);
+    const parentAngle = (parent.rotation * Math.PI) / 180;
+    const startX = parentSeg.p1.x + Math.cos(parentAngle) * iw.xPosition;
+    const startZ = parentSeg.p1.z - Math.sin(parentAngle) * iw.xPosition;
+    const angle = (iw.rotation * Math.PI) / 180;
+    return {
+      p1: { x: startX, z: startZ },
+      p2: { x: startX + Math.cos(angle) * iw.length, z: startZ - Math.sin(angle) * iw.length }
+    };
+  };
+
   const extendToNextWall = () => {
     if (!editingInternalWall) return;
-    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId) || config.internalWalls.find(w => w.id === editingInternalWall.parentWallId);
-    if (!parent) return;
-    // Lógica secuencial implementada anteriormente: iterar sobre muros exteriores e internos
-    // ... (Se mantiene la lógica de distancias y sorting)
+    const seg = getWallGlobalSegment(editingInternalWall);
+    const dir = { x: Math.cos((editingInternalWall.rotation * Math.PI) / 180), z: -Math.sin((editingInternalWall.rotation * Math.PI) / 180) };
+    
+    // Buscar todas las paredes que no sean la actual ni su padre
+    const otherWalls = [
+      ...config.walls,
+      ...config.internalWalls.filter(iw => iw.id !== editingInternalWall.id && iw.id !== editingInternalWall.parentWallId)
+    ];
+
+    const intersections: number[] = [];
+    otherWalls.forEach(w => {
+      const otherSeg = getWallGlobalSegment(w);
+      // Intersección de rayo con segmento
+      const x1 = seg.p1.x, z1 = seg.p1.z, x2 = seg.p1.x + dir.x * 10000, z2 = seg.p1.z + dir.z * 10000;
+      const x3 = otherSeg.p1.x, z3 = otherSeg.p1.z, x4 = otherSeg.p2.x, z4 = otherSeg.p2.z;
+      const den = (x1 - x2) * (z3 - z4) - (z1 - z2) * (x3 - x4);
+      if (Math.abs(den) < 0.01) return;
+      const t = ((x1 - x3) * (z3 - z4) - (z1 - z3) * (x3 - x4)) / den;
+      const u = -((x1 - x2) * (z1 - z3) - (z1 - z2) * (x1 - x3)) / den;
+      if (t > 0 && u >= 0 && u <= 1) {
+        intersections.push(Math.round(t * 10000));
+      }
+    });
+
+    const sorted = Array.from(new Set(intersections)).sort((a, b) => a - b);
     const currentLen = parseInt(localIWData?.length || "0") || editingInternalWall.length;
-    setLocalIWData(prev => prev ? { ...prev, length: Math.round(currentLen + 500).toString() } : null);
+    
+    // Buscar la siguiente intersección después del largo actual
+    const next = sorted.find(d => d > currentLen + 50);
+    const finalLen = next || sorted[0] || currentLen;
+    
+    setLocalIWData(prev => prev ? { ...prev, length: finalLen.toString() } : null);
   };
 
   const joinWithParallel = (side: 'left' | 'right') => {
     if (!editingInternalWall) return;
     const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
     if (!parent) return;
-    
-    // Buscar tabiques paralelos al actual
     const parallels = config.internalWalls.filter(iw => iw.parentWallId === parent.id && iw.id !== editingInternalWall.id);
     const sorted = parallels.sort((a, b) => a.xPosition - b.xPosition);
-    
     let target: InternalWall | null = null;
-    if (side === 'left') {
-      target = sorted.reverse().find(iw => iw.xPosition < editingInternalWall.xPosition) || null;
-    } else {
-      target = sorted.find(iw => iw.xPosition > editingInternalWall.xPosition) || null;
-    }
+    if (side === 'left') target = sorted.reverse().find(iw => iw.xPosition < editingInternalWall.xPosition) || null;
+    else target = sorted.find(iw => iw.xPosition > editingInternalWall.xPosition) || null;
 
     if (target) {
       const dist = Math.abs(editingInternalWall.xPosition - target.xPosition);
@@ -366,6 +390,10 @@ export default function SteelFramingPage() {
                   <Button variant="outline" size="icon" onClick={extendToNextWall} title="Proyectar a próxima pared"><ArrowRightToLine className="w-4 h-4" /></Button>
                 </div>
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black uppercase">Posición (mm)</Label>
+                <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} className="col-span-3" />
+              </div>
               <div className="space-y-3 mt-2 border-t pt-4">
                 <Label className="text-[9px] font-black uppercase text-slate-400">Uniones Inteligentes</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -385,7 +413,7 @@ export default function SteelFramingPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Diálogos previos para vanos y opciones de tabique se mantienen */}
+        {/* Diálogo Editar Vano */}
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader><DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-blue-600"><Settings2 className="w-5 h-5" /> Editar Vano {selectedOpening?.isInternal ? '(Interno)' : ''}</DialogTitle></DialogHeader>
