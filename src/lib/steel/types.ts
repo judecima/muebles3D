@@ -7,6 +7,7 @@ export interface SteelOpening {
   height: number;
   position: number; 
   sillHeight?: number; 
+  status?: 'ok' | 'warning' | 'error';
 }
 
 export interface InternalWall {
@@ -19,6 +20,7 @@ export interface InternalWall {
   x: number;
   z: number;
   openings: SteelOpening[];
+  status?: 'ok' | 'warning' | 'error';
 }
 
 export interface SteelWall {
@@ -31,6 +33,7 @@ export interface SteelWall {
   rotation: number;
   openings: SteelOpening[];
   studSpacing: 400 | 600;
+  status?: 'ok' | 'warning' | 'error';
 }
 
 export interface LayerVisibility {

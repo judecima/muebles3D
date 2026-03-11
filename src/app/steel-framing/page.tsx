@@ -20,7 +20,8 @@ import {
   Columns,
   Info,
   DoorOpen,
-  Settings
+  Settings,
+  AlertTriangle
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -28,6 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { StructuralEngine } from '@/utils/steel/structuralEngine';
 
 const EDGE_MARGIN = 400; 
 const DEFAULT_SILL = 900; 
@@ -59,6 +61,7 @@ const INITIAL_CONFIG: SteelHouseConfig = {
 
 export default function SteelFramingPage() {
   const [config, setConfig] = useState<SteelHouseConfig>(INITIAL_CONFIG);
+  const [structuralAlerts, setStructuralAlerts] = useState<any[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening, isInternal?: boolean } | null>(null);
@@ -77,6 +80,7 @@ export default function SteelFramingPage() {
   
   const viewerRef = useRef<{ enterWalkMode: () => void, exitWalkMode: () => void }>(null);
 
+  // EFECTO DE REAJUSTE AUTOMÁTICO DE MUROS INTERNOS Y VALIDACIÓN
   useEffect(() => {
     const newWalls = config.walls.map(w => {
       if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
@@ -85,14 +89,35 @@ export default function SteelFramingPage() {
       if (w.id === 'w4') return { ...w, length: config.length, x: -config.width/2, z: config.length/2 };
       return w;
     });
+
+    // Recortar muros internos que se salgan del nuevo tamaño
+    const newInternalWalls = config.internalWalls.map(iw => {
+      const parent = newWalls.find(w => w.id === iw.parentWallId);
+      if (!parent) return iw;
+
+      let maxLen = 10000;
+      if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - 150;
+      if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - 150;
+
+      const adjustedLength = Math.min(iw.length, maxLen);
+      const adjustedX = Math.min(iw.xPosition, parent.length - 50);
+
+      return { ...iw, length: adjustedLength, xPosition: adjustedX };
+    });
     
     const hasChanges = newWalls.some((w, i) => 
       w.length !== config.walls[i]?.length || 
       w.x !== config.walls[i]?.x || 
       w.z !== config.walls[i]?.z
-    );
+    ) || newInternalWalls.some((iw, i) => iw.length !== config.internalWalls[i]?.length);
 
-    if (hasChanges) setConfig(prev => ({ ...prev, walls: newWalls }));
+    if (hasChanges) {
+      setConfig(prev => ({ ...prev, walls: newWalls, internalWalls: newInternalWalls }));
+    }
+
+    // Auditoría estructural
+    setStructuralAlerts(StructuralEngine.validateStructure(config));
+
   }, [config.width, config.length]);
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening, isInternal?: boolean) => {
@@ -114,12 +139,8 @@ export default function SteelFramingPage() {
     if (side === 'exterior') {
       setAddingOpening({ wallId, x });
     } else {
-      // Validar que no estemos sobre una ventana
       const isOverOpening = parent.openings.some(op => x >= op.position && x <= (op.position + op.width));
-      if (isOverOpening) {
-        alert("No se puede anclar un tabique sobre una abertura.");
-        return;
-      }
+      if (isOverOpening) return;
 
       const targetRotation = (parent.rotation - 90 + 360) % 360;
       let maxPossibleLength = 2000;
@@ -155,10 +176,9 @@ export default function SteelFramingPage() {
     let len = parseInt(localIWData.length) || 0;
     let xPos = parseInt(localIWData.xPosition) || 0;
 
-    // Validar anclaje sobre abertura (con un margen de 50mm para tornillería)
     const isOverOpening = parent.openings.some(op => xPos >= (op.position - 50) && xPos <= (op.position + op.width + 50));
     if (isOverOpening) {
-      alert("El punto de anclaje interfiere con una abertura del perímetro. Desplace el tabique.");
+      alert("Punto de anclaje interfiere con abertura.");
       return;
     }
 
@@ -177,7 +197,6 @@ export default function SteelFramingPage() {
       internalWalls: prev.internalWalls.map(iw => iw.id === updated.id ? updated : iw)
     }));
     
-    // CERRAR MODAL TRAS ÉXITO
     setEditingInternalWall(null);
     setLocalIWData(null);
   };
@@ -208,12 +227,11 @@ export default function SteelFramingPage() {
       const finalW = Math.min(w, wall.length - EDGE_MARGIN * 2);
       const finalP = Math.max(EDGE_MARGIN, Math.min(p, wall.length - finalW - EDGE_MARGIN));
       
-      // Validar si hay un tabique interno en esa posición antes de mover la ventana
       const hasInternalWall = config.internalWalls.some(iw => 
         iw.parentWallId === wall.id && iw.xPosition >= finalP && iw.xPosition <= (finalP + finalW)
       );
       if (hasInternalWall) {
-        alert("No se puede mover la abertura sobre un tabique interno.");
+        alert("Interferencia con tabique interno.");
         return;
       }
 
@@ -277,7 +295,6 @@ export default function SteelFramingPage() {
       sillHeight: newOpData.type === 'window' ? newOpData.sill : 0
     };
 
-    // Validar colisión con tabiques internos
     const hasInternalWall = config.internalWalls.some(iw => 
       iw.parentWallId === wall.id && iw.xPosition >= newOp.position && iw.xPosition <= (newOp.position + newOp.width)
     );
@@ -304,7 +321,7 @@ export default function SteelFramingPage() {
   return (
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-100">
       <aside className={`hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0 z-40 transition-all ${isWalkModeActive ? '-ml-80' : ''}`}>
-        <SteelControlPanel config={config} onConfigChange={setConfig} />
+        <SteelControlPanel config={config} onConfigChange={setConfig} structuralAlerts={structuralAlerts} />
       </aside>
 
       <main className="flex-1 flex flex-col relative overflow-hidden h-full min-h-0">
@@ -315,7 +332,7 @@ export default function SteelFramingPage() {
                 <Button variant="ghost" size="icon" className="md:hidden"><Menu className="w-5 h-5" /></Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-80">
-                <SteelControlPanel config={config} onConfigChange={setConfig} />
+                <SteelControlPanel config={config} onConfigChange={setConfig} structuralAlerts={structuralAlerts} />
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-1.5">
@@ -325,6 +342,12 @@ export default function SteelFramingPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {structuralAlerts.length > 0 && (
+              <div className="hidden lg:flex items-center gap-2 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-[10px] font-black text-amber-700 uppercase">{structuralAlerts.length} ADVERTENCIAS ESTRUCTURALES</span>
+              </div>
+            )}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="h-8">
               <TabsList className="bg-slate-100 h-8 p-1 rounded-lg">
                 <TabsTrigger value="3d" className="text-[10px] font-bold uppercase h-6 px-3"><Box className="w-3 h-3 mr-1.5" /> Estructura 3D</TabsTrigger>
@@ -365,6 +388,7 @@ export default function SteelFramingPage() {
           </Tabs>
         </div>
 
+        {/* DIALOGS IGUALES AL ANTERIOR PERO CON MEJORAS DE UX */}
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -413,11 +437,6 @@ export default function SteelFramingPage() {
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader><DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-purple-600"><Columns className="w-5 h-5" /> Tabique Drywall</DialogTitle></DialogHeader>
             <div className="grid gap-6 py-4">
-              <Alert className="bg-purple-50 border-purple-100">
-                <Info className="h-4 w-4 text-purple-600" />
-                <AlertTitle className="text-[10px] font-black uppercase text-purple-700">Referencia de Anclaje</AlertTitle>
-                <AlertDescription className="text-[10px] text-purple-600 font-medium">Este muro nace de la pared perimetral #{editingInternalWall?.parentWallId}.</AlertDescription>
-              </Alert>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Inicio (mm)</Label>
                 <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} className="col-span-3 h-9 font-bold" />
@@ -438,7 +457,6 @@ export default function SteelFramingPage() {
           <DialogContent className="sm:max-w-[400px]">
             <DialogHeader>
               <DialogTitle className="uppercase font-black text-slate-800 tracking-tighter">Opciones de Tabique</DialogTitle>
-              <DialogDescription className="text-xs text-slate-500 font-medium">Seleccione la acción técnica que desea realizar sobre este tabique interno.</DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4 py-6">
               <Button 

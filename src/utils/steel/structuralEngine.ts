@@ -6,6 +6,7 @@ export interface HeaderAnalysis {
   deflectionMm: number;
   maxAllowableDeflection: number;
   requiredIx: number;
+  status: 'ok' | 'warning' | 'error';
 }
 
 export interface BlockingData {
@@ -20,10 +21,10 @@ export class StructuralEngine {
   private static readonly TUBE_IX = 1200000; 
   
   // Criterios de diseño (Norma AISI)
-  private static readonly DEAD_LOAD_KPA = 0.5; // kN/m2 (Peso propio + placas)
-  private static readonly LIVE_LOAD_ROOF_KPA = 1.0; // kN/m2
-  private static readonly WIND_PRESSURE_KPA = 0.8; // kN/m2 (Presión lateral)
-  private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; // Capacidad de corte sin rigidizar por metro
+  private static readonly DEAD_LOAD_KPA = 0.5; // kN/m2
+  private static readonly LIVE_LOAD_ROOF_KPA = 1.0; 
+  private static readonly WIND_PRESSURE_KPA = 0.8; 
+  private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; 
 
   /**
    * Analiza y divide un muro en paneles estructurales aplicando cálculo de cargas
@@ -39,9 +40,6 @@ export class StructuralEngine {
       const xEnd = (i + 1) * panelWidth;
       
       const loads = this.calculatePanelLoads(panelWidth, wall.height, config);
-      
-      // Decisión de rigidización: si la fuerza de corte supera la capacidad nominal
-      // O si el panel es un extremo de muro (criterio de estabilidad global)
       const needsBracing = (loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * panelWidth / 1000) || (i === 0 || i === numPanels - 1);
 
       panels.push({
@@ -58,18 +56,12 @@ export class StructuralEngine {
     return panels;
   }
 
-  /**
-   * Calcula las cargas tributarias para un panel específico
-   */
   private static calculatePanelLoads(widthMm: number, heightMm: number, config: SteelHouseConfig): PanelLoads {
     const widthM = widthMm / 1000;
     const heightM = heightMm / 1000;
-    const tributaryWidthM = config.length / 2000; // Mitad de la profundidad de la casa
+    const tributaryWidthM = config.length / 2000; 
 
-    // 1. Carga Vertical (kN -> N)
     const verticalLoadKN = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * widthM * tributaryWidthM;
-    
-    // 2. Carga Lateral (Viento)
     const shearForceKN = this.WIND_PRESSURE_KPA * widthM * heightM;
 
     return {
@@ -82,15 +74,18 @@ export class StructuralEngine {
   static calculateHeader(opening: SteelOpening, config: SteelHouseConfig): HeaderAnalysis {
     const L = opening.width;
     const tributaryWidth = config.length / 2; 
-    const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; // kN/mm2 -> N/mm2
+    const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; 
     const loadNmm = designLoadTotal * tributaryWidth; 
     
     const maxAllowableDeflection = L / 360;
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
 
     let type: HeaderAnalysis['type'] = 'single';
+    let status: HeaderAnalysis['status'] = 'ok';
+
     if (L > 2500 || requiredIx > this.TUBE_IX) {
       type = 'truss';
+      status = 'warning'; // Requiere refuerzo especial no estándar
     } else if (requiredIx > (this.PGC_IX_SINGLE * 3)) {
       type = 'tube';
     } else if (requiredIx > (this.PGC_IX_SINGLE * 2)) {
@@ -99,15 +94,9 @@ export class StructuralEngine {
       type = 'double';
     }
 
-    let currentIx = this.PGC_IX_SINGLE;
-    if (type === 'double') currentIx *= 2;
-    if (type === 'triple') currentIx *= 3;
-    if (type === 'tube') currentIx = this.TUBE_IX;
-    if (type === 'truss') currentIx = 10000000; 
+    if (L > 3500) status = 'error'; // Límite para Steel Framing liviano sin vigas laminadas
 
-    const deflectionMm = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * currentIx);
-
-    return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx };
+    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status };
   }
 
   static calculateBlocking(wall: SteelWall): BlockingData[] {
@@ -135,5 +124,34 @@ export class StructuralEngine {
       }
     }
     return blockings;
+  }
+
+  /**
+   * Valida la salud estructural global de la configuración
+   */
+  static validateStructure(config: SteelHouseConfig): { wallId: string, status: 'ok' | 'warning' | 'error', message: string }[] {
+    const alerts: any[] = [];
+
+    config.walls.forEach(wall => {
+      // 1. Validar vanos
+      wall.openings.forEach(op => {
+        const analysis = this.calculateHeader(op, config);
+        if (analysis.status !== 'ok') {
+          alerts.push({ 
+            wallId: wall.id, 
+            status: analysis.status, 
+            message: `Vano de ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Supera límites' : 'Requiere dintel reforzado'}` 
+          });
+        }
+      });
+
+      // 2. Validar refuerzos de unión (T-Junctions)
+      const hasUnions = config.internalWalls.some(iw => iw.parentWallId === wall.id);
+      if (hasUnions && !config.layers.reinforcements) {
+        alerts.push({ wallId: wall.id, status: 'warning', message: `Unión en T en ${wall.id}: Refuerzos de unión desactivados visualmente.` });
+      }
+    });
+
+    return alerts;
   }
 }

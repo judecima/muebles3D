@@ -15,7 +15,9 @@ import {
   Layout,
   Layers,
   Maximize2,
-  Camera
+  Camera,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
@@ -23,39 +25,21 @@ import { Switch } from '@/components/ui/switch';
 interface SteelControlPanelProps {
   config: SteelHouseConfig;
   onConfigChange: (config: SteelHouseConfig) => void;
+  structuralAlerts: { status: 'ok' | 'warning' | 'error', message: string }[];
 }
 
-export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelProps) {
+export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: SteelControlPanelProps) {
   
-  const addWall = () => {
-    const newWall: SteelWall = {
-      id: Math.random().toString(36).substr(2, 9),
-      length: 4000,
-      height: config.globalWallHeight,
-      thickness: 100,
-      x: 0,
-      z: 0,
-      rotation: 0,
-      openings: [],
-      studSpacing: 400
-    };
-    onConfigChange({ ...config, walls: [...config.walls, newWall] });
-  };
-
-  const removeWall = (id: string) => {
-    onConfigChange({ ...config, walls: config.walls.filter(w => w.id !== id) });
-  };
-
-  const updateWall = (id: string, field: keyof SteelWall, value: any) => {
-    const newWalls = config.walls.map(w => w.id === id ? { ...w, [field]: value } : w);
-    onConfigChange({ ...config, walls: newWalls });
-  };
-
   const toggleLayer = (layer: keyof LayerVisibility) => {
     onConfigChange({
       ...config,
       layers: { ...config.layers, [layer]: !config.layers[layer] }
     });
+  };
+
+  const updateWall = (id: string, field: keyof SteelWall, value: any) => {
+    const newWalls = config.walls.map(w => w.id === id ? { ...w, [field]: value } : w);
+    onConfigChange({ ...config, walls: newWalls });
   };
 
   return (
@@ -64,15 +48,41 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Home className="w-5 h-5 text-blue-400" /> 
-            <span>ArquiMax Structural v8.5</span>
+            <span>ArquiMax Structural v10.0</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Motor de Cargas e Interiores</span>
+          <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Motor de Auditoría AISI</span>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="p-0 pb-20">
-        <Accordion type="multiple" defaultValue={['global', 'layers', 'walls']} className="w-full">
+        <Accordion type="multiple" defaultValue={['alerts', 'global', 'layers']} className="w-full">
           
+          {structuralAlerts.length > 0 && (
+            <AccordionItem value="alerts" className="border-b px-4 bg-amber-50/30">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-black uppercase text-amber-700">Informe de Auditoría ({structuralAlerts.length})</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-2 pb-4">
+                {structuralAlerts.map((alert, i) => (
+                  <div key={i} className={`p-2 rounded border text-[9px] font-bold flex gap-2 items-start ${alert.status === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${alert.status === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                    {alert.message}
+                  </div>
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
+          {structuralAlerts.length === 0 && (
+            <div className="px-4 py-3 bg-green-50 border-b flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-[10px] font-black text-green-700 uppercase">Estructura Validada</span>
+            </div>
+          )}
+
           <AccordionItem value="global" className="border-b px-4">
             <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2">
@@ -147,9 +157,9 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
             <AccordionContent className="pb-4">
               <div className="space-y-3">
                 {config.walls.map((wall, idx) => (
-                  <div key={wall.id} className="border rounded-xl p-3 bg-slate-50/50 space-y-3 group">
+                  <div key={wall.id} className="border rounded-xl p-3 bg-slate-50/50 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-slate-700">Muro Perímetro #{idx + 1}</span>
+                      <span className="text-[10px] font-black uppercase text-slate-700">Muro #{idx + 1}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
@@ -160,10 +170,7 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                         <Label className="text-[8px] font-bold uppercase text-slate-400">Modulación</Label>
                         <Select value={wall.studSpacing.toString()} onValueChange={(val) => updateWall(wall.id, 'studSpacing', parseInt(val))}>
                           <SelectTrigger className="h-7 text-[9px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="400">400mm</SelectItem>
-                            <SelectItem value="600">600mm</SelectItem>
-                          </SelectContent>
+                          <SelectContent><SelectItem value="400">400mm</SelectItem><SelectItem value="600">600mm</SelectItem></SelectContent>
                         </Select>
                       </div>
                     </div>
