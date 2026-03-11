@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as THREE from 'three';
@@ -43,7 +44,7 @@ export class SteelSceneManager {
     header: 0x2563eb,
     king: 0xef4444,
     jack: 0xf59e0b,
-    cripple: 0x8b5cf6, // Color distintivo para cripples
+    cripple: 0x8b5cf6, 
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
     panel_int: 0xd1d5db,
@@ -274,7 +275,6 @@ export class SteelSceneManager {
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.header, 0, thickness));
         
-        // Cripples para tabiques internos
         StructuralEngine.calculateCrippleStuds(iw, op).forEach(c => {
           group.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness));
         });
@@ -336,6 +336,32 @@ export class SteelSceneManager {
       }
     });
 
+    // BACKING STUDS: Detectar si un tabique interno se ancla aquí o termina aquí
+    config.internalWalls.forEach(iw => {
+      // Caso 1: El tabique nace de este muro
+      if (iw.parentWallId === wall.id) {
+        structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange/2, this.profileFlange, 90, 'PGC', this.colors.junction));
+      }
+      
+      // Caso 2: El tabique es pasante y termina en este muro
+      const parentOfIW = config.walls.find(w => w.id === iw.parentWallId);
+      if (parentOfIW) {
+        const isOpposite = (
+          (parentOfIW.id === 'w1' && wall.id === 'w3') ||
+          (parentOfIW.id === 'w3' && wall.id === 'w1') ||
+          (parentOfIW.id === 'w2' && wall.id === 'w4') ||
+          (parentOfIW.id === 'w4' && wall.id === 'w2')
+        );
+        
+        if (isOpposite) {
+          const maxInternal = (wall.id === 'w1' || wall.id === 'w3') ? config.length - 100 : config.width - 100;
+          if (Math.abs(iw.length - maxInternal) < 5) {
+            structuralGroup.add(this.createProfile(studHeight, iw.xPosition - this.profileFlange/2, this.profileFlange, 90, 'PGC', this.colors.junction));
+          }
+        }
+      }
+    });
+
     if (layers.horizontalBlocking) {
       StructuralEngine.calculateBlocking(wall).forEach(b => {
         structuralGroup.add(this.createProfile(b.xEnd - b.xStart, b.xStart, b.y, 0, 'PGU', this.colors.blocking));
@@ -373,7 +399,6 @@ export class SteelSceneManager {
         structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       }
 
-      // CRIpple Studs (Modulación continua sobre y bajo el vano)
       StructuralEngine.calculateCrippleStuds(wall, op).forEach(c => {
         structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple));
       });

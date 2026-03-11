@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -32,14 +33,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { StructuralEngine } from '@/utils/steel/structuralEngine';
 
 const EDGE_MARGIN_EXTERIOR = 400; 
-const EDGE_MARGIN_INTERNAL = 50; // Margen mínimo para permitir montantes de unión
+const EDGE_MARGIN_INTERNAL = 50; 
 const DEFAULT_SILL = 900; 
+const EXTERIOR_WALL_THICKNESS = 100;
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
-  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2000, position: EDGE_MARGIN_EXTERIOR }], studSpacing: 400 },
-  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
-  { id: 'w3', length: w, height: h, thickness: 100, x: w/2, z: l/2, rotation: 180, openings: [], studSpacing: 400 },
-  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
+  { id: 'w1', length: w, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2000, position: EDGE_MARGIN_EXTERIOR }], studSpacing: 400 },
+  { id: 'w2', length: l, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
+  { id: 'w3', length: w, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: w/2, z: l/2, rotation: 180, openings: [], studSpacing: 400 },
+  { id: 'w4', length: l, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
 ];
 
 const INITIAL_CONFIG: SteelHouseConfig = {
@@ -95,13 +97,13 @@ export default function SteelFramingPage() {
       if (!parent) return iw;
 
       let maxLen = 10000;
-      if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - 150;
-      if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - 150;
+      if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - EXTERIOR_WALL_THICKNESS;
+      if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - EXTERIOR_WALL_THICKNESS;
 
+      // Reajuste automático si las paredes externas se achican
       const adjustedLength = Math.min(iw.length, maxLen);
       const adjustedX = Math.min(iw.xPosition, parent.length - 50);
 
-      // Reajustar aberturas internas si el muro se acorta
       const adjustedOpenings = (iw.openings || []).map(op => {
         const margin = EDGE_MARGIN_INTERNAL;
         const finalW = Math.min(op.width, adjustedLength - margin * 2);
@@ -150,8 +152,8 @@ export default function SteelFramingPage() {
 
       const targetRotation = (parent.rotation - 90 + 360) % 360;
       let maxPossibleLength = 2000;
-      if (parent.id === 'w1' || parent.id === 'w3') maxPossibleLength = config.length - 150;
-      if (parent.id === 'w2' || parent.id === 'w4') maxPossibleLength = config.width - 150;
+      if (parent.id === 'w1' || parent.id === 'w3') maxPossibleLength = config.length - EXTERIOR_WALL_THICKNESS;
+      if (parent.id === 'w2' || parent.id === 'w4') maxPossibleLength = config.width - EXTERIOR_WALL_THICKNESS;
 
       const newIW: InternalWall = {
         id: Math.random().toString(36).substr(2, 9),
@@ -179,7 +181,7 @@ export default function SteelFramingPage() {
       return;
     }
 
-    let len = parseInt(localIWData.length) || 0;
+    let inputLen = parseInt(localIWData.length) || 0;
     let xPos = parseInt(localIWData.xPosition) || 0;
 
     const isOverOpening = parent.openings.some(op => xPos >= (op.position - 50) && xPos <= (op.position + op.width + 50));
@@ -191,20 +193,23 @@ export default function SteelFramingPage() {
     xPos = Math.max(50, Math.min(xPos, parent.length - 50));
     
     let maxLen = 10000;
-    if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - 150;
-    if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - 150;
+    if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - EXTERIOR_WALL_THICKNESS;
+    if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - EXTERIOR_WALL_THICKNESS;
     
-    len = Math.max(100, Math.min(len, maxLen));
+    // SNAPPING: Si es muy grande o cercano al máximo, clavar a maxLen para asegurar validez estructural sin luces
+    let finalLen = Math.max(100, Math.min(inputLen, maxLen));
+    if (inputLen >= maxLen - 100) {
+      finalLen = maxLen;
+    }
 
-    // Ajustar aberturas del muro editado para que no excedan el nuevo largo
     const adjustedOpenings = (editingInternalWall.openings || []).map(op => {
       const margin = EDGE_MARGIN_INTERNAL;
-      const fw = Math.min(op.width, len - margin * 2);
-      const fp = Math.max(margin, Math.min(op.position, len - fw - margin));
+      const fw = Math.min(op.width, finalLen - margin * 2);
+      const fp = Math.max(margin, Math.min(op.position, finalLen - fw - margin));
       return { ...op, width: fw, position: fp };
     });
 
-    const updated: InternalWall = { ...editingInternalWall, length: len, xPosition: xPos, openings: adjustedOpenings };
+    const updated: InternalWall = { ...editingInternalWall, length: finalLen, xPosition: xPos, openings: adjustedOpenings };
     
     setConfig(prev => ({
       ...prev,
@@ -224,18 +229,16 @@ export default function SteelFramingPage() {
   const commitOpeningChange = () => {
     if (!selectedOpening || !localOpeningData) return;
     
-    const w = parseInt(localOpeningData.width) || 0;
-    const p = parseInt(localOpeningData.position) || 0;
+    const inputW = parseInt(localOpeningData.width) || 0;
+    const inputP = parseInt(localOpeningData.position) || 0;
     
     if (selectedOpening.isInternal) {
       const wall = config.internalWalls.find(iw => iw.id === selectedOpening.wallId);
       if (!wall) return;
 
       const margin = EDGE_MARGIN_INTERNAL;
-      // Primero ajustamos el ancho si es mayor que el espacio disponible total
-      const finalW = Math.min(w, wall.length - margin * 2);
-      // Luego ajustamos la posición: si excede el largo de la pared (considerando ancho), se clava al valor máximo válido
-      const finalP = Math.max(margin, Math.min(p, wall.length - finalW - margin));
+      const finalW = Math.min(inputW, wall.length - margin * 2);
+      const finalP = Math.max(margin, Math.min(inputP, wall.length - finalW - margin));
 
       setConfig(prev => ({
         ...prev,
@@ -249,8 +252,8 @@ export default function SteelFramingPage() {
       if (!wall) return;
       
       const margin = EDGE_MARGIN_EXTERIOR;
-      const finalW = Math.min(w, wall.length - margin * 2);
-      const finalP = Math.max(margin, Math.min(p, wall.length - finalW - margin));
+      const finalW = Math.min(inputW, wall.length - margin * 2);
+      const finalP = Math.max(margin, Math.min(inputP, wall.length - finalW - margin));
       
       const hasInternalWall = config.internalWalls.some(iw => 
         iw.parentWallId === wall.id && iw.xPosition >= finalP && iw.xPosition <= (finalP + finalW)
@@ -291,7 +294,6 @@ export default function SteelFramingPage() {
     const doorWidth = 800;
     const margin = EDGE_MARGIN_INTERNAL;
     
-    // Validar si el muro es lo suficientemente largo
     if (wallActionChoice.length < (doorWidth + margin * 2)) {
       alert("El tabique es demasiado corto para una puerta estándar.");
       return;
@@ -440,11 +442,11 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
-                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} onBlur={commitOpeningChange} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Posición</Label>
-                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} onBlur={commitOpeningChange} className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
@@ -480,11 +482,11 @@ export default function SteelFramingPage() {
             <div className="grid gap-6 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Inicio (mm)</Label>
-                <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} className="col-span-3 h-9 font-bold" />
+                <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} onBlur={commitInternalWallChanges} className="col-span-3 h-9 font-bold" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Largo (mm)</Label>
-                <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} className="col-span-3 h-9 font-bold" />
+                <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} onBlur={commitInternalWallChanges} className="col-span-3 h-9 font-bold" />
               </div>
             </div>
             <DialogFooter className="flex gap-2">
