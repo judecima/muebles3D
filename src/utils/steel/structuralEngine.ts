@@ -58,6 +58,7 @@ export class StructuralEngine {
     while (currentX < wall.length) {
       let targetX = Math.min(currentX + maxPanelWidth, wall.length);
       
+      // Ajuste automático: Si una unión de panel cae dentro de una abertura, moverla al borde
       if (targetX < wall.length) {
         for (const op of openings) {
           const opStart = op.position;
@@ -121,16 +122,17 @@ export class StructuralEngine {
     let status: HeaderAnalysis['status'] = 'ok';
     let trussData: HeaderAnalysis['trussData'] = undefined;
 
-    // Calcular altura disponible para la viga (desde el vano hasta la solera superior)
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-    const availableHeightForTruss = wallHeight - headerBottom - 40; // Restamos solera superior
+    
+    // Altura técnica disponible para la viga (hasta solera superior)
+    const availableHeightForTruss = Math.max(0, wallHeight - headerBottom - 40);
 
     if (L > 2500 || requiredIx > this.TUBE_IX) {
       type = 'truss';
       status = L > 3500 ? 'error' : 'warning';
       trussData = {
-        height: Math.max(400, availableHeightForTruss), // La viga ocupa todo el espacio hasta arriba
+        height: Math.max(400, availableHeightForTruss),
         numDiagonals: Math.ceil(L / 400),
         chordThickness: 1.25
       };
@@ -154,20 +156,20 @@ export class StructuralEngine {
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerTop = sill + opening.height;
 
-    // Determinar si hay una viga reticulada que cubra todo el espacio superior
     const analysis = this.calculateHeader(opening, wall.length, config, wallH);
     const hasFullTruss = analysis.type === 'truss' && (analysis.trussData?.height || 0) >= (wallH - headerTop - 50);
 
-    // Cripples SUPERIORES (Solo si la viga no llega hasta la solera superior)
+    // Cripples SUPERIORES (Solo si la viga no ocupa todo el espacio)
     if (!hasFullTruss) {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-          cripples.push({ x, yStart: headerTop + (analysis.type === 'truss' ? (analysis.trussData?.height || 400) : 100), yEnd: wallH - 40, type: 'upper' });
+          const trussOffset = analysis.type === 'truss' ? (analysis.trussData?.height || 400) : 100;
+          cripples.push({ x, yStart: headerTop + trussOffset, yEnd: wallH - 40, type: 'upper' });
         }
       }
     }
 
-    // Cripples INFERIORES (Solo ventanas)
+    // Cripples INFERIORES (Ventanas)
     if (opening.type === 'window') {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
@@ -224,8 +226,6 @@ export class StructuralEngine {
           alerts.push({ wallId: wall.id, status: analysis.status, message: msg });
         }
       });
-      const hasUnions = config.internalWalls.some(iw => iw.parentWallId === wall.id);
-      if (hasUnions && !config.layers.reinforcements) alerts.push({ wallId: wall.id, status: 'warning', message: `Refuerzos de unión desactivados en ${wall.id}.` });
     });
     return alerts;
   }

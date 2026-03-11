@@ -331,20 +331,33 @@ export class SteelSceneManager {
   }
 
   private drawTrussHeader(group: THREE.Group, x: number, y: number, w: number, h: number, thickness: number) {
+    // Cordón inferior
     group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, 0, thickness));
+    // Cordón superior (ajustado para no sobresalir)
     group.add(this.createProfile(w, x, y + h - 40, 0, 'PGC', this.colors.header_truss, 0, thickness));
+    
     const numDivisions = Math.ceil(w / 400);
     const divW = w / numDivisions;
+    
     for (let i = 0; i <= numDivisions; i++) {
       const posX = x + (i * divW);
+      // Montantes internos
       group.add(this.createProfile(h - 80, posX - 20, y + 40, 90, 'PGC', this.colors.header_truss, 0, thickness));
+      
       if (i < numDivisions) {
-        const diagLen = Math.sqrt(divW * divW + h * h);
-        const angle = Math.atan2(h, divW);
-        const diag = this.createProfile(diagLen, posX, y, 0, 'PGC', this.colors.header_truss, 0, thickness);
-        diag.rotation.z = i % 2 === 0 ? angle : -angle;
-        if (i % 2 !== 0) diag.position.y += h;
-        group.add(diag);
+        const diagH = h - 80;
+        const diagLen = Math.sqrt(divW * divW + diagH * diagH);
+        const angle = Math.atan2(diagH, divW);
+        
+        // Perfil para diagonal
+        const diagGeom = new THREE.BoxGeometry(diagLen, 15, thickness - 10);
+        const diagMat = new THREE.MeshStandardMaterial({ color: this.colors.header_truss, metalness: 0.8 });
+        const diagMesh = new THREE.Mesh(diagGeom, diagMat);
+        
+        // Posicionamiento preciso de la diagonal
+        diagMesh.position.set(posX + divW/2, y + h/2, 0);
+        diagMesh.rotation.z = i % 2 === 0 ? angle : -angle;
+        group.add(diagMesh);
       }
     }
   }

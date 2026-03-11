@@ -36,7 +36,7 @@ const DEFAULT_SILL = 900;
 const EXTERIOR_WALL_THICKNESS = 100;
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
-  { id: 'w1', length: w, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2000, position: EDGE_MARGIN_EXTERIOR }], studSpacing: 400 },
+  { id: 'w1', length: w, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: EDGE_MARGIN_EXTERIOR }], studSpacing: 400 },
   { id: 'w2', length: l, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
   { id: 'w3', length: w, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: w/2, z: l/2, rotation: 180, openings: [], studSpacing: 400 },
   { id: 'w4', length: l, height: h, thickness: EXTERIOR_WALL_THICKNESS, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN_EXTERIOR, sillHeight: DEFAULT_SILL }], studSpacing: 400 },
@@ -114,41 +114,28 @@ export default function SteelFramingPage() {
 
   const getWallSegments = useCallback((wallId: string, clickX: number, totalLength: number, isInternalWall: boolean) => {
     const baseMargin = isInternalWall ? EDGE_MARGIN_INTERNAL : EDGE_MARGIN_EXTERIOR;
-    const currentWall = isInternalWall 
-      ? config.internalWalls.find(iw => iw.id === wallId)
-      : config.walls.find(w => w.id === wallId);
-
-    const startingIntersections = config.internalWalls
-      .filter(iw => iw.parentWallId === wallId)
-      .map(iw => iw.xPosition);
+    const boundaries = [0];
     
-    const arrivingIntersections: number[] = [];
-    if (currentWall) {
-      config.internalWalls.forEach(other => {
-        if (other.id === wallId) return;
-        if (isInternalWall) {
-          const isV1 = currentWall.rotation === 90 || currentWall.rotation === 270;
-          const isV2 = other.rotation === 90 || other.rotation === 270;
-          if (isV1 !== isV2) arrivingIntersections.push(other.xPosition);
-        } else {
-          const parentOfOther = config.walls.find(w => w.id === other.parentWallId);
-          if (parentOfOther) {
-            const isOpp = ((parentOfOther.id === 'w1' && wallId === 'w3') || (parentOfOther.id === 'w3' && wallId === 'w1') || (parentOfOther.id === 'w2' && wallId === 'w4') || (parentOfOther.id === 'w4' && wallId === 'w2'));
-            if (isOpp) {
-              const maxL = (wallId === 'w1' || wallId === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
-              if (Math.abs(other.length - maxL) < 10) arrivingIntersections.push(other.xPosition);
-            }
-          }
-        }
-      });
-    }
+    // Intersecciones que nacen aquí
+    config.internalWalls.forEach(iw => {
+      if (iw.parentWallId === wallId) boundaries.push(iw.xPosition);
+    });
 
-    const allIntersections = Array.from(new Set([...startingIntersections, ...arrivingIntersections]));
-    const boundaries = [0, ...allIntersections, totalLength].sort((a, b) => a - b);
-    for (let i = 0; i < boundaries.length - 1; i++) {
-      if (clickX >= boundaries[i] && clickX <= boundaries[i+1]) {
-        const start = boundaries[i];
-        const end = boundaries[i+1];
+    // Intersecciones que llegan aquí (Cruces completos)
+    config.internalWalls.forEach(iw => {
+      const parent = config.walls.find(w => w.id === iw.parentWallId);
+      if (!parent) return;
+      const isOpposite = (parent.id === 'w1' && wallId === 'w3') || (parent.id === 'w3' && wallId === 'w1') || (parent.id === 'w2' && wallId === 'w4') || (parent.id === 'w4' && wallId === 'w2');
+      if (isOpposite && Math.abs(iw.length - (wallId === 'w1' || wallId === 'w3' ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS)) < 10) {
+        boundaries.push(iw.xPosition);
+      }
+    });
+
+    const sortedBounds = Array.from(new Set([...boundaries, totalLength])).sort((a, b) => a - b);
+    for (let i = 0; i < sortedBounds.length - 1; i++) {
+      if (clickX >= sortedBounds[i] && clickX <= sortedBounds[i+1]) {
+        const start = sortedBounds[i];
+        const end = sortedBounds[i+1];
         const min = start === 0 ? baseMargin : start + INTERSECTION_MARGIN;
         const max = end === totalLength ? totalLength - baseMargin : end - INTERSECTION_MARGIN;
         return { start, end, min, max };
@@ -209,6 +196,7 @@ export default function SteelFramingPage() {
   const handleWallDoubleClick = useCallback((wallId: string, x: number, side: 'exterior' | 'interior') => {
     if (side === 'exterior') {
       setAddingOpening({ wallId, x, isInternal: false });
+      setNewOpeningData({ type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL });
     } else {
       const parent = config.walls.find(w => w.id === wallId);
       if (!parent) return;
@@ -252,23 +240,8 @@ export default function SteelFramingPage() {
     if (!editingInternalWall) return;
     const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
     if (!parent) return;
-
     let maxL = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
-    
-    // Buscar si hay algún tabique interno que se cruce
-    let nearestIntersection = maxL;
-    config.internalWalls.forEach(other => {
-      if (other.id === editingInternalWall.id) return;
-      // Lógica simplificada: si el tabique perpendicular está en el camino
-      const isPerpendicular = Math.abs(editingInternalWall.rotation - other.rotation) === 90 || Math.abs(editingInternalWall.rotation - other.rotation) === 270;
-      if (isPerpendicular) {
-        // En una app real haríamos raycasting 2D completo, aquí aproximamos
-        // Si el 'other' está lo suficientemente cerca del eje de nuestro tabique
-        // Por ahora snapping al muro opuesto es lo más común
-      }
-    });
-
-    setLocalIWData(prev => prev ? { ...prev, length: nearestIntersection.toString() } : null);
+    setLocalIWData(prev => prev ? { ...prev, length: maxL.toString() } : null);
   };
 
   const createOpening = () => {
@@ -278,7 +251,20 @@ export default function SteelFramingPage() {
     const bounds = getWallSegments(wall.id, addingOpening.x, wall.length, !!addingOpening.isInternal);
     const finalW = Math.min(newOpData.width, bounds.max - bounds.min);
     const finalP = Math.max(bounds.min, Math.min(addingOpening.x - finalW / 2, bounds.max - finalW));
-    const newOp: SteelOpening = { id: Math.random().toString(36).substr(2, 9), type: newOpData.type, width: finalW, height: newOpData.height, position: finalP, sillHeight: newOpData.type === 'window' ? newOpData.sill : 0 };
+    
+    // Altura mínima garantizada para puertas: 2050mm
+    const finalH = newOpData.type === 'door' ? Math.max(newOpData.height, 2050) : newOpData.height;
+    const finalSill = newOpData.type === 'window' ? newOpData.sill : 0;
+
+    const newOp: SteelOpening = { 
+      id: Math.random().toString(36).substr(2, 9), 
+      type: newOpData.type, 
+      width: finalW, 
+      height: finalH, 
+      position: finalP, 
+      sillHeight: finalSill 
+    };
+
     if (addingOpening.isInternal) {
       setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === wall.id ? { ...iw, openings: [...iw.openings, newOp] } : iw) }));
     } else {
@@ -371,14 +357,33 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black">Tipo</Label>
-                <Select value={newOpData.type} onValueChange={(v: any) => setNewOpeningData({ ...newOpData, type: v })}>
+                <Select 
+                  value={newOpData.type} 
+                  disabled={addingOpening?.isInternal}
+                  onValueChange={(v: any) => {
+                    const isDoor = v === 'door';
+                    setNewOpeningData({ 
+                      ...newOpData, 
+                      type: v, 
+                      height: isDoor ? 2050 : 1100, 
+                      sill: isDoor ? 0 : DEFAULT_SILL 
+                    });
+                  }}
+                >
                   <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="window">Ventana</SelectItem><SelectItem value="door">Puerta</SelectItem></SelectContent>
+                  <SelectContent>
+                    {!addingOpening?.isInternal && <SelectItem value="window">Ventana</SelectItem>}
+                    <SelectItem value="door">Puerta</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black">Ancho</Label>
                 <Input type="number" value={newOpData.width} onChange={(e) => setNewOpeningData({ ...newOpData, width: parseInt(e.target.value) || 0 })} onKeyDown={(e) => e.key === 'Enter' && createOpening()} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black">Altura</Label>
+                <Input type="number" value={newOpData.height} onChange={(e) => setNewOpeningData({ ...newOpData, height: parseInt(e.target.value) || 0 })} onKeyDown={(e) => e.key === 'Enter' && createOpening()} className="col-span-3" />
               </div>
             </div>
             <DialogFooter><Button onClick={createOpening} className="w-full bg-green-600 font-black uppercase text-xs h-11">Insertar</Button></DialogFooter>
@@ -413,11 +418,15 @@ export default function SteelFramingPage() {
             <DialogHeader><DialogTitle className="uppercase font-black text-slate-800 tracking-tighter">Opciones de Tabique</DialogTitle></DialogHeader>
             <div className="grid grid-cols-2 gap-4 py-6">
               <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-blue-500 hover:bg-blue-50 transition-all group"
-                onClick={() => { setAddingOpening({ wallId: wallActionChoice!.id, x: wallActionChoice!.lastClickX || wallActionChoice!.length / 2, isInternal: true }); setWallActionChoice(null); }}>
+                onClick={() => { 
+                  setAddingOpening({ wallId: wallActionChoice!.id, x: wallActionChoice!.lastClickX || wallActionChoice!.length / 2, isInternal: true }); 
+                  setNewOpeningData({ type: 'door', width: 900, height: 2050, sill: 0 }); // Default normative door
+                  setWallActionChoice(null); 
+                }}>
                 <DoorOpen className="w-8 h-8 text-slate-400 group-hover:text-blue-600" />
                 <span className="font-black uppercase text-[10px]">Sumar Puerta</span>
               </Button>
-              <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-purple-500 hover:bg-purple-50 transition-all group"
+              <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-purple-500 hover:bg-blue-50 transition-all group"
                 onClick={() => { setEditingInternalWall(wallActionChoice); setLocalIWData({ length: wallActionChoice!.length.toString(), xPosition: Math.round(wallActionChoice!.xPosition).toString() }); setWallActionChoice(null); }}>
                 <Settings className="w-8 h-8 text-slate-400 group-hover:text-purple-600" />
                 <span className="font-black uppercase text-[10px]">Editar Estructura</span>
