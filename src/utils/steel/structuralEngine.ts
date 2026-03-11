@@ -1,4 +1,4 @@
-import { SteelOpening, SteelHouseConfig, SteelWall } from '@/lib/steel/types';
+import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads } from '@/lib/steel/types';
 
 export interface HeaderAnalysis {
   type: 'single' | 'double' | 'triple' | 'tube' | 'truss';
@@ -8,60 +8,83 @@ export interface HeaderAnalysis {
   requiredIx: number;
 }
 
-export interface BracingData {
-  xStart: number;
-  yStart: number;
-  xEnd: number;
-  yEnd: number;
-}
-
 export interface BlockingData {
   xStart: number;
   xEnd: number;
   y: number;
 }
 
-export interface WallPanel {
-  id: string;
-  xStart: number;
-  xEnd: number;
-  width: number;
-  isWallStart: boolean;
-  isWallEnd: boolean;
-}
-
 export class StructuralEngine {
   private static readonly STEEL_MODULUS = 203000; 
   private static readonly PGC_IX_SINGLE = 185000; 
   private static readonly TUBE_IX = 1200000; 
-  private static readonly DESIGN_LOAD_KPA = 0.002; 
+  
+  // Criterios de diseño (Norma AISI)
+  private static readonly DEAD_LOAD_KPA = 0.5; // kN/m2 (Peso propio + placas)
+  private static readonly LIVE_LOAD_ROOF_KPA = 1.0; // kN/m2
+  private static readonly WIND_PRESSURE_KPA = 0.8; // kN/m2 (Presión lateral)
+  private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; // Capacidad de corte sin rigidizar por metro
 
   /**
-   * Divide un muro en paneles estructurales manejables (3m a 4m)
+   * Analiza y divide un muro en paneles estructurales aplicando cálculo de cargas
    */
-  static calculateWallPanels(wall: SteelWall): WallPanel[] {
-    const panels: WallPanel[] = [];
-    const maxPanelWidth = 4000; // 4 metros máximo por panel
+  static calculateWallPanels(wall: SteelWall, config: SteelHouseConfig): WallPanelData[] {
+    const panels: WallPanelData[] = [];
+    const maxPanelWidth = 4000; 
     const numPanels = Math.ceil(wall.length / maxPanelWidth);
     const panelWidth = wall.length / numPanels;
 
     for (let i = 0; i < numPanels; i++) {
+      const xStart = i * panelWidth;
+      const xEnd = (i + 1) * panelWidth;
+      
+      const loads = this.calculatePanelLoads(panelWidth, wall.height, config);
+      
+      // Decisión de rigidización: si la fuerza de corte supera la capacidad nominal
+      // O si el panel es un extremo de muro (criterio de estabilidad global)
+      const needsBracing = (loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * panelWidth / 1000) || (i === 0 || i === numPanels - 1);
+
       panels.push({
         id: `${wall.id}-p${i}`,
-        xStart: i * panelWidth,
-        xEnd: (i + 1) * panelWidth,
+        xStart,
+        xEnd,
         width: panelWidth,
         isWallStart: i === 0,
-        isWallEnd: i === numPanels - 1
+        isWallEnd: i === numPanels - 1,
+        needsBracing,
+        loads
       });
     }
     return panels;
   }
 
+  /**
+   * Calcula las cargas tributarias para un panel específico
+   */
+  private static calculatePanelLoads(widthMm: number, heightMm: number, config: SteelHouseConfig): PanelLoads {
+    const widthM = widthMm / 1000;
+    const heightM = heightMm / 1000;
+    const tributaryWidthM = config.length / 2000; // Mitad de la profundidad de la casa
+
+    // 1. Carga Vertical (kN -> N)
+    const verticalLoadKN = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * widthM * tributaryWidthM;
+    
+    // 2. Carga Lateral (Viento)
+    const shearForceKN = this.WIND_PRESSURE_KPA * widthM * heightM;
+
+    return {
+      verticalLoadN: verticalLoadKN * 1000,
+      shearForceN: shearForceKN * 1000,
+      overturningMomentNm: shearForceKN * heightM
+    };
+  }
+
   static calculateHeader(opening: SteelOpening, config: SteelHouseConfig): HeaderAnalysis {
     const L = opening.width;
     const tributaryWidth = config.length / 2; 
-    const loadNmm = (this.DESIGN_LOAD_KPA * tributaryWidth); 
+    const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; // kN/mm2 -> N/mm2
+    const loadNmm = designLoadTotal * tributaryWidth; 
+    
     const maxAllowableDeflection = L / 360;
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
 
@@ -85,11 +108,6 @@ export class StructuralEngine {
     const deflectionMm = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * currentIx);
 
     return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx };
-  }
-
-  static calculateBracing(wall: SteelWall): BracingData[] {
-    // Cruces de San Andrés eliminadas del sistema
-    return [];
   }
 
   static calculateBlocking(wall: SteelWall): BlockingData[] {

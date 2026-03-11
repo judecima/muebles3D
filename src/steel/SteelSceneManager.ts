@@ -2,8 +2,8 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
-import { StructuralEngine, WallPanel } from '../utils/steel/structuralEngine';
+import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility, WallPanelData } from '@/lib/steel/types';
+import { StructuralEngine } from '@/utils/steel/structuralEngine';
 import { InputController } from '@/engine/player/InputController';
 import { CollisionSystem } from '@/engine/player/CollisionSystem';
 import { PlayerController } from '@/engine/player/PlayerController';
@@ -34,7 +34,7 @@ export class SteelSceneManager {
 
   private colors = {
     background: 0xf1f5f9,
-    steel: 0x9ca3af, 
+    steel: 0x9ca3af,      // Gris (Estructura base)
     header: 0x2563eb,
     headerTriple: 0x1e40af,
     headerTube: 0x0f172a,
@@ -44,9 +44,10 @@ export class SteelSceneManager {
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
     panel_int: 0xe2e8f0,
-    blocking: 0x0d9488, // Verde para Blocking
-    junction: 0x2563eb, // Azul para uniones de paneles
-    corner: 0xef4444    // Rojo para refuerzos de esquina
+    blocking: 0x22c55e,   // Verde (Blocking)
+    junction: 0x3b82f6,   // Azul (Uniones de paneles)
+    corner: 0xef4444,     // Rojo (Refuerzos de esquina)
+    bracing: 0xf59e0b     // Ámbar (Cruces de San Andrés)
   };
 
   private profileWidth = 100; 
@@ -233,43 +234,48 @@ export class SteelSceneManager {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
-    const panels = StructuralEngine.calculateWallPanels(wall);
+    const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - (this.profileFlange * 2);
 
     panels.forEach(panel => {
-      // Soleras por panel
+      // 1. SOLERAS (PGU) - Por panel
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
       structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
 
-      // Montante de inicio de panel (Junction si no es inicio de muro)
-      const isJunction = !panel.isWallStart;
-      const color = panel.isWallStart ? this.colors.corner : this.colors.junction;
-      structuralGroup.add(this.createProfile(studHeight, panel.xStart, this.profileFlange, 90, 'PGC', color));
+      // 2. MONTANTES (PGC)
+      // Unión entre paneles (Doble montante azul) o Esquina (Triple rojo)
+      const junctionColor = panel.isWallStart ? this.colors.corner : this.colors.junction;
+      const startStudCount = panel.isWallStart ? 3 : 2;
       
-      // Doble montante en unión de paneles
-      if (isJunction) {
-        structuralGroup.add(this.createProfile(studHeight, panel.xStart - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.junction));
+      for (let i = 0; i < startStudCount; i++) {
+        structuralGroup.add(this.createProfile(studHeight, panel.xStart + (i * 10), this.profileFlange, 90, 'PGC', junctionColor));
       }
 
-      // Montantes internos
-      const relativeStuds = Math.floor(panel.width / wall.studSpacing);
-      for (let i = 1; i <= relativeStuds; i++) {
-        const x = panel.xStart + (i * wall.studSpacing);
-        if (x < panel.xEnd - 50) {
-          const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
-          if (!inOpening) {
-            structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
-          }
+      // Montantes de campo
+      for (let x = panel.xStart + wall.studSpacing; x < panel.xEnd - 50; x += wall.studSpacing) {
+        const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
+        if (!inOpening) {
+          structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
         }
       }
 
-      // Montante final de muro
+      // Cierre de panel final
       if (panel.isWallEnd) {
-        structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.corner));
+        for (let i = 0; i < 3; i++) {
+          structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner));
+        }
+      }
+
+      // 3. RIGIDIZACIÓN (Cruces de San Andrés Ámbar)
+      if (layers.bracing && panel.needsBracing) {
+        const opInPanel = wall.openings.some(op => op.position < panel.xEnd && (op.position + op.width) > panel.xStart);
+        if (!opInPanel) {
+          this.createBracingCross(structuralGroup, panel.xStart, 0, panel.width, wall.height);
+        }
       }
     });
 
-    // Bloqueos Horizontales
+    // 4. BLOQUEOS HORIZONTALES (Verde)
     if (layers.horizontalBlocking) {
       const blocks = StructuralEngine.calculateBlocking(wall);
       blocks.forEach(b => {
@@ -277,33 +283,23 @@ export class SteelSceneManager {
       });
     }
 
-    // Aberturas y Vanos
+    // 5. VANOS Y DINTELES
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
       const headerAnalysis = StructuralEngine.calculateHeader(op, config);
 
+      // King & Jack Studs
       structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
       structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king));
-
+      
       const jackH = headerH - this.profileFlange;
       structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
+      // Dintel según análisis AISI
       if (headerAnalysis.type === 'truss') {
-        const trussH = 300;
-        const diagCount = Math.max(2, Math.ceil(op.width / 400));
-        const diagW = op.width / diagCount;
-        structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.headerTriple));
-        structuralGroup.add(this.createProfile(op.width, op.position, headerH + trussH, 0, 'PGC', this.colors.headerTriple));
-        for (let i = 0; i < diagCount; i++) {
-          const diagLen = Math.sqrt(Math.pow(diagW, 2) + Math.pow(trussH, 2));
-          const angle = Math.atan2(trussH, diagW);
-          const mesh = this.createProfile(diagLen, op.position + (i * diagW), headerH, 0, 'PGC', this.colors.header);
-          mesh.rotation.z = (i % 2 === 0) ? angle : -angle;
-          mesh.position.y += (i % 2 === 0) ? 0 : trussH;
-          structuralGroup.add(mesh);
-        }
+        this.createTrussHeader(structuralGroup, op.position, headerH, op.width);
       } else if (headerAnalysis.type === 'tube') {
         const tubeMesh = this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.headerTube);
         tubeMesh.scale.y = 2.5; 
@@ -311,25 +307,49 @@ export class SteelSceneManager {
       } else {
         const count = headerAnalysis.type === 'triple' ? 3 : (headerAnalysis.type === 'double' ? 2 : 1);
         for (let i = 0; i < count; i++) {
-          structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', count === 3 ? this.colors.headerTriple : this.colors.header, i * 15));
+          structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', count >= 2 ? this.colors.headerTriple : this.colors.header, i * 15));
         }
       }
 
+      // Umbrales
       if (op.type === 'window') {
         structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       }
-
-      const crippleSpacing = wall.studSpacing;
-      for (let x = op.position + crippleSpacing; x < op.position + op.width; x += crippleSpacing) {
-        const topSpace = wall.height - headerH - (headerAnalysis.type === 'truss' ? 350 : this.profileFlange * 2);
-        if (topSpace > 50) {
-          structuralGroup.add(this.createProfile(topSpace, x, wall.height - topSpace - this.profileFlange, 90, 'PGC', this.colors.steel));
-        }
-        if (op.type === 'window' && sill > 100) {
-          structuralGroup.add(this.createProfile(sill - this.profileFlange * 2, x, this.profileFlange, 90, 'PGC', this.colors.steel));
-        }
-      }
     });
+  }
+
+  private createBracingCross(group: THREE.Group, x: number, y: number, w: number, h: number) {
+    const angle = Math.atan2(h, w);
+    const length = Math.sqrt(w*w + h*h);
+    
+    // Diagonal 1: /
+    const d1 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, 20);
+    d1.rotation.z = angle;
+    d1.position.set(x + w/2, y + h/2, 20);
+    group.add(d1);
+
+    // Diagonal 2: \
+    const d2 = this.createProfile(length, x, y, 0, 'PGU', this.colors.bracing, -20);
+    d2.rotation.z = -angle;
+    d2.position.set(x + w/2, y + h/2, -20);
+    group.add(d2);
+  }
+
+  private createTrussHeader(group: THREE.Group, x: number, y: number, w: number) {
+    const trussH = 300;
+    group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.headerTriple));
+    group.add(this.createProfile(w, x, y + trussH, 0, 'PGC', this.colors.headerTriple));
+    
+    const count = Math.max(2, Math.ceil(w / 400));
+    const step = w / count;
+    for (let i = 0; i < count; i++) {
+      const diagLen = Math.sqrt(step*step + trussH*trussH);
+      const angle = Math.atan2(trussH, step);
+      const diag = this.createProfile(diagLen, x + (i * step), y, 0, 'PGC', this.colors.header);
+      diag.rotation.z = (i % 2 === 0) ? angle : -angle;
+      diag.position.y += (i % 2 === 0) ? 0 : trussH;
+      group.add(diag);
+    }
   }
 
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0): THREE.Mesh {

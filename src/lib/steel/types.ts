@@ -25,9 +25,10 @@ export interface LayerVisibility {
   exteriorPanels: boolean;
   interiorPanels: boolean;
   steelProfiles: boolean;
-  horizontalBlocking: boolean; // Rigidizadores horizontales
+  horizontalBlocking: boolean;
   lintels: boolean;
   reinforcements: boolean;
+  bracing: boolean; // Restaurado para control de Cruces de San Andrés
 }
 
 export interface SteelHouseConfig {
@@ -50,4 +51,22 @@ export interface MaterialItem {
 export interface MaterialEstimate {
   items: MaterialItem[];
   totalSteelWeightKg: number;
+}
+
+// Tipos para el Modelo Estructural Jerárquico
+export interface PanelLoads {
+  verticalLoadN: number;   // Carga vertical total (N)
+  shearForceN: number;     // Fuerza de corte lateral (N)
+  overturningMomentNm: number; // Momento de volcamiento
+}
+
+export interface WallPanelData {
+  id: string;
+  xStart: number;
+  xEnd: number;
+  width: number;
+  isWallStart: boolean;
+  isWallEnd: boolean;
+  needsBracing: boolean;
+  loads: PanelLoads;
 }
