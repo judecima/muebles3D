@@ -21,11 +21,42 @@ export interface BlockingData {
   y: number;
 }
 
+export interface WallPanel {
+  id: string;
+  xStart: number;
+  xEnd: number;
+  width: number;
+  isWallStart: boolean;
+  isWallEnd: boolean;
+}
+
 export class StructuralEngine {
   private static readonly STEEL_MODULUS = 203000; 
   private static readonly PGC_IX_SINGLE = 185000; 
   private static readonly TUBE_IX = 1200000; 
   private static readonly DESIGN_LOAD_KPA = 0.002; 
+
+  /**
+   * Divide un muro en paneles estructurales manejables (3m a 4m)
+   */
+  static calculateWallPanels(wall: SteelWall): WallPanel[] {
+    const panels: WallPanel[] = [];
+    const maxPanelWidth = 4000; // 4 metros máximo por panel
+    const numPanels = Math.ceil(wall.length / maxPanelWidth);
+    const panelWidth = wall.length / numPanels;
+
+    for (let i = 0; i < numPanels; i++) {
+      panels.push({
+        id: `${wall.id}-p${i}`,
+        xStart: i * panelWidth,
+        xEnd: (i + 1) * panelWidth,
+        width: panelWidth,
+        isWallStart: i === 0,
+        isWallEnd: i === numPanels - 1
+      });
+    }
+    return panels;
+  }
 
   static calculateHeader(opening: SteelOpening, config: SteelHouseConfig): HeaderAnalysis {
     const L = opening.width;
@@ -56,78 +87,61 @@ export class StructuralEngine {
     return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx };
   }
 
-  /**
-   * Calcula la posición de las Cruces de San Andrés
-   */
   static calculateBracing(wall: SteelWall): BracingData[] {
     const braces: BracingData[] = [];
     const minBraceWidth = 600; 
     
-    // Identificar zonas ciegas (sin aberturas)
-    const sortedOpenings = [...wall.openings].sort((a, b) => a.position - b.position);
-    let currentX = 0;
-    const wallZones: { start: number, end: number }[] = [];
+    // Las cruces ahora se calculan dentro de los paneles
+    const panels = this.calculateWallPanels(wall);
 
-    sortedOpenings.forEach(op => {
-      if (op.position - currentX > minBraceWidth) {
-        wallZones.push({ start: currentX, end: op.position });
-      }
-      currentX = op.position + op.width;
-    });
+    panels.forEach(panel => {
+      // Buscar espacios libres de aberturas dentro del panel
+      const sortedOpenings = [...wall.openings]
+        .filter(op => op.position < panel.xEnd && (op.position + op.width) > panel.xStart)
+        .sort((a, b) => a.position - b.position);
 
-    if (wall.length - currentX > minBraceWidth) {
-      wallZones.push({ start: currentX, end: wall.length });
-    }
-
-    // Aplicar cruces según normativa de ancho
-    wallZones.forEach(zone => {
-      const zoneW = zone.end - zone.start;
-      let numX = 0;
-      if (zoneW > 4000) numX = 2;
-      else if (zoneW > 1200 || wall.height > 2700) numX = 1;
-
-      if (numX > 0) {
-        const segmentW = zoneW / numX;
-        for (let i = 0; i < numX; i++) {
-          const xS = zone.start + (i * segmentW) + 50;
-          const xE = zone.start + ((i + 1) * segmentW) - 50;
-          
-          // Cruz principal \
-          braces.push({ xStart: xS, yStart: 50, xEnd: xE, yEnd: wall.height - 50 });
-          // Cruz invertida /
-          braces.push({ xStart: xE, yStart: 50, xEnd: xS, yEnd: wall.height - 50 });
+      let currentX = panel.xStart;
+      
+      sortedOpenings.forEach(op => {
+        if (op.position - currentX > minBraceWidth) {
+          this.addBraceToSegment(currentX, op.position, wall.height, braces);
         }
+        currentX = op.position + op.width;
+      });
+
+      if (panel.xEnd - currentX > minBraceWidth) {
+        this.addBraceToSegment(currentX, panel.xEnd, wall.height, braces);
       }
     });
 
     return braces;
   }
 
-  /**
-   * Calcula el bloqueo horizontal (Bridging)
-   */
+  private static addBraceToSegment(start: number, end: number, height: number, list: BracingData[]) {
+    const margin = 50;
+    // Cruz principal \
+    list.push({ xStart: start + margin, yStart: margin, xEnd: end - margin, yEnd: height - margin });
+    // Cruz invertida /
+    list.push({ xStart: end - margin, yStart: margin, xEnd: start + margin, yEnd: height - margin });
+  }
+
   static calculateBlocking(wall: SteelWall): BlockingData[] {
     const blockings: BlockingData[] = [];
-    const numRows = wall.height > 3000 ? 2 : (wall.height > 2400 ? 1 : 0);
+    const numRows = wall.height > 2400 ? (wall.height > 3000 ? 2 : 1) : 0;
     if (numRows === 0) return [];
 
     const rowSpacing = wall.height / (numRows + 1);
 
     for (let row = 1; row <= numRows; row++) {
       const y = row * rowSpacing;
-      
-      // Generar bloqueos entre montantes
       for (let x = 0; x < wall.length - wall.studSpacing; x += wall.studSpacing) {
         const xStart = x;
         const xEnd = x + wall.studSpacing;
 
-        // Verificar que no intersecte aberturas en esa altura
         const intersects = wall.openings.some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
           const top = sill + op.height;
-          const inXRange = (xStart < op.position + op.width && xEnd > op.position);
-          const inYRange = (y > sill && y < top);
-          return inXRange && inYRange;
+          return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
         });
 
         if (!intersects) {
@@ -135,7 +149,6 @@ export class StructuralEngine {
         }
       }
     }
-
     return blockings;
   }
 }

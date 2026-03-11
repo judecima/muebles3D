@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility } from '@/lib/steel/types';
-import { StructuralEngine } from '../utils/steel/structuralEngine';
+import { StructuralEngine, WallPanel } from '../utils/steel/structuralEngine';
 import { InputController } from '@/engine/player/InputController';
 import { CollisionSystem } from '@/engine/player/CollisionSystem';
 import { PlayerController } from '@/engine/player/PlayerController';
@@ -20,7 +20,6 @@ export class SteelSceneManager {
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
-  // Player System
   private input: InputController;
   private collisions: CollisionSystem;
   private player: PlayerController;
@@ -45,8 +44,10 @@ export class SteelSceneManager {
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
     panel_int: 0xe2e8f0,
-    bracing: 0xf59e0b, // Ámbar para X-Bracing
-    blocking: 0x0d9488  // Verde azulado para Blocking
+    bracing: 0xf97316, // Naranja para X-Bracing
+    blocking: 0x0d9488, // Verde para Blocking
+    junction: 0x2563eb, // Azul para uniones de paneles
+    corner: 0xef4444    // Rojo para refuerzos de esquina
   };
 
   private profileWidth = 100; 
@@ -82,7 +83,6 @@ export class SteelSceneManager {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
-    // Initialize Player Systems
     this.input = new InputController();
     this.collisions = new CollisionSystem();
     this.player = new PlayerController(this.scene, this.input, this.collisions);
@@ -234,21 +234,52 @@ export class SteelSceneManager {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
-    // Soleras PGU
-    structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
-    structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
-
+    const panels = StructuralEngine.calculateWallPanels(wall);
     const studHeight = wall.height - (this.profileFlange * 2);
 
-    // Cruces de San Andrés
+    panels.forEach(panel => {
+      // Soleras por panel
+      structuralGroup.add(this.createProfile(panel.width, panel.xStart, 0, 0, 'PGU'));
+      structuralGroup.add(this.createProfile(panel.width, panel.xStart, wall.height - this.profileFlange, 0, 'PGU'));
+
+      // Montante de inicio de panel (Junction si no es inicio de muro)
+      const isJunction = !panel.isWallStart;
+      const color = panel.isWallStart ? this.colors.corner : this.colors.junction;
+      structuralGroup.add(this.createProfile(studHeight, panel.xStart, this.profileFlange, 90, 'PGC', color));
+      
+      // Doble montante en unión de paneles
+      if (isJunction) {
+        structuralGroup.add(this.createProfile(studHeight, panel.xStart - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.junction));
+      }
+
+      // Montantes internos
+      const relativeStuds = Math.floor(panel.width / wall.studSpacing);
+      for (let i = 1; i <= relativeStuds; i++) {
+        const x = panel.xStart + (i * wall.studSpacing);
+        if (x < panel.xEnd - 50) {
+          const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
+          if (!inOpening) {
+            structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
+          }
+        }
+      }
+
+      // Montante final de muro
+      if (panel.isWallEnd) {
+        structuralGroup.add(this.createProfile(studHeight, panel.xEnd - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.corner));
+      }
+    });
+
+    // Cruces de San Andrés (Calculadas per panel)
     if (layers.crossBracing) {
       const braces = StructuralEngine.calculateBracing(wall);
       braces.forEach(b => {
         const len = Math.sqrt(Math.pow(b.xEnd - b.xStart, 2) + Math.pow(b.yEnd - b.yStart, 2));
         const angle = Math.atan2(b.yEnd - b.yStart, b.xEnd - b.xStart);
-        const mesh = this.createProfile(len, b.xStart, b.yStart, 0, 'PGU', this.colors.bracing, 15);
+        // Renderizado estrictamente EN EL PLANO (zOffset = 0)
+        const mesh = this.createProfile(len, b.xStart, b.yStart, 0, 'PGU', this.colors.bracing, 0);
         mesh.rotation.z = angle;
-        mesh.scale.y = 0.5; // Fleje delgado
+        mesh.scale.y = 0.4; // Fleje estructural
         structuralGroup.add(mesh);
       });
     }
@@ -261,7 +292,7 @@ export class SteelSceneManager {
       });
     }
 
-    // Aberturas y Vanos
+    // Aberturas y Vanos (Sin cambios en lógica, solo colores si aplica)
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
@@ -314,16 +345,6 @@ export class SteelSceneManager {
         }
       }
     });
-
-    const addStud = (x: number) => {
-      const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
-      if (!inOpening) structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
-    };
-
-    addStud(0);
-    addStud(wall.length - this.profileFlange);
-    const count = Math.floor(wall.length / wall.studSpacing);
-    for (let i = 1; i <= count; i++) addStud(i * wall.studSpacing);
   }
 
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0): THREE.Mesh {
