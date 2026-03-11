@@ -2,8 +2,8 @@ import { SteelHouseConfig, MaterialEstimate, MaterialItem } from '@/lib/steel/ty
 import { StructuralEngine } from './structuralEngine';
 
 /**
- * Calculador de Materiales Avanzado para Steel Framing v4.0
- * Integra análisis estructural dinámico para el cómputo de refuerzos pesados.
+ * Calculador de Materiales Avanzado para Steel Framing v5.0
+ * Integra Cruces de San Andrés y Bloqueos Horizontales en el cómputo.
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -20,8 +20,25 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   const PANEL_WASTE = 1.15; 
 
   config.walls.forEach(wall => {
-    // 1. SOLERAS (PGU)
+    // 1. SOLERAS (PGU) base y superior
     totalPGULenMM += (wall.length * 2);
+
+    // 2. REFUERZOS LATERALES (Cruces de San Andrés)
+    if (config.layers.crossBracing) {
+      const braces = StructuralEngine.calculateBracing(wall);
+      braces.forEach(b => {
+        const len = Math.sqrt(Math.pow(b.xEnd - b.xStart, 2) + Math.pow(b.yEnd - b.yStart, 2));
+        totalPGULenMM += len; // Se computan como flejes (PGU simplificado)
+      });
+    }
+
+    // 3. BLOQUEOS HORIZONTALES
+    if (config.layers.horizontalBlocking) {
+      const blocks = StructuralEngine.calculateBlocking(wall);
+      blocks.forEach(b => {
+        totalPGULenMM += (b.xEnd - b.xStart);
+      });
+    }
 
     const studHeight = wall.height - (PROFILE_FLANGE * 2);
     const totalStudPositions = Math.floor(wall.length / wall.studSpacing) + 1;
@@ -30,30 +47,23 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
-      
-      // Inteligencia Estructural para el BOM
       const analysis = StructuralEngine.calculateHeader(op, config);
 
-      // Descuento de montantes de campo
       const studsInOpening = Math.floor(op.width / wall.studSpacing);
       fieldStuds -= studsInOpening;
 
-      // King Studs (2 por vano)
+      // King Studs
       totalPGCLenMM += (2 * studHeight);
-
-      // Jack Studs (2 por vano)
+      // Jack Studs
       const jackH = headerH - PROFILE_FLANGE;
       totalPGCLenMM += (2 * jackH);
 
-      // Cómputo del Dintel según solución
+      // Dinteles
       if (analysis.type === 'truss') {
-        // Viga reticulada: Cordones (2 * ancho) + Diagonales (estimado 1.5 * ancho)
         totalPGCLenMM += (op.width * 3.5);
       } else if (analysis.type === 'tube') {
-        // Tubo estructural (Hierro pesado)
         totalTubeLenMM += op.width;
       } else {
-        // Ensambles PGC simples/dobles/triples
         const multiplier = analysis.type === 'triple' ? 3 : (analysis.type === 'double' ? 2 : 1);
         totalPGCLenMM += (op.width * multiplier);
       }
@@ -86,19 +96,19 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   const totalTubeLenM = (totalTubeLenMM / 1000) * STEEL_WASTE;
 
   items.push({
-    name: 'Perfil PGU 100x0.9mm (Soleras)',
+    name: 'Perfil PGU 100x0.9mm (Soleras/Bridging)',
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil(totalPGULenM / BAR_LENGTH_M),
-    description: `Barras de 6m. Incluye factor de desperdicio del 10%.`
+    description: `Barras de 6m. Incluye soleras, cruces y bloqueos.`
   });
 
   items.push({
-    name: 'Perfil PGC 100x0.9mm (Montantes/Dinteles/Cerchas)',
+    name: 'Perfil PGC 100x0.9mm (Montantes/Refuerzos)',
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil(totalPGCLenM / BAR_LENGTH_M),
-    description: `Barras de 6m. Considera refuerzos analizados por StructuralEngine.`
+    description: `Barras de 6m. Incluye King/Jack Studs y cripples.`
   });
 
   if (totalTubeLenM > 0) {
@@ -107,7 +117,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       category: 'perfileria',
       unit: 'm',
       quantity: parseFloat(totalTubeLenM.toFixed(2)),
-      description: `Refuerzos de herrería para vanos de carga media-alta.`
+      description: `Refuerzos pesados para vanos de gran luz.`
     });
   }
 
@@ -119,7 +129,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'paneles',
     unit: 'un',
     quantity: Math.ceil(totalExtAreaM2 / PANEL_AREA_M2),
-    description: `Placas 1.2x2.4m. Incluye 15% desperdicio.`
+    description: `Placas 1.2x2.4m.`
   });
 
   items.push({

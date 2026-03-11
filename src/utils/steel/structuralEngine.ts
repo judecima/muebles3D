@@ -1,4 +1,4 @@
-import { SteelOpening, SteelHouseConfig } from '@/lib/steel/types';
+import { SteelOpening, SteelHouseConfig, SteelWall } from '@/lib/steel/types';
 
 export interface HeaderAnalysis {
   type: 'single' | 'double' | 'triple' | 'tube' | 'truss';
@@ -8,35 +8,33 @@ export interface HeaderAnalysis {
   requiredIx: number;
 }
 
-export class StructuralEngine {
-  // Constantes de ingeniería (Unidades: N, mm)
-  private static readonly STEEL_MODULUS = 203000; // MPa (N/mm2)
-  private static readonly PGC_IX_SINGLE = 185000; // mm4 (Perfil 100x0.9 aproximado)
-  private static readonly TUBE_IX = 1200000; // mm4 (Tubo 100x100x3.2)
-  private static readonly DESIGN_LOAD_KPA = 0.002; // 2 kN/m2 (Carga techo aproximada)
+export interface BracingData {
+  xStart: number;
+  yStart: number;
+  xEnd: number;
+  yEnd: number;
+}
 
-  /**
-   * Realiza un análisis estructural completo del vano basado en AISI S240.
-   */
+export interface BlockingData {
+  xStart: number;
+  xEnd: number;
+  y: number;
+}
+
+export class StructuralEngine {
+  private static readonly STEEL_MODULUS = 203000; 
+  private static readonly PGC_IX_SINGLE = 185000; 
+  private static readonly TUBE_IX = 1200000; 
+  private static readonly DESIGN_LOAD_KPA = 0.002; 
+
   static calculateHeader(opening: SteelOpening, config: SteelHouseConfig): HeaderAnalysis {
     const L = opening.width;
-    
-    // 1. Cálculo de Carga Tributaria (w)
-    // Suponemos que el muro soporta la mitad del ancho de la casa (tributaria)
     const tributaryWidth = config.length / 2; 
-    const loadNmm = (this.DESIGN_LOAD_KPA * tributaryWidth); // N/mm lineal sobre el dintel
-
-    // 2. Límite de Flecha (L/360 para vanos con terminaciones frágiles)
+    const loadNmm = (this.DESIGN_LOAD_KPA * tributaryWidth); 
     const maxAllowableDeflection = L / 360;
-
-    // 3. Momento de Inercia Requerido (Ix_req)
-    // Fórmula de flecha para viga simplemente apoyada: delta = (5 * w * L^4) / (384 * E * I)
-    // Despejando I: I = (5 * w * L^4) / (384 * E * delta_max)
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
 
-    // 4. Selección de solución técnica
     let type: HeaderAnalysis['type'] = 'single';
-    
     if (L > 2500 || requiredIx > this.TUBE_IX) {
       type = 'truss';
     } else if (requiredIx > (this.PGC_IX_SINGLE * 3)) {
@@ -47,21 +45,97 @@ export class StructuralEngine {
       type = 'double';
     }
 
-    // Calcular flecha real con la solución elegida (solo para debug/visual)
     let currentIx = this.PGC_IX_SINGLE;
     if (type === 'double') currentIx *= 2;
     if (type === 'triple') currentIx *= 3;
     if (type === 'tube') currentIx = this.TUBE_IX;
-    if (type === 'truss') currentIx = 10000000; // Inercia virtual muy alta para cerchas
+    if (type === 'truss') currentIx = 10000000; 
 
     const deflectionMm = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * currentIx);
 
-    return {
-      type,
-      loadNmm,
-      deflectionMm,
-      maxAllowableDeflection,
-      requiredIx
-    };
+    return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx };
+  }
+
+  /**
+   * Calcula la posición de las Cruces de San Andrés
+   */
+  static calculateBracing(wall: SteelWall): BracingData[] {
+    const braces: BracingData[] = [];
+    const minBraceWidth = 600; 
+    
+    // Identificar zonas ciegas (sin aberturas)
+    const sortedOpenings = [...wall.openings].sort((a, b) => a.position - b.position);
+    let currentX = 0;
+    const wallZones: { start: number, end: number }[] = [];
+
+    sortedOpenings.forEach(op => {
+      if (op.position - currentX > minBraceWidth) {
+        wallZones.push({ start: currentX, end: op.position });
+      }
+      currentX = op.position + op.width;
+    });
+
+    if (wall.length - currentX > minBraceWidth) {
+      wallZones.push({ start: currentX, end: wall.length });
+    }
+
+    // Aplicar cruces según normativa de ancho
+    wallZones.forEach(zone => {
+      const zoneW = zone.end - zone.start;
+      let numX = 0;
+      if (zoneW > 4000) numX = 2;
+      else if (zoneW > 1200 || wall.height > 2700) numX = 1;
+
+      if (numX > 0) {
+        const segmentW = zoneW / numX;
+        for (let i = 0; i < numX; i++) {
+          const xS = zone.start + (i * segmentW) + 50;
+          const xE = zone.start + ((i + 1) * segmentW) - 50;
+          
+          // Cruz principal \
+          braces.push({ xStart: xS, yStart: 50, xEnd: xE, yEnd: wall.height - 50 });
+          // Cruz invertida /
+          braces.push({ xStart: xE, yStart: 50, xEnd: xS, yEnd: wall.height - 50 });
+        }
+      }
+    });
+
+    return braces;
+  }
+
+  /**
+   * Calcula el bloqueo horizontal (Bridging)
+   */
+  static calculateBlocking(wall: SteelWall): BlockingData[] {
+    const blockings: BlockingData[] = [];
+    const numRows = wall.height > 3000 ? 2 : (wall.height > 2400 ? 1 : 0);
+    if (numRows === 0) return [];
+
+    const rowSpacing = wall.height / (numRows + 1);
+
+    for (let row = 1; row <= numRows; row++) {
+      const y = row * rowSpacing;
+      
+      // Generar bloqueos entre montantes
+      for (let x = 0; x < wall.length - wall.studSpacing; x += wall.studSpacing) {
+        const xStart = x;
+        const xEnd = x + wall.studSpacing;
+
+        // Verificar que no intersecte aberturas en esa altura
+        const intersects = wall.openings.some(op => {
+          const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+          const top = sill + op.height;
+          const inXRange = (xStart < op.position + op.width && xEnd > op.position);
+          const inYRange = (y > sill && y < top);
+          return inXRange && inYRange;
+        });
+
+        if (!intersects) {
+          blockings.push({ xStart, xEnd, y });
+        }
+      }
+    }
+
+    return blockings;
   }
 }

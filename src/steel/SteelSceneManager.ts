@@ -44,7 +44,9 @@ export class SteelSceneManager {
     grid: 0xd1d5db,
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
-    panel_int: 0xe2e8f0
+    panel_int: 0xe2e8f0,
+    bracing: 0xf59e0b, // Ámbar para X-Bracing
+    blocking: 0x0d9488  // Verde azulado para Blocking
   };
 
   private profileWidth = 100; 
@@ -144,7 +146,6 @@ export class SteelSceneManager {
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // 1. Priorizar aberturas existentes
     const openingIntersects = this.raycaster.intersectObjects(this.openingsGroup.children);
     if (openingIntersects.length > 0) {
       const { wallId, opening } = openingIntersects[0].object.userData;
@@ -152,12 +153,9 @@ export class SteelSceneManager {
       return;
     }
 
-    // 2. Si no es abertura, buscar muros para agregar
     const wallMeshes: THREE.Object3D[] = [];
     this.houseGroup.traverse(child => {
-      if (child.userData && child.userData.isWall) {
-        wallMeshes.push(child);
-      }
+      if (child.userData && child.userData.isWall) wallMeshes.push(child);
     });
 
     const wallIntersects = this.raycaster.intersectObjects(wallMeshes);
@@ -165,10 +163,7 @@ export class SteelSceneManager {
       const intersect = wallIntersects[0];
       const { wallId } = intersect.object.userData;
       const localPoint = intersect.object.worldToLocal(intersect.point.clone());
-      // En ExtrudeGeometry el eje X local es el largo del muro
-      if (this.onWallDoubleClickCallback) {
-        this.onWallDoubleClickCallback(wallId, localPoint.x);
-      }
+      if (this.onWallDoubleClickCallback) this.onWallDoubleClickCallback(wallId, localPoint.x);
     }
   };
 
@@ -239,15 +234,37 @@ export class SteelSceneManager {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
+    // Soleras PGU
     structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
     structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
 
     const studHeight = wall.height - (this.profileFlange * 2);
 
+    // Cruces de San Andrés
+    if (layers.crossBracing) {
+      const braces = StructuralEngine.calculateBracing(wall);
+      braces.forEach(b => {
+        const len = Math.sqrt(Math.pow(b.xEnd - b.xStart, 2) + Math.pow(b.yEnd - b.yStart, 2));
+        const angle = Math.atan2(b.yEnd - b.yStart, b.xEnd - b.xStart);
+        const mesh = this.createProfile(len, b.xStart, b.yStart, 0, 'PGU', this.colors.bracing, 15);
+        mesh.rotation.z = angle;
+        mesh.scale.y = 0.5; // Fleje delgado
+        structuralGroup.add(mesh);
+      });
+    }
+
+    // Bloqueos Horizontales
+    if (layers.horizontalBlocking) {
+      const blocks = StructuralEngine.calculateBlocking(wall);
+      blocks.forEach(b => {
+        structuralGroup.add(this.createProfile(b.xEnd - b.xStart, b.xStart, b.y, 0, 'PGU', this.colors.blocking));
+      });
+    }
+
+    // Aberturas y Vanos
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
-      
       const headerAnalysis = StructuralEngine.calculateHeader(op, config);
 
       structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
@@ -277,9 +294,8 @@ export class SteelSceneManager {
         structuralGroup.add(tubeMesh);
       } else {
         const count = headerAnalysis.type === 'triple' ? 3 : (headerAnalysis.type === 'double' ? 2 : 1);
-        const color = count === 3 ? this.colors.headerTriple : this.colors.header;
         for (let i = 0; i < count; i++) {
-          structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', color, i * 15));
+          structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', count === 3 ? this.colors.headerTriple : this.colors.header, i * 15));
         }
       }
 
@@ -301,9 +317,7 @@ export class SteelSceneManager {
 
     const addStud = (x: number) => {
       const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
-      if (!inOpening) {
-        structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
-      }
+      if (!inOpening) structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
     };
 
     addStud(0);
