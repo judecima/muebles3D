@@ -22,17 +22,17 @@ import {
   Plus,
   Trash2,
   ArrowRightLeft,
-  Columns
+  Columns,
+  Info
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const EDGE_MARGIN = 400; 
-const HEADER_SPACE = 300; 
-const MIN_SPACE_BETWEEN = 600; 
 const DEFAULT_SILL = 900; 
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
@@ -64,17 +64,17 @@ export default function SteelFramingPage() {
   const [config, setConfig] = useState<SteelHouseConfig>(INITIAL_CONFIG);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // States para modales y edición
+  // Estados para modales y edición de vanos
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
   const [localOpeningData, setLocalOpeningData] = useState<{ width: string, position: string } | null>(null);
-  
   const [addingOpening, setAddingOpening] = useState<{ wallId: string, x: number } | null>(null);
-  const [editingInternalWall, setEditingInternalWall] = useState<InternalWall | null>(null);
-  const [localInternalWallLength, setLocalInternalWallLength] = useState<string>('');
-  
   const [newOpData, setNewOpeningData] = useState<{ type: OpeningType, width: number, height: number, sill: number }>({
     type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL
   });
+
+  // Estados para edición de tabiques internos
+  const [editingInternalWall, setEditingInternalWall] = useState<InternalWall | null>(null);
+  const [localIWData, setLocalIWData] = useState<{ length: string, xPosition: string } | null>(null);
   
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
@@ -84,6 +84,7 @@ export default function SteelFramingPage() {
     exitWalkMode: () => void
   }>(null);
 
+  // Sincronizar paredes perimetrales si cambian dimensiones globales
   useEffect(() => {
     const newWalls = config.walls.map(w => {
       if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
@@ -112,6 +113,14 @@ export default function SteelFramingPage() {
     });
   }, []);
 
+  const handleInternalWallDoubleClick = useCallback((iw: InternalWall) => {
+    setEditingInternalWall(iw);
+    setLocalIWData({
+      length: iw.length.toString(),
+      xPosition: Math.round(iw.xPosition).toString()
+    });
+  }, []);
+
   const handleWallDoubleClick = useCallback((wallId: string, x: number, side: 'exterior' | 'interior') => {
     if (side === 'exterior') {
       setAddingOpening({ wallId, x });
@@ -120,14 +129,18 @@ export default function SteelFramingPage() {
       if (!parent) return;
 
       // Cálculo de rotación para que apunte hacia ADENTRO
-      // parent.rotation 0 -> Inward +Z -> Internal rot 270 (X points +Z)
       const targetRotation = (parent.rotation - 90 + 360) % 360;
+
+      // Calcular largo máximo basado en la pared opuesta
+      let maxPossibleLength = 2000;
+      if (parent.id === 'w1' || parent.id === 'w3') maxPossibleLength = config.length - 100;
+      if (parent.id === 'w2' || parent.id === 'w4') maxPossibleLength = config.width - 100;
 
       const newIW: InternalWall = {
         id: Math.random().toString(36).substr(2, 9),
         parentWallId: wallId,
-        xPosition: x,
-        length: 2000, 
+        xPosition: Math.round(x),
+        length: Math.min(2000, maxPossibleLength), 
         height: config.globalWallHeight,
         rotation: targetRotation,
         x: 0, 
@@ -139,19 +152,48 @@ export default function SteelFramingPage() {
         internalWalls: [...prev.internalWalls, newIW]
       }));
       setEditingInternalWall(newIW);
-      setLocalInternalWallLength(newIW.length.toString());
+      setLocalIWData({
+        length: newIW.length.toString(),
+        xPosition: Math.round(newIW.xPosition).toString()
+      });
     }
-  }, [config.walls, config.globalWallHeight]);
+  }, [config.walls, config.globalWallHeight, config.width, config.length]);
 
-  const commitInternalWallLength = () => {
-    if (!editingInternalWall) return;
-    const val = parseInt(localInternalWallLength) || 0;
-    const updated = { ...editingInternalWall, length: val };
+  const commitInternalWallChanges = () => {
+    if (!editingInternalWall || !localIWData) return;
+    
+    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
+    if (!parent) return;
+
+    let len = parseInt(localIWData.length) || 0;
+    let xPos = parseInt(localIWData.xPosition) || 0;
+
+    // Validar límites de posición en pared padre
+    xPos = Math.max(50, Math.min(xPos, parent.length - 50));
+
+    // Validar límites de largo según perímetro
+    let maxLen = 2000;
+    if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - 150;
+    if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - 150;
+    
+    len = Math.max(100, Math.min(len, maxLen));
+
+    const updated: InternalWall = { 
+      ...editingInternalWall, 
+      length: len, 
+      xPosition: xPos 
+    };
+
     setConfig(prev => ({
       ...prev,
       internalWalls: prev.internalWalls.map(iw => iw.id === updated.id ? updated : iw)
     }));
+    
     setEditingInternalWall(updated);
+    setLocalIWData({
+      length: len.toString(),
+      xPosition: xPos.toString()
+    });
   };
 
   const deleteInternalWall = () => {
@@ -163,10 +205,6 @@ export default function SteelFramingPage() {
     setEditingInternalWall(null);
   };
 
-  const handleWalkModeLock = useCallback((locked: boolean) => {
-    setIsWalkModeActive(locked);
-  }, []);
-
   const commitOpeningChange = () => {
     if (!selectedOpening || !localOpeningData) return;
     
@@ -176,7 +214,11 @@ export default function SteelFramingPage() {
     const wall = config.walls.find(w => w.id === selectedOpening.wallId);
     if (!wall) return;
 
-    const newOpening = { ...selectedOpening.opening, width: w, position: p };
+    // Validar que no salga de la pared
+    const finalW = Math.min(w, wall.length - EDGE_MARGIN * 2);
+    const finalP = Math.max(EDGE_MARGIN, Math.min(p, wall.length - finalW - EDGE_MARGIN));
+
+    const newOpening = { ...selectedOpening.opening, width: finalW, position: finalP };
     
     const newWalls = config.walls.map(w => 
       w.id === selectedOpening.wallId 
@@ -186,6 +228,7 @@ export default function SteelFramingPage() {
     
     setConfig({ ...config, walls: newWalls });
     setSelectedOpening({ ...selectedOpening, opening: newOpening });
+    setLocalOpeningData({ width: finalW.toString(), position: finalP.toString() });
   };
 
   const handleDeleteOpening = () => {
@@ -199,14 +242,28 @@ export default function SteelFramingPage() {
     if (!addingOpening) return;
     const wall = config.walls.find(w => w.id === addingOpening.wallId);
     if (!wall) return;
+
     const newOp: SteelOpening = {
       id: Math.random().toString(36).substr(2, 9),
       type: newOpData.type,
       width: newOpData.width,
       height: newOpData.height,
-      position: addingOpening.x - newOpData.width / 2,
+      position: Math.max(EDGE_MARGIN, Math.min(addingOpening.x - newOpData.width / 2, wall.length - newOpData.width - EDGE_MARGIN)),
       sillHeight: newOpData.type === 'window' ? newOpData.sill : 0
     };
+
+    // Validar colisión con otras aberturas (simplificado)
+    const collision = wall.openings.some(op => {
+      const start = op.position - 200;
+      const end = op.position + op.width + 200;
+      return (newOp.position < end && (newOp.position + newOp.width) > start);
+    });
+
+    if (collision) {
+      alert("Espacio insuficiente. Respete la separación mínima de 200mm entre vanos.");
+      return;
+    }
+
     setConfig({ ...config, walls: config.walls.map(w => w.id === wall.id ? { ...w, openings: [...w.openings, newOp] } : w) });
     setAddingOpening(null);
   };
@@ -254,8 +311,9 @@ export default function SteelFramingPage() {
                 ref={viewerRef}
                 config={config} 
                 onOpeningDoubleClick={handleOpeningDoubleClick}
+                onInternalWallDoubleClick={handleInternalWallDoubleClick}
                 onWallDoubleClick={handleWallDoubleClick}
-                onWalkModeLock={handleWalkModeLock}
+                onWalkModeLock={(locked) => setIsWalkModeActive(locked)}
               />
               
               {!isWalkModeActive && (
@@ -338,31 +396,49 @@ export default function SteelFramingPage() {
 
         {/* Modal Editar Tabique Interno */}
         <Dialog open={!!editingInternalWall} onOpenChange={(open) => !open && setEditingInternalWall(null)}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-purple-600">
-                <Columns className="w-5 h-5" /> Editar Tabique Drywall
+                <Columns className="w-5 h-5" /> Tabique Drywall Interior
               </DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-6 py-4">
+              <Alert className="bg-purple-50 border-purple-100">
+                <Info className="h-4 w-4 text-purple-600" />
+                <AlertTitle className="text-[10px] font-black uppercase text-purple-700">Referencia de Anclaje</AlertTitle>
+                <AlertDescription className="text-[10px] text-purple-600 font-medium">
+                  Este muro nace de la pared perimetral <span className="font-black">#{editingInternalWall?.parentWallId}</span>. 
+                  Las medidas se limitan automáticamente al perímetro exterior.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-[10px] font-black uppercase text-slate-500">Punto Inicio (mm)</Label>
+                <Input
+                  type="number"
+                  value={localIWData?.xPosition || ''}
+                  onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)}
+                  onBlur={commitInternalWallChanges}
+                  onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()}
+                  className="col-span-3 h-9 font-bold"
+                />
+              </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Largo (mm)</Label>
                 <Input
                   type="number"
-                  value={localInternalWallLength}
-                  onChange={(e) => setLocalInternalWallLength(e.target.value)}
-                  onBlur={commitInternalWallLength}
-                  onKeyDown={(e) => e.key === 'Enter' && commitInternalWallLength()}
+                  value={localIWData?.length || ''}
+                  onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)}
+                  onBlur={commitInternalWallChanges}
+                  onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()}
                   className="col-span-3 h-9 font-bold"
                 />
               </div>
-              <p className="text-[9px] text-slate-400 italic col-span-4 text-center">
-                El largo máximo está limitado por las paredes perimetrales.
-              </p>
             </div>
             <DialogFooter className="flex gap-2">
-              <Button variant="destructive" onClick={deleteInternalWall} className="font-bold uppercase text-[10px]"><Trash2 className="w-4 h-4 mr-2" /> Eliminar</Button>
-              <Button onClick={() => setEditingInternalWall(null)} className="bg-purple-600 font-black uppercase text-[10px] flex-1">Confirmar</Button>
+              <Button variant="destructive" onClick={deleteInternalWall} className="font-bold uppercase text-[10px] h-10"><Trash2 className="w-4 h-4 mr-2" /> Eliminar Muro</Button>
+              <Button onClick={() => setEditingInternalWall(null)} className="bg-purple-600 font-black uppercase text-[10px] flex-1 h-10">Confirmar Diseño</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
