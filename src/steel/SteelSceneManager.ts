@@ -35,6 +35,7 @@ export class SteelSceneManager {
     steel: 0x9ca3af, 
     header: 0x2563eb,
     headerTriple: 0x1e40af,
+    headerTube: 0x0f172a, // Azul muy oscuro para tubos
     king: 0xef4444,
     jack: 0xf59e0b,
     grid: 0xd1d5db,
@@ -210,40 +211,54 @@ export class SteelSceneManager {
 
     const studHeight = wall.height - (this.profileFlange * 2);
 
-    // 2. Estructura de Aberturas (Framing de Vanos)
+    // 2. Estructura de Aberturas (Framing de Vanos Inteligente)
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
       
-      // Cálculo de ingeniería para el dintel
-      const headerSolution = StructuralEngine.calculateHeader(op, config);
+      // Inteligencia Estructural: Selección de dintel
+      const headerAnalysis = StructuralEngine.calculateHeader(op, config);
 
       // King Studs (Altura completa)
       structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
       structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king));
 
-      // Jack Studs (Soportan el dintel)
+      // Jack Studs (Apoyo de dintel)
       const jackH = headerH - this.profileFlange;
       structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      // Dintel (Header) - Lógica visual según solución
-      const headerColor = headerSolution.type === 'triple' || headerSolution.type === 'truss' ? this.colors.headerTriple : this.colors.header;
-      
-      if (headerSolution.type === 'truss') {
-        // Viga reticulada Warren para vanos gigantes
+      // Representación Visual del Dintel
+      if (headerAnalysis.type === 'truss') {
+        // Viga Reticulada Warren (300mm de peralte)
         const trussH = 300;
-        const diagCount = Math.ceil(op.width / 300);
+        const diagCount = Math.max(2, Math.ceil(op.width / 400));
         const diagW = op.width / diagCount;
+        
+        // Cordones superior e inferior
+        structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.headerTriple));
+        structuralGroup.add(this.createProfile(op.width, op.position, headerH + trussH, 0, 'PGC', this.colors.headerTriple));
+        
+        // Diagonales (Warren)
         for (let i = 0; i < diagCount; i++) {
-          // Cordón superior e inferior ya cubiertos por la caja del header? Dibujamos representativo
-          structuralGroup.add(this.createProfile(diagW, op.position + i * diagW, headerH, 0, 'PGC', headerColor));
-          structuralGroup.add(this.createProfile(diagW, op.position + i * diagW, headerH + trussH, 0, 'PGC', headerColor));
+          const diagLen = Math.sqrt(Math.pow(diagW, 2) + Math.pow(trussH, 2));
+          const angle = Math.atan2(trussH, diagW);
+          const mesh = this.createProfile(diagLen, op.position + (i * diagW), headerH, 0, 'PGC', this.colors.header);
+          mesh.rotation.z = (i % 2 === 0) ? angle : -angle;
+          mesh.position.y += (i % 2 === 0) ? 0 : trussH;
+          structuralGroup.add(mesh);
         }
+      } else if (headerAnalysis.type === 'tube') {
+        // Tubo Estructural (Boxed Header)
+        const tubeMesh = this.createProfile(op.width, op.position, headerH, 0, 'PGC', this.colors.headerTube);
+        tubeMesh.scale.y = 2.5; // Visualmente más grueso
+        structuralGroup.add(tubeMesh);
       } else {
-        const headerCount = headerSolution.type === 'triple' ? 3 : (headerSolution.type === 'double' ? 2 : 1);
-        for (let i = 0; i < headerCount; i++) {
-          structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', headerColor, i * 10));
+        // Ensambles PGC (Simple, Doble, Triple)
+        const count = headerAnalysis.type === 'triple' ? 3 : (headerAnalysis.type === 'double' ? 2 : 1);
+        const color = count === 3 ? this.colors.headerTriple : this.colors.header;
+        for (let i = 0; i < count; i++) {
+          structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', color, i * 15));
         }
       }
 
@@ -252,12 +267,12 @@ export class SteelSceneManager {
         structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       }
 
-      // Cripple Studs (Superiores e Inferiores PGC)
+      // Cripple Studs
       const crippleSpacing = wall.studSpacing;
       for (let x = op.position + crippleSpacing; x < op.position + op.width; x += crippleSpacing) {
-        const upperCrippleH = wall.height - headerH - this.profileFlange * 2;
-        if (upperCrippleH > 50) {
-          structuralGroup.add(this.createProfile(upperCrippleH, x, headerH + this.profileFlange, 90, 'PGC', this.colors.steel));
+        const topSpace = wall.height - headerH - (headerAnalysis.type === 'truss' ? 350 : this.profileFlange * 2);
+        if (topSpace > 50) {
+          structuralGroup.add(this.createProfile(topSpace, x, wall.height - topSpace - this.profileFlange, 90, 'PGC', this.colors.steel));
         }
         if (op.type === 'window' && sill > 100) {
           structuralGroup.add(this.createProfile(sill - this.profileFlange * 2, x, this.profileFlange, 90, 'PGC', this.colors.steel));
@@ -265,20 +280,18 @@ export class SteelSceneManager {
       }
     });
 
-    // 3. Montantes de Campo (Standard Studs PGC) - Omitir zonas de vanos
+    // 3. Montantes de Campo (Standard Studs PGC) - Evitar aberturas
     const addStud = (x: number) => {
-      const inOpeningZone = wall.openings.some(op => x >= (op.position - 50) && x <= (op.position + op.width + 50));
-      if (!inOpeningZone) {
+      const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
+      if (!inOpening) {
         structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
       }
     };
 
     addStud(0);
     addStud(wall.length - this.profileFlange);
-    const fieldStudCount = Math.floor(wall.length / wall.studSpacing);
-    for (let i = 1; i <= fieldStudCount; i++) {
-      addStud(i * wall.studSpacing);
-    }
+    const count = Math.floor(wall.length / wall.studSpacing);
+    for (let i = 1; i <= count; i++) addStud(i * wall.studSpacing);
   }
 
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0): THREE.Mesh {
