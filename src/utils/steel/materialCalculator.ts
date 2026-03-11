@@ -1,9 +1,10 @@
+
 import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall, InternalWall } from '@/lib/steel/types';
 import { StructuralEngine } from './structuralEngine';
 
 /**
- * Motor de Cómputo Métrico Industrial ArquiMax v14.0
- * Incluye lógica de Ladder Backing y uniones de alta eficiencia.
+ * Motor de Cómputo Métrico Industrial ArquiMax v16.0
+ * Incluye cuantificación de Vigas Reticuladas y refuerzos de grandes luces.
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -46,10 +47,9 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       totalConnections += 2;
     });
 
-    // Sumar Ladder Backing para uniones en T
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wall.id) {
-        pgc100Len += studHeight; // Montante de respaldo
+        pgc100Len += studHeight; 
         const ladders = StructuralEngine.calculateLadderBacking(wall.height);
         ladders.forEach(l => {
           pgu100Len += (l.xEnd - l.xStart);
@@ -59,20 +59,33 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     });
 
     wall.openings.forEach(op => {
+      const analysis = StructuralEngine.calculateHeader(op, wall.length, config);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
       
+      // King Studs (apoyos laterales reforzados para trusses)
+      const numKings = analysis.type === 'truss' ? 3 : 1;
       if (fusion === 'none') {
-        pgc100Len += 2 * studHeight; 
+        pgc100Len += numKings * 2 * studHeight; 
       } else {
-        pgc100Len += 1 * studHeight; 
+        pgc100Len += numKings * 1 * studHeight; 
       }
 
+      // Jack Studs
       pgc100Len += 2 * (sill + op.height - 40); 
-      pgc100Len += op.width; 
+
+      // Header / Truss
+      if (analysis.type === 'truss') {
+        pgc100Len += op.width * 2; // Cordones superior e inferior
+        const numDiagonals = Math.ceil(op.width / 400);
+        pgc100Len += numDiagonals * 600; // Aproximación de diagonales y montantes de viga
+      } else {
+        pgc100Len += op.width; 
+      }
+
       if (op.type === 'window') pgu100Len += op.width; 
       
-      const cripples = StructuralEngine.calculateCrippleStuds(wall, op);
+      const cripples = StructuralEngine.calculateCrippleStuds(wall, op, config);
       cripples.forEach(c => {
         pgc100Len += (c.yEnd - c.yStart);
         totalConnections += 4;
@@ -102,7 +115,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       pgc70Len += 2 * studHeight; 
       pgc70Len += op.width; 
       
-      const cripples = StructuralEngine.calculateCrippleStuds(iw, op);
+      const cripples = StructuralEngine.calculateCrippleStuds(iw, op, config);
       cripples.forEach(c => {
         pgc70Len += (c.yEnd - c.yStart);
         totalConnections += 4;
@@ -121,14 +134,14 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((pgc100Len / BAR_LEN) * WASTE_STEEL),
-    description: 'Montantes estructurales, Kings, Jacks y refuerzos de unión.'
+    description: 'Montantes estructurales, Kings reforzados y vigas reticuladas.'
   });
   items.push({
     name: 'Perfiles PGU 100x0.90mm (6m)',
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((pgu100Len / BAR_LEN) * WASTE_STEEL),
-    description: 'Soleras superior/inferior y Bloqueos de respaldo (Ladder).'
+    description: 'Soleras y bloqueos de refuerzo.'
   });
   if (pgc70Len > 0) {
     items.push({
@@ -136,14 +149,14 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       category: 'perfileria',
       unit: 'un',
       quantity: Math.ceil((pgc70Len / BAR_LEN) * WASTE_STEEL),
-      description: 'Montantes para tabiquería interna Drywall.'
+      description: 'Montantes Drywall.'
     });
     items.push({
       name: 'Perfiles PGU 70x0.50mm (6m)',
       category: 'perfileria',
       unit: 'un',
       quantity: Math.ceil((pgu70Len / BAR_LEN) * WASTE_STEEL),
-      description: 'Soleras para tabiquería interna Drywall.'
+      description: 'Soleras Drywall.'
     });
   }
 
@@ -159,7 +172,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'paneles',
     unit: 'un',
     quantity: Math.ceil((areaInteriorTotal / BOARD_AREA) * WASTE_BOARDS),
-    description: 'Revestimiento interior (muros y tabiques).'
+    description: 'Revestimiento interior.'
   });
 
   items.push({
@@ -167,7 +180,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'aislacion',
     unit: 'm²',
     quantity: Math.ceil(areaExteriorNet * 1.05),
-    description: 'Aislación termoacústica (Área neta).'
+    description: 'Aislación termoacústica.'
   });
   items.push({
     name: 'Barrera de Agua y Viento (WRB)',
@@ -189,14 +202,14 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     category: 'fijaciones',
     unit: 'un',
     quantity: Math.ceil(areaInteriorTotal * 25 + areaExteriorGross * 20),
-    description: 'Fijación de placas a perfiles.'
+    description: 'Fijación de placas.'
   });
   items.push({
     name: 'Anclajes Expansivos 3/8" x 3 3/4"',
     category: 'fijaciones',
     unit: 'un',
     quantity: totalAnchors,
-    description: 'Anclaje de solera inferior a platea.'
+    description: 'Anclaje a platea.'
   });
 
   return {

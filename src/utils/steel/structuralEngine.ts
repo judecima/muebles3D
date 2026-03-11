@@ -9,6 +9,11 @@ export interface HeaderAnalysis {
   requiredIx: number;
   status: 'ok' | 'warning' | 'error';
   isFusedWithCorner: 'none' | 'left' | 'right';
+  trussData?: {
+    height: number;
+    numDiagonals: number;
+    chordThickness: number;
+  };
 }
 
 export interface BlockingData {
@@ -87,10 +92,16 @@ export class StructuralEngine {
     
     let type: HeaderAnalysis['type'] = 'single';
     let status: HeaderAnalysis['status'] = 'ok';
+    let trussData: HeaderAnalysis['trussData'] = undefined;
 
     if (L > 2500 || requiredIx > this.TUBE_IX) {
       type = 'truss';
-      status = 'warning';
+      status = L > 3500 ? 'error' : 'warning';
+      trussData = {
+        height: 400, // Altura estándar de viga reticulada
+        numDiagonals: Math.ceil(L / 400),
+        chordThickness: 1.25
+      };
     } else if (requiredIx > (this.PGC_IX_SINGLE * 3)) {
       type = 'tube';
     } else if (requiredIx > (this.PGC_IX_SINGLE * 2)) {
@@ -101,12 +112,12 @@ export class StructuralEngine {
 
     if (L > 3500) status = 'error'; 
 
-    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion };
+    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, trussData };
   }
 
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
     const analysis = this.calculateHeader(opening, wall.length, config);
-    // Si es reticulada o viga tubo masiva, no requiere cripples estándar (el refuerzo ocupa todo el espacio)
+    // Si es reticulada o viga tubo masiva, los cripples superiores son reemplazados por el cuerpo de la viga
     if (analysis.type === 'truss' || analysis.type === 'tube') return [];
 
     const cripples: CrippleData[] = [];
@@ -171,7 +182,10 @@ export class StructuralEngine {
       wall.openings.forEach(op => {
         const analysis = this.calculateHeader(op, wall.length, config);
         if (analysis.status !== 'ok') {
-          alerts.push({ wallId: wall.id, status: analysis.status, message: `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico - Viga Reticulada' : 'Refuerzo Especial'}` });
+          const msg = analysis.type === 'truss' 
+            ? `Vano ${op.width}mm en ${wall.id}: Requiere Viga Reticulada (Truss)`
+            : `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico' : 'Refuerzo Especial'}`;
+          alerts.push({ wallId: wall.id, status: analysis.status, message: msg });
         }
       });
       const hasUnions = config.internalWalls.some(iw => iw.parentWallId === wall.id);

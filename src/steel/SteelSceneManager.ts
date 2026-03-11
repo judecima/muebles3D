@@ -44,7 +44,7 @@ export class SteelSceneManager {
     steel: 0x9ca3af,      
     steelDrywall: 0x64748b, 
     header: 0x2563eb,
-    header_truss: 0x7c3aed, // Violeta para vigas reticuladas
+    header_truss: 0x7c3aed, 
     king: 0xef4444,
     jack: 0xf59e0b,
     cripple: 0x8b5cf6, 
@@ -248,19 +248,16 @@ export class SteelSceneManager {
         group.add(this.createProfile(studHeight, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         
-        const headerW = analysis.type === 'truss' ? op.width + 100 : op.width;
-        const headerX = analysis.type === 'truss' ? op.position - 50 : op.position;
-        group.add(this.createProfile(headerW, headerX, headerH, 0, 'PGC', headerColor, 0, thickness));
+        if (analysis.type === 'truss') {
+          this.drawTrussHeader(group, op.position, headerH - 400, op.width, 400, thickness);
+        } else {
+          group.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', headerColor, 0, thickness));
+        }
         
         StructuralEngine.calculateCrippleStuds(iw, op, config).forEach(c => {
           group.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness));
         });
       });
-      if (config.layers.horizontalBlocking) {
-        StructuralEngine.calculateBlocking(iw).forEach(b => {
-          group.add(this.createProfile(b.xEnd - b.xStart, b.xStart, b.y, 0, 'PGU', this.colors.blocking, 0, thickness));
-        });
-      }
     }
     if (!config.structuralMode && config.layers.interiorPanels) {
       const shape = new THREE.Shape();
@@ -307,27 +304,57 @@ export class SteelSceneManager {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerTop = sill + op.height;
-      const headerColor = analysis.type === 'truss' ? this.colors.header_truss : (analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header));
       const fusion = analysis.isFusedWithCorner;
       const fusedL = fusion === 'left'; const fusedR = fusion === 'right';
 
-      if (!fusedL) {
-        structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * 2, this.profileFlange, 90, 'PGC', this.colors.king));
-        structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
-      } else { structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position, this.profileFlange, 90, 'PGC', this.colors.jack)); }
+      // Refuerzos de apoyo lateral (King Studs)
+      const numKings = analysis.type === 'truss' ? 3 : 1;
+      for (let i = 0; i < numKings; i++) {
+        if (!fusedL) structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * (2 + i), this.profileFlange, 90, 'PGC', this.colors.king));
+        if (!fusedR) structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange * (1 + i), this.profileFlange, 90, 'PGC', this.colors.king));
+      }
 
-      if (!fusedR) {
-        structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.king));
-        structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
-      } else { structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position + op.width - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack)); }
+      // Jack Studs (Apoyo directo de viga)
+      if (!fusedL) structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
+      if (!fusedR) structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      const finalHeaderW = fusedL || fusedR ? op.width + 50 : op.width;
-      const finalHeaderX = fusedL ? op.position - 50 : op.position;
-      structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerTop, 0, 'PGC', headerColor));
+      if (analysis.type === 'truss') {
+        this.drawTrussHeader(structuralGroup, op.position, headerTop - 400, op.width, 400, this.profileWidth);
+      } else {
+        const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
+        const finalHeaderW = fusedL || fusedR ? op.width + 50 : op.width;
+        const finalHeaderX = fusedL ? op.position - 50 : op.position;
+        structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerTop, 0, 'PGC', headerColor));
+      }
       
       if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       StructuralEngine.calculateCrippleStuds(wall, op, config).forEach(c => structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple)));
     });
+  }
+
+  private drawTrussHeader(group: THREE.Group, x: number, y: number, w: number, h: number, thickness: number) {
+    // Cordón Inferior
+    group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, 0, thickness));
+    // Cordón Superior
+    group.add(this.createProfile(w, x, y + h - 40, 0, 'PGC', this.colors.header_truss, 0, thickness));
+    
+    // Diagonales y montantes internos
+    const numDivisions = Math.ceil(w / 400);
+    const divW = w / numDivisions;
+    for (let i = 0; i <= numDivisions; i++) {
+      const posX = x + (i * divW);
+      // Montante vertical interno
+      group.add(this.createProfile(h - 80, posX - 20, y + 40, 90, 'PGC', this.colors.header_truss, 0, thickness));
+      // Diagonal (simplificada visualmente con perfil rotado)
+      if (i < numDivisions) {
+        const diagLen = Math.sqrt(divW * divW + h * h);
+        const angle = Math.atan2(h, divW);
+        const diag = this.createProfile(diagLen, posX, y, 0, 'PGC', this.colors.header_truss, 0, thickness);
+        diag.rotation.z = i % 2 === 0 ? angle : -angle;
+        if (i % 2 !== 0) diag.position.y += h;
+        group.add(diag);
+      }
+    }
   }
 
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number): THREE.Mesh {
