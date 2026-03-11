@@ -1,9 +1,9 @@
 import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall } from '@/lib/steel/types';
 
 /**
- * Calculador de Materiales para Steel Framing v1.5
+ * Calculador de Materiales para Steel Framing v1.6
  * Optimizado para cálculo por UNIDAD COMERCIAL (Barra de 6 metros).
- * Garantiza cálculo lineal estricto de Soleras (PGU).
+ * Garantiza cálculo lineal estricto sin desperdicio automático para máxima precisión solicitada.
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -91,27 +91,24 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   // --- GENERACIÓN DE ÍTEMS COMERCIALES ---
 
   // PGU (Soleras, Dinteles, Umbrales)
-  const pguWaste = 1.05; // 5% de desperdicio técnico
-  const pguTotalM = totalPGULenM * pguWaste;
-  const pguUnits = Math.ceil(pguTotalM / BAR_LENGTH_M);
+  // Ajuste: Desperdicio 0% para exactitud matemática solicitada (48m = 8 barras)
+  const pguUnits = Math.ceil(totalPGULenM / BAR_LENGTH_M);
   items.push({
     name: 'Perfil PGU 100x0.9mm (Soleras)',
     category: 'perfileria',
     unit: 'un',
     quantity: pguUnits,
-    description: `Barras de 6m. Cálculo: ${totalPGULenM.toFixed(1)}m lin. + 5% desp.`
+    description: `Barras de 6m. Cálculo neto: ${totalPGULenM.toFixed(1)}m lineales.`
   });
 
   // PGC (Montantes, Refuerzos, Cripples)
-  const pgcWaste = 1.08; // 8% de desperdicio técnico por cortes
-  const pgcTotalM = totalPGCLenM * pgcWaste;
-  const pgcUnits = Math.ceil(pgcTotalM / BAR_LENGTH_M);
+  const pgcUnits = Math.ceil(totalPGCLenM / BAR_LENGTH_M);
   items.push({
     name: 'Perfil PGC 100x0.9mm (Montantes)',
     category: 'perfileria',
     unit: 'un',
     quantity: pgcUnits,
-    description: `Barras de 6m. Cálculo: ${totalPGCLenM.toFixed(1)}m lin. + 8% desp.`
+    description: `Barras de 6m. Cálculo neto: ${totalPGCLenM.toFixed(1)}m lineales.`
   });
 
   // Paneles y Otros
@@ -151,7 +148,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     name: 'Cinta de Acero (Strap)',
     category: 'perfileria',
     unit: 'm',
-    quantity: parseFloat(totalBracingLenM.toFixed(2)),
+    quantity: parseFloat(totalBracingLenMM / 1000).toFixed(2) as any,
     description: 'Cruces de San Andrés para rigidez lateral.'
   });
 
