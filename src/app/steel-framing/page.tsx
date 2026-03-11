@@ -63,13 +63,19 @@ const INITIAL_CONFIG: SteelHouseConfig = {
 export default function SteelFramingPage() {
   const [config, setConfig] = useState<SteelHouseConfig>(INITIAL_CONFIG);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // States para modales y edición
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
+  const [localOpeningData, setLocalOpeningData] = useState<{ width: string, position: string } | null>(null);
+  
   const [addingOpening, setAddingOpening] = useState<{ wallId: string, x: number } | null>(null);
   const [editingInternalWall, setEditingInternalWall] = useState<InternalWall | null>(null);
+  const [localInternalWallLength, setLocalInternalWallLength] = useState<string>('');
   
   const [newOpData, setNewOpeningData] = useState<{ type: OpeningType, width: number, height: number, sill: number }>({
     type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL
   });
+  
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
   
@@ -100,24 +106,31 @@ export default function SteelFramingPage() {
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening) => {
     setSelectedOpening({ wallId, opening });
+    setLocalOpeningData({
+      width: opening.width.toString(),
+      position: Math.round(opening.position).toString()
+    });
   }, []);
 
   const handleWallDoubleClick = useCallback((wallId: string, x: number, side: 'exterior' | 'interior') => {
     if (side === 'exterior') {
       setAddingOpening({ wallId, x });
     } else {
-      // Agregar pared interna Drywall perpendicular
       const parent = config.walls.find(w => w.id === wallId);
       if (!parent) return;
+
+      // Cálculo de rotación para que apunte hacia ADENTRO
+      // parent.rotation 0 -> Inward +Z -> Internal rot 270 (X points +Z)
+      const targetRotation = (parent.rotation - 90 + 360) % 360;
 
       const newIW: InternalWall = {
         id: Math.random().toString(36).substr(2, 9),
         parentWallId: wallId,
         xPosition: x,
-        length: 2000, // Largo inicial ajustable
+        length: 2000, 
         height: config.globalWallHeight,
-        rotation: (parent.rotation + 90) % 360,
-        x: 0, // Se calcula en el SceneManager basado en la matriz del padre
+        rotation: targetRotation,
+        x: 0, 
         z: 0
       };
       
@@ -126,12 +139,14 @@ export default function SteelFramingPage() {
         internalWalls: [...prev.internalWalls, newIW]
       }));
       setEditingInternalWall(newIW);
+      setLocalInternalWallLength(newIW.length.toString());
     }
   }, [config.walls, config.globalWallHeight]);
 
-  const updateInternalWall = (field: keyof InternalWall, value: any) => {
+  const commitInternalWallLength = () => {
     if (!editingInternalWall) return;
-    const updated = { ...editingInternalWall, [field]: value };
+    const val = parseInt(localInternalWallLength) || 0;
+    const updated = { ...editingInternalWall, length: val };
     setConfig(prev => ({
       ...prev,
       internalWalls: prev.internalWalls.map(iw => iw.id === updated.id ? updated : iw)
@@ -152,15 +167,23 @@ export default function SteelFramingPage() {
     setIsWalkModeActive(locked);
   }, []);
 
-  const updateOpeningDim = (field: keyof SteelOpening, val: number) => {
-    if (!selectedOpening) return;
-    const safeVal = isNaN(val) ? 0 : val;
+  const commitOpeningChange = () => {
+    if (!selectedOpening || !localOpeningData) return;
+    
+    const w = parseInt(localOpeningData.width) || 0;
+    const p = parseInt(localOpeningData.position) || 0;
+    
     const wall = config.walls.find(w => w.id === selectedOpening.wallId);
     if (!wall) return;
 
-    let newOpening = { ...selectedOpening.opening, [field]: safeVal };
-    // ... logic de validacion ...
-    const newWalls = config.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? newOpening : o) } : w);
+    const newOpening = { ...selectedOpening.opening, width: w, position: p };
+    
+    const newWalls = config.walls.map(w => 
+      w.id === selectedOpening.wallId 
+        ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? newOpening : o) } 
+        : w
+    );
+    
     setConfig({ ...config, walls: newWalls });
     setSelectedOpening({ ...selectedOpening, opening: newOpening });
   };
@@ -264,11 +287,25 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
-                <Input type="number" value={selectedOpening?.opening.width ?? 0} onChange={(e) => updateOpeningDim('width', parseInt(e.target.value) || 0)} className="col-span-3" />
+                <Input 
+                  type="number" 
+                  value={localOpeningData?.width || ''} 
+                  onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)}
+                  onBlur={commitOpeningChange}
+                  onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()}
+                  className="col-span-3" 
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Posición</Label>
-                <Input type="number" value={Math.round(selectedOpening?.opening.position ?? 0)} onChange={(e) => updateOpeningDim('position', parseInt(e.target.value) || 0)} className="col-span-3" />
+                <Input 
+                  type="number" 
+                  value={localOpeningData?.position || ''} 
+                  onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)}
+                  onBlur={commitOpeningChange}
+                  onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()}
+                  className="col-span-3" 
+                />
               </div>
             </div>
             <DialogFooter>
@@ -312,8 +349,10 @@ export default function SteelFramingPage() {
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Largo (mm)</Label>
                 <Input
                   type="number"
-                  value={editingInternalWall?.length ?? 0}
-                  onChange={(e) => updateInternalWall('length', parseInt(e.target.value) || 0)}
+                  value={localInternalWallLength}
+                  onChange={(e) => setLocalInternalWallLength(e.target.value)}
+                  onBlur={commitInternalWallLength}
+                  onKeyDown={(e) => e.key === 'Enter' && commitInternalWallLength()}
                   className="col-span-3 h-9 font-bold"
                 />
               </div>
