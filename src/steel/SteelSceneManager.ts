@@ -241,7 +241,7 @@ export class SteelSceneManager {
       });
       openings.forEach(op => {
         const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-        const headerH = sill + op.height;
+        const headerBottom = sill + op.height;
         const analysis = StructuralEngine.calculateHeader(op, iw.length, config, iw.height);
         const headerColor = analysis.type === 'truss' ? this.colors.header_truss : this.colors.header;
         
@@ -249,9 +249,10 @@ export class SteelSceneManager {
         group.add(this.createProfile(studHeight, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.king, 0, thickness));
         
         if (analysis.type === 'truss') {
-          this.drawTrussHeader(group, op.position, headerH, op.width, analysis.trussData?.height || 400, thickness);
+          this.drawTrussHeader(group, op.position, headerBottom, op.width, analysis.trussData?.height || 400, thickness);
         } else {
-          group.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', headerColor, 0, thickness));
+          // Dintel estándar de 100mm de alto
+          group.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, thickness, 100));
         }
         
         StructuralEngine.calculateCrippleStuds(iw, op, config).forEach(c => {
@@ -303,7 +304,7 @@ export class SteelSceneManager {
     wall.openings.forEach(op => {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      const headerTop = sill + op.height;
+      const headerBottom = sill + op.height;
       const fusion = analysis.isFusedWithCorner;
       const fusedL = fusion === 'left'; const fusedR = fusion === 'right';
 
@@ -313,16 +314,17 @@ export class SteelSceneManager {
         if (!fusedR) structuralGroup.add(this.createProfile(studHeight, op.position + op.width + this.profileFlange * (1 + i), this.profileFlange, 90, 'PGC', this.colors.king));
       }
 
-      if (!fusedL) structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
-      if (!fusedR) structuralGroup.add(this.createProfile(headerTop - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
+      if (!fusedL) structuralGroup.add(this.createProfile(headerBottom - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
+      if (!fusedR) structuralGroup.add(this.createProfile(headerBottom - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
       if (analysis.type === 'truss') {
-        this.drawTrussHeader(structuralGroup, op.position, headerTop, op.width, analysis.trussData?.height || 400, this.profileWidth);
+        this.drawTrussHeader(structuralGroup, op.position, headerBottom, op.width, analysis.trussData?.height || 400, this.profileWidth);
       } else {
         const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
         const finalHeaderW = fusedL || fusedR ? op.width + 50 : op.width;
         const finalHeaderX = fusedL ? op.position - 50 : op.position;
-        structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerTop, 0, 'PGC', headerColor));
+        // Dintel estándar de 100mm de alto
+        structuralGroup.add(this.createProfile(finalHeaderW, finalHeaderX, headerBottom, 0, 'PGC', headerColor, 0, this.profileWidth, 100));
       }
       
       if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
@@ -362,12 +364,22 @@ export class SteelSceneManager {
     }
   }
 
-  private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number): THREE.Mesh {
+  private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number, customHeight?: number): THREE.Mesh {
     const width = customWidth || this.profileWidth;
+    const flangeHeight = customHeight || this.profileFlange;
     const isVertical = rotZ === 90;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(isVertical ? this.profileFlange : len, isVertical ? len : this.profileFlange, width), new THREE.MeshStandardMaterial({ color: color || this.colors.steel, metalness: 0.8, roughness: 0.2 }));
-    mesh.position.set(x + (isVertical ? this.profileFlange / 2 : len / 2), y + (isVertical ? len / 2 : this.profileFlange / 2), zOffset);
-    mesh.castShadow = mesh.receiveShadow = true; return mesh;
+    
+    const geomH = isVertical ? len : flangeHeight;
+    const geomW = isVertical ? this.profileFlange : len;
+    
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(geomW, geomH, width), 
+      new THREE.MeshStandardMaterial({ color: color || this.colors.steel, metalness: 0.8, roughness: 0.2 })
+    );
+    
+    mesh.position.set(x + geomW / 2, y + geomH / 2, zOffset);
+    mesh.castShadow = mesh.receiveShadow = true; 
+    return mesh;
   }
 
   private createPanelMesh(wall: SteelWall, side: 'exterior' | 'interior', config: SteelHouseConfig): THREE.Mesh {

@@ -155,6 +155,7 @@ export class StructuralEngine {
     const headerBottom = sill + opening.height;
 
     const analysis = this.calculateHeader(opening, wall.length, config, wallH);
+    // Header estándar tiene 100mm de alto
     const headerHeight = analysis.type === 'truss' ? (analysis.trussData?.height || 400) : 100;
     const headerTop = headerBottom + headerHeight;
 
@@ -164,7 +165,7 @@ export class StructuralEngine {
     if (!isFullTruss) {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-          // El cripple nace justo encima del header y termina en la solera superior (con un offset de 40mm por ala solera)
+          // Aseguramos que el cripple empiece exactamente donde termina el header
           cripples.push({ x, yStart: headerTop, yEnd: wallH - 40, type: 'upper' });
         }
       }
@@ -196,7 +197,7 @@ export class StructuralEngine {
         const xEnd = x + studSpacing; 
         const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-          const top = sill + op.height;
+          const top = sill + op.height + 100; // Considerar el header en la intersección
           return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
         });
         if (!intersects) blockings.push({ xStart, xEnd, y });

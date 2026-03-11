@@ -240,31 +240,64 @@ export default function SteelFramingPage() {
     const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
     if (!parent) return;
 
-    // Lógica avanzada: Buscar la pared perpendicular más cercana
-    // 1. Identificar eje de movimiento (X o Z) basado en rotación
-    const rot = editingInternalWall.rotation;
-    let maxPossibleLength = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
+    // Lógica 2D de intersección real (Ray-casting)
+    const parentRad = (parent.rotation * Math.PI) / 180;
+    const parentDir = { x: Math.cos(parentRad), z: -Math.sin(parentRad) };
+    const perpDir = { x: Math.sin(parentRad), z: Math.cos(parentRad) };
     
-    // Buscar intersecciones con otros tabiques internos
-    let closestInternalDist = Infinity;
-    config.internalWalls.forEach(iw => {
-      if (iw.id === editingInternalWall.id) return;
-      // Una pared interna es perpendicular si sus rotaciones difieren en 90 o 270 grados
-      const isPerpendicular = Math.abs(iw.rotation - editingInternalWall.rotation) % 180 !== 0;
-      if (isPerpendicular) {
-        // Calcular si el tabique proyectado intersectaría a iw
-        // (Simplificación basada en que actualmente las paredes están en ejes 0, 90, 180, 270)
-        const currentIsHorizontal = (rot === 0 || rot === 180);
-        const targetIsHorizontal = (iw.rotation === 0 || iw.rotation === 180);
-        
-        // Si nosotros somos verticales y ellos horizontales (o viceversa)
-        // Calculamos distancia basándonos en posiciones relativas
-        // NOTA: Esta lógica requiere conocer las posiciones absolutas finales que se calculan en buildHouse
-        // pero podemos aproximar usando las jerarquías.
-      }
+    const p0 = {
+      x: parent.x + parentDir.x * editingInternalWall.xPosition + perpDir.x * (EXTERIOR_WALL_THICKNESS / 2),
+      z: parent.z + parentDir.z * editingInternalWall.xPosition + perpDir.z * (EXTERIOR_WALL_THICKNESS / 2)
+    };
+    
+    const iwRad = (editingInternalWall.rotation * Math.PI) / 180;
+    const iwDir = { x: Math.cos(iwRad), z: -Math.sin(iwRad) };
+
+    let minLen = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
+
+    const getIntersection = (rayP: {x:number, z:number}, rayD: {x:number, z:number}, segA: {x:number, z:number}, segB: {x:number, z:number}) => {
+      const x1 = rayP.x, z1 = rayP.z;
+      const x2 = rayP.x + rayD.x, z2 = rayP.z + rayD.z;
+      const x3 = segA.x, z3 = segA.z;
+      const x4 = segB.x, z4 = segB.z;
+      const den = (x1 - x2) * (z3 - z4) - (z1 - z2) * (x3 - x4);
+      if (Math.abs(den) < 0.01) return null;
+      const t = ((x1 - x3) * (z3 - z4) - (z1 - z3) * (x3 - x4)) / den;
+      const u = -((x1 - x2) * (z1 - z3) - (z1 - z2) * (x1 - x3)) / den;
+      if (t > 10 && u >= 0 && u <= 1) return t;
+      return null;
+    };
+
+    // Escanear contra muros exteriores
+    config.walls.forEach(w => {
+      const wRad = (w.rotation * Math.PI) / 180;
+      const wD = { x: Math.cos(wRad), z: -Math.sin(wRad) };
+      const A = { x: w.x, z: w.z };
+      const B = { x: w.x + wD.x * w.length, z: w.z + wD.z * w.length };
+      const dist = getIntersection(p0, iwDir, A, B);
+      if (dist !== null) minLen = Math.min(minLen, dist);
     });
 
-    setLocalIWData(prev => prev ? { ...prev, length: maxPossibleLength.toString() } : null);
+    // Escanear contra otros tabiques internos
+    config.internalWalls.forEach(other => {
+      if (other.id === editingInternalWall.id) return;
+      const op = config.walls.find(pw => pw.id === other.parentWallId);
+      if (!op) return;
+      const oPRad = (op.rotation * Math.PI) / 180;
+      const oPDir = { x: Math.cos(oPRad), z: -Math.sin(oPRad) };
+      const oPPerp = { x: Math.sin(oPRad), z: Math.cos(oPRad) };
+      const start = {
+        x: op.x + oPDir.x * other.xPosition + oPPerp.x * (EXTERIOR_WALL_THICKNESS/2),
+        z: op.z + oPDir.z * other.xPosition + oPPerp.z * (EXTERIOR_WALL_THICKNESS/2)
+      };
+      const oIRad = (other.rotation * Math.PI) / 180;
+      const oIDir = { x: Math.cos(oIRad), z: -Math.sin(oIRad) };
+      const end = { x: start.x + oIDir.x * other.length, z: start.z + oIDir.z * other.length };
+      const dist = getIntersection(p0, iwDir, start, end);
+      if (dist !== null) minLen = Math.min(minLen, dist);
+    });
+
+    setLocalIWData(prev => prev ? { ...prev, length: Math.round(minLen).toString() } : null);
   };
 
   const createOpening = () => {
