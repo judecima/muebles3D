@@ -3,44 +3,25 @@
 import * as React from 'react';
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { SteelSceneManager } from '@/steel/SteelSceneManager';
-import { SteelHouseConfig, SteelOpening } from '@/lib/steel/types';
+import { SteelHouseConfig } from '@/lib/steel/types';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
-  onOpeningDoubleClick?: (wallId: string, opening: SteelOpening) => void;
-  onWalkModeLock?: (locked: boolean) => void;
 }
 
-export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkModeLock }: SteelViewerProps, ref) => {
+export const SteelViewer = forwardRef(({ config }: SteelViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SteelSceneManager | null>(null);
 
   useImperativeHandle(ref, () => ({
-    enterWalkMode: () => {
-      if (managerRef.current) {
-        managerRef.current.enterWalkMode();
-      }
-    },
-    setMovement: (direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down' | 'sprint', active: boolean) => {
-      if (managerRef.current) {
-        managerRef.current.setMovement(direction, active);
-      }
-    },
-    updateJoystickMove: (x: number, y: number) => {
-      if (managerRef.current) managerRef.current.updateJoystickMove(x, y);
-    },
-    updateJoystickLook: (x: number, y: number) => {
-      if (managerRef.current) managerRef.current.updateJoystickLook(x, y);
+    fitCamera: () => {
+      if (managerRef.current) managerRef.current.fitCamera();
     }
   }));
 
   useEffect(() => {
     if (containerRef.current && !managerRef.current) {
-      managerRef.current = new SteelSceneManager(
-        containerRef.current, 
-        onOpeningDoubleClick,
-        onWalkModeLock
-      );
+      managerRef.current = new SteelSceneManager(containerRef.current);
     }
 
     return () => {
@@ -49,7 +30,7 @@ export const SteelViewer = forwardRef(({ config, onOpeningDoubleClick, onWalkMod
         managerRef.current = null;
       }
     };
-  }, [onOpeningDoubleClick, onWalkModeLock]);
+  }, []);
 
   useEffect(() => {
     if (managerRef.current) {

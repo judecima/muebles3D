@@ -1,4 +1,5 @@
 export type OpeningType = 'door' | 'window';
+export type RoofType = 'none' | 'one-side' | 'two-sides';
 
 export interface SteelOpening {
   id: string;
@@ -26,9 +27,11 @@ export interface LayerVisibility {
   interiorPanels: boolean;
   steelProfiles: boolean;
   crossBracing: boolean;
-  horizontalBlocking: boolean; // Rigidizadores horizontales
+  horizontalBlocking: boolean;
   lintels: boolean;
   reinforcements: boolean;
+  roofPanels: boolean;
+  roofStructure: boolean;
 }
 
 export interface SteelHouseConfig {
@@ -38,6 +41,11 @@ export interface SteelHouseConfig {
   walls: SteelWall[];
   layers: LayerVisibility;
   structuralMode: boolean;
+  roof: {
+    type: RoofType;
+    pitch: number; // grados
+    overhang: number; // mm
+  };
 }
 
 export interface MaterialItem {
