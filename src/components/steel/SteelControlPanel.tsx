@@ -145,6 +145,10 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                 <Label htmlFor="ext-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Exteriores</Label>
               </div>
               <div className="flex items-center gap-2">
+                <Checkbox id="int-pan" checked={config.layers.interiorPanels} onCheckedChange={() => toggleLayer('interiorPanels')} />
+                <Label htmlFor="int-pan" className="text-[10px] font-bold uppercase cursor-pointer">Paneles Interiores</Label>
+              </div>
+              <div className="flex items-center gap-2">
                 <Checkbox id="profiles" checked={config.layers.steelProfiles} onCheckedChange={() => toggleLayer('steelProfiles')} />
                 <Label htmlFor="profiles" className="text-[10px] font-bold uppercase cursor-pointer">Perfilería (PGC/PGU)</Label>
               </div>
