@@ -99,34 +99,65 @@ export default function SteelFramingPage() {
     setIsWalkModeActive(locked);
   }, []);
 
+  /**
+   * Actualiza la posición de la abertura validando límites y solapamientos
+   */
   const updateOpeningPosition = (val: number) => {
     if (!selectedOpening) return;
+    const wall = config.walls.find(w => w.id === selectedOpening.wallId);
+    if (!wall) return;
+
+    // 1. Validar límites laterales del muro
+    const maxPos = wall.length - selectedOpening.opening.width;
+    let newPos = Math.max(0, Math.min(val, maxPos));
+
+    // 2. Validar solapamiento con otras aberturas en el mismo muro
+    const otherOpenings = wall.openings.filter(o => o.id !== selectedOpening.opening.id);
+    const hasOverlap = otherOpenings.some(o => {
+      const startA = newPos;
+      const endA = newPos + selectedOpening.opening.width;
+      const startB = o.position;
+      const endB = o.position + o.width;
+      return (startA < endB && endA > startB);
+    });
+
+    if (hasOverlap) return; // Impedir movimiento si hay solapamiento
+
     const newWalls = config.walls.map(w => {
       if (w.id === selectedOpening.wallId) {
         return {
           ...w,
-          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, position: val } : o)
+          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, position: newPos } : o)
         };
       }
       return w;
     });
     setConfig({ ...config, walls: newWalls });
-    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, position: val } });
+    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, position: newPos } });
   };
 
   const updateOpeningDim = (field: 'width' | 'height', val: number) => {
     if (!selectedOpening) return;
+    const wall = config.walls.find(w => w.id === selectedOpening.wallId);
+    if (!wall) return;
+
+    // Al cambiar dimensiones también validamos límites
+    let newWidth = field === 'width' ? val : selectedOpening.opening.width;
+    if (newWidth + selectedOpening.opening.position > wall.length) {
+      newWidth = wall.length - selectedOpening.opening.position;
+    }
+
     const newWalls = config.walls.map(w => {
       if (w.id === selectedOpening.wallId) {
         return {
           ...w,
-          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, [field]: val } : o)
+          openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, [field]: val, width: newWidth } : o)
         };
       }
       return w;
     });
     setConfig({ ...config, walls: newWalls });
-    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, [field]: val } });
+    setSelectedOpening({ ...selectedOpening, opening: { ...selectedOpening.opening, [field]: val, width: newWidth } });
   };
 
   return (
@@ -224,73 +255,12 @@ export default function SteelFramingPage() {
                     </div>
                   </div>
                 )}
-
-                {isWalkModeActive && (
-                  <div className="bg-slate-900/90 backdrop-blur text-white px-4 py-3 rounded-xl border border-white/10 shadow-2xl animate-in zoom-in duration-300 pointer-events-auto">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Gamepad2 className="w-4 h-4 text-blue-400" />
-                      <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">MODO CAMINATA</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-y-2">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Keyboard className="w-3 h-3" />
-                        <span className="text-[9px] font-medium uppercase">W-A-S-D: Moverse</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Move className="w-3 h-3" />
-                        <span className="text-[9px] font-medium uppercase">Flechas: Cámara</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
-
-              {isWalkModeActive && (
-                <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
-                  <div className="absolute bottom-16 left-16 pointer-events-auto">
-                    <SteelJoystick 
-                      label="Moverse" 
-                      onMove={(v) => viewerRef.current?.updateJoystickMove(v.x, v.y)} 
-                    />
-                  </div>
-                  
-                  <div className="absolute bottom-16 right-16 pointer-events-auto">
-                    <SteelJoystick 
-                      label="Cámara" 
-                      onMove={(v) => viewerRef.current?.updateJoystickLook(v.x, v.y)} 
-                    />
-                  </div>
-
-                  <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-4 pointer-events-auto scale-90">
-                    <Button 
-                      variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
-                      onMouseDown={() => viewerRef.current?.setMovement('up', true)} onMouseUp={() => viewerRef.current?.setMovement('up', false)}
-                      onTouchStart={() => viewerRef.current?.setMovement('up', true)} onTouchEnd={() => viewerRef.current?.setMovement('up', false)}
-                    >
-                      <ArrowUp className="w-6 h-6 text-white" />
-                    </Button>
-                    <Button 
-                      variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-blue-600/60 backdrop-blur border border-white/20 shadow-lg" 
-                      onMouseDown={() => viewerRef.current?.setMovement('sprint', true)} onMouseUp={() => viewerRef.current?.setMovement('sprint', false)}
-                      onTouchStart={() => viewerRef.current?.setMovement('sprint', true)} onTouchEnd={() => viewerRef.current?.setMovement('sprint', false)}
-                    >
-                      <Zap className="w-6 h-6 text-white" />
-                    </Button>
-                    <Button 
-                      variant="secondary" size="icon" className="w-14 h-14 rounded-full bg-slate-900/40 backdrop-blur border border-white/20" 
-                      onMouseDown={() => viewerRef.current?.setMovement('down', true)} onMouseUp={() => viewerRef.current?.setMovement('down', false)}
-                      onTouchStart={() => viewerRef.current?.setMovement('down', true)} onTouchEnd={() => viewerRef.current?.setMovement('down', false)}
-                    >
-                      <ArrowDown className="w-6 h-6 text-white" />
-                    </Button>
-                  </div>
-                </div>
-              )}
 
               {!isWalkModeActive && (
                 <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-200 shadow-sm pointer-events-none">
                   <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                    <MousePointer className="w-3 h-3 text-blue-500" /> ROTAR: CLICK IZQ | PAN: CLICK DER | ZOOM: RUEDA
+                    <MousePointer className="w-3 h-3 text-blue-500" /> DOBLE CLICK EN VANOS PARA DESPLAZAR
                   </p>
                 </div>
               )}
@@ -322,7 +292,7 @@ export default function SteelFramingPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Settings2 className="w-5 h-5 text-blue-500" />
-                Reacomodar {selectedOpening?.opening.type === 'door' ? 'Puerta' : 'Ventana'}
+                Desplazar {selectedOpening?.opening.type === 'door' ? 'Puerta' : 'Ventana'}
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -346,20 +316,10 @@ export default function SteelFramingPage() {
                   className="col-span-3 h-9"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="height" className="text-right text-xs font-bold uppercase">Alto</Label>
-                <Input
-                  id="height"
-                  type="number"
-                  value={selectedOpening?.opening.height || 0}
-                  onChange={(e) => updateOpeningDim('height', parseInt(e.target.value))}
-                  className="col-span-3 h-9"
-                />
-              </div>
             </div>
             <DialogFooter>
               <Button onClick={() => setSelectedOpening(null)} className="w-full bg-blue-600 hover:bg-blue-700 font-bold uppercase text-xs">
-                Guardar Cambios
+                Confirmar Ubicación
               </Button>
             </DialogFooter>
           </DialogContent>

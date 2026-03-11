@@ -15,13 +15,10 @@ export class SteelSceneManager {
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
-  // Movimiento FPS y Joystick
   private moveForward = false;
   private moveBackward = false;
   private moveLeft = false;
   private moveRight = false;
-  private moveUp = false;
-  private moveDown = false;
   private isShiftPressed = false;
   private joystickMove = new THREE.Vector2(0, 0);
   private joystickLook = new THREE.Vector2(0, 0);
@@ -36,10 +33,10 @@ export class SteelSceneManager {
   private colors = {
     background: 0xf1f5f9,
     steel: 0x9ca3af, 
-    header: 0x2563eb,  // Azul para dinteles
-    headerTriple: 0x1e40af, // Azul oscuro para dinteles triples
-    king: 0xef4444,    // Rojo para King Studs
-    jack: 0xf59e0b,    // Ámbar para Jack Studs
+    header: 0x2563eb,
+    headerTriple: 0x1e40af,
+    king: 0xef4444,
+    jack: 0xf59e0b,
     grid: 0xd1d5db,
     floor: 0xe2e8f0,
     panel_ext: 0x94a3b8,
@@ -98,8 +95,6 @@ export class SteelSceneManager {
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
-    document.addEventListener('keydown', this.onKeyDown);
-    document.addEventListener('keyup', this.onKeyUp);
   }
 
   public setMovement(direction: string, active: boolean) {
@@ -108,8 +103,6 @@ export class SteelSceneManager {
       case 'backward': this.moveBackward = active; break;
       case 'left': this.moveLeft = active; break;
       case 'right': this.moveRight = active; break;
-      case 'up': this.moveUp = active; break;
-      case 'down': this.moveDown = active; break;
       case 'sprint': this.isShiftPressed = active; break;
     }
   }
@@ -217,7 +210,6 @@ export class SteelSceneManager {
     structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
 
     const studHeight = wall.height - (this.profileFlange * 2);
-    const studPositions: number[] = [];
 
     // 2. Estructura de Aberturas (Framing de Vanos)
     wall.openings.forEach(op => {
@@ -234,36 +226,34 @@ export class SteelSceneManager {
       structuralGroup.add(this.createProfile(jackH, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       structuralGroup.add(this.createProfile(jackH, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      // Dintel (Header)
+      // Dintel (Header PGC) - Requisito: PGC Simple o Triple
       const headerColor = isTripleHeader ? this.colors.headerTriple : this.colors.header;
       const headerCount = isTripleHeader ? 3 : 1;
       for (let i = 0; i < headerCount; i++) {
-        structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGU', headerColor, i * 10));
+        structuralGroup.add(this.createProfile(op.width, op.position, headerH, 0, 'PGC', headerColor, i * 10));
       }
 
-      // Umbral (Window Sill)
+      // Umbral (Window Sill PGU)
       if (op.type === 'window') {
         structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       }
 
-      // Cripple Studs (Superiores e Inferiores)
+      // Cripple Studs (Superiores e Inferiores PGC)
       const crippleSpacing = wall.studSpacing;
       for (let x = op.position + crippleSpacing; x < op.position + op.width; x += crippleSpacing) {
-        // Cripple superior
         const upperCrippleH = wall.height - headerH - this.profileFlange * 2;
         if (upperCrippleH > 50) {
           structuralGroup.add(this.createProfile(upperCrippleH, x, headerH + this.profileFlange, 90, 'PGC', this.colors.steel));
         }
-        // Cripple inferior (solo ventanas)
         if (op.type === 'window' && sill > 100) {
           structuralGroup.add(this.createProfile(sill - this.profileFlange * 2, x, this.profileFlange, 90, 'PGC', this.colors.steel));
         }
       }
     });
 
-    // 3. Montantes de Campo (Standard Studs)
+    // 3. Montantes de Campo (Standard Studs PGC) - Omitir zonas de vanos
     const addStud = (x: number) => {
-      const inOpeningZone = wall.openings.some(op => x >= (op.position - 100) && x <= (op.position + op.width + 100));
+      const inOpeningZone = wall.openings.some(op => x >= (op.position - 50) && x <= (op.position + op.width + 50));
       if (!inOpeningZone) {
         structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
       }
