@@ -100,7 +100,6 @@ export default function SteelFramingPage() {
       if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - EXTERIOR_WALL_THICKNESS;
       if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - EXTERIOR_WALL_THICKNESS;
 
-      // Reajuste automático si las paredes externas se achican
       const adjustedLength = Math.min(iw.length, maxLen);
       const adjustedX = Math.min(iw.xPosition, parent.length - 50);
 
@@ -196,7 +195,6 @@ export default function SteelFramingPage() {
     if (parent.id === 'w1' || parent.id === 'w3') maxLen = config.length - EXTERIOR_WALL_THICKNESS;
     if (parent.id === 'w2' || parent.id === 'w4') maxLen = config.width - EXTERIOR_WALL_THICKNESS;
     
-    // SNAPPING: Si es muy grande o cercano al máximo, clavar a maxLen para asegurar validez estructural sin luces
     let finalLen = Math.max(100, Math.min(inputLen, maxLen));
     if (inputLen >= maxLen - 100) {
       finalLen = maxLen;
@@ -442,11 +440,11 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label>
-                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} onBlur={commitOpeningChange} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Posición</Label>
-                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} onBlur={commitOpeningChange} className="col-span-3" />
+                <Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitOpeningChange()} className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
@@ -482,11 +480,11 @@ export default function SteelFramingPage() {
             <div className="grid gap-6 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Inicio (mm)</Label>
-                <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} onBlur={commitInternalWallChanges} className="col-span-3 h-9 font-bold" />
+                <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} className="col-span-3 h-9 font-bold" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase text-slate-500">Largo (mm)</Label>
-                <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} onBlur={commitInternalWallChanges} className="col-span-3 h-9 font-bold" />
+                <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} onKeyDown={(e) => e.key === 'Enter' && commitInternalWallChanges()} className="col-span-3 h-9 font-bold" />
               </div>
             </div>
             <DialogFooter className="flex gap-2">
