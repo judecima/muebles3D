@@ -33,11 +33,14 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+const EDGE_MARGIN = 150; // Margen mínimo estructural desde el borde del muro
+const HEADER_SPACE = 100; // Espacio mínimo superior para dintel y solera
+
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
-  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: w/2 - 450 }], studSpacing: 400 },
-  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: l/2 - 600, sillHeight: 900 }], studSpacing: 400 },
+  { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: EDGE_MARGIN }], studSpacing: 400 },
+  { id: 'w2', length: l, height: h, thickness: 100, x: w/2, z: -l/2, rotation: 270, openings: [{ id: 'o2', type: 'window', width: 1200, height: 1100, position: EDGE_MARGIN, sillHeight: 900 }], studSpacing: 400 },
   { id: 'w3', length: w, height: h, thickness: 100, x: w/2, z: l/2, rotation: 180, openings: [], studSpacing: 400 },
-  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: l/2 - 750, sillHeight: 900 }], studSpacing: 400 },
+  { id: 'w4', length: l, height: h, thickness: 100, x: -w/2, z: l/2, rotation: 90, openings: [{ id: 'o3', type: 'window', width: 1500, height: 1100, position: EDGE_MARGIN, sillHeight: 900 }], studSpacing: 400 },
 ];
 
 const INITIAL_CONFIG: SteelHouseConfig = {
@@ -70,7 +73,6 @@ export default function SteelFramingPage() {
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening } | null>(null);
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
-  const isMobile = useIsMobile();
   
   const viewerRef = useRef<{ 
     enterWalkMode: () => void, 
@@ -107,30 +109,25 @@ export default function SteelFramingPage() {
     setIsWalkModeActive(locked);
   }, []);
 
-  /**
-   * Actualiza la posición de la abertura validando límites y solapamientos
-   */
   const updateOpeningPosition = (val: number) => {
     if (!selectedOpening) return;
     const safeVal = isNaN(val) ? 0 : val;
     const wall = config.walls.find(w => w.id === selectedOpening.wallId);
     if (!wall) return;
 
-    // 1. Validar límites laterales del muro
-    const maxPos = wall.length - selectedOpening.opening.width;
-    let newPos = Math.max(0, Math.min(safeVal, maxPos));
+    const maxPos = wall.length - selectedOpening.opening.width - EDGE_MARGIN;
+    let newPos = Math.max(EDGE_MARGIN, Math.min(safeVal, maxPos));
 
-    // 2. Validar solapamiento con otras aberturas en el mismo muro
     const otherOpenings = wall.openings.filter(o => o.id !== selectedOpening.opening.id);
     const hasOverlap = otherOpenings.some(o => {
-      const startA = newPos;
-      const endA = newPos + selectedOpening.opening.width;
+      const startA = newPos - 50; 
+      const endA = newPos + selectedOpening.opening.width + 50;
       const startB = o.position;
       const endB = o.position + o.width;
       return (startA < endB && endA > startB);
     });
 
-    if (hasOverlap) return; // Impedir movimiento si hay solapamiento
+    if (hasOverlap) return;
 
     const newWalls = config.walls.map(w => {
       if (w.id === selectedOpening.wallId) {
@@ -153,11 +150,19 @@ export default function SteelFramingPage() {
 
     let newOpening = { ...selectedOpening.opening, [field]: safeVal };
 
-    // Validar que el ancho no exceda el muro según la posición actual
     if (field === 'width') {
-      if (safeVal + newOpening.position > wall.length) {
-        newOpening.width = Math.max(0, wall.length - newOpening.position);
-      }
+      const maxW = wall.length - newOpening.position - EDGE_MARGIN;
+      newOpening.width = Math.max(0, Math.min(safeVal, maxW));
+    }
+
+    if (field === 'height') {
+      const maxH = wall.height - HEADER_SPACE;
+      newOpening.height = Math.max(0, Math.min(safeVal, maxH));
+    }
+
+    if (field === 'sillHeight' && newOpening.type === 'window') {
+      const maxSill = wall.height - newOpening.height - HEADER_SPACE;
+      newOpening.sillHeight = Math.max(0, Math.min(safeVal, maxSill));
     }
 
     const newWalls = config.walls.map(w => {

@@ -27,10 +27,8 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
 
-interface SteelControlPanelProps {
-  config: SteelHouseConfig;
-  onConfigChange: (config: SteelHouseConfig) => void;
-}
+const EDGE_MARGIN = 150; 
+const HEADER_SPACE = 100;
 
 export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelProps) {
   
@@ -74,7 +72,7 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
       type,
       width: type === 'door' ? 900 : 1200,
       height: type === 'door' ? 2050 : 1100,
-      position: 500,
+      position: EDGE_MARGIN,
       sillHeight: type === 'window' ? 900 : 0
     };
 
@@ -85,6 +83,24 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
     const wall = config.walls.find(w => w.id === wallId);
     if (!wall) return;
     updateWall(wallId, 'openings', wall.openings.filter(op => op.id !== opId));
+  };
+
+  const validateOpeningValue = (wall: SteelWall, opId: string, field: keyof SteelOpening, val: number): number => {
+    const opening = wall.openings.find(o => o.id === opId);
+    if (!opening) return val;
+
+    switch (field) {
+      case 'width':
+        return Math.max(0, Math.min(val, wall.length - opening.position - EDGE_MARGIN));
+      case 'height':
+        return Math.max(0, Math.min(val, wall.height - HEADER_SPACE));
+      case 'position':
+        return Math.max(EDGE_MARGIN, Math.min(val, wall.length - opening.width - EDGE_MARGIN));
+      case 'sillHeight':
+        return Math.max(0, Math.min(val, wall.height - opening.height - HEADER_SPACE));
+      default:
+        return val;
+    }
   };
 
   const updateRoof = (field: string, value: any) => {
@@ -109,7 +125,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
       <CardContent className="p-0 pb-20">
         <Accordion type="multiple" defaultValue={['global', 'layers', 'roof']} className="w-full">
           
-          {/* SECCIÓN: DIMENSIONES GLOBALES */}
           <AccordionItem value="global" className="border-b px-4">
             <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2">
@@ -150,7 +165,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
             </AccordionContent>
           </AccordionItem>
 
-          {/* SECCIÓN: TECHO ESTRUCTURAL */}
           <AccordionItem value="roof" className="border-b px-4">
             <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2">
@@ -212,7 +226,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
             </AccordionContent>
           </AccordionItem>
 
-          {/* SECCIÓN: CAPAS Y VISIBILIDAD */}
           <AccordionItem value="layers" className="border-b px-4">
             <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2">
@@ -248,7 +261,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
             </AccordionContent>
           </AccordionItem>
 
-          {/* SECCIÓN: MUROS */}
           <AccordionItem value="walls" className="border-b px-4">
             <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2">
@@ -319,21 +331,24 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                               <div className="space-y-1">
                                 <Label className="text-[7px] font-black uppercase text-slate-400">Ancho</Label>
                                 <Input type="number" value={op.width} onChange={(e) => {
-                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, width: parseInt(e.target.value) || 0 } : o);
+                                  const newVal = validateOpeningValue(wall, op.id, 'width', parseInt(e.target.value) || 0);
+                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, width: newVal } : o);
                                   updateWall(wall.id, 'openings', newOps);
                                 }} className="h-6 text-[9px] font-bold" />
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-[7px] font-black uppercase text-slate-400">Alto</Label>
                                 <Input type="number" value={op.height} onChange={(e) => {
-                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, height: parseInt(e.target.value) || 0 } : o);
+                                  const newVal = validateOpeningValue(wall, op.id, 'height', parseInt(e.target.value) || 0);
+                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, height: newVal } : o);
                                   updateWall(wall.id, 'openings', newOps);
                                 }} className="h-6 text-[9px] font-bold" />
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-[7px] font-black uppercase text-slate-400">Posición</Label>
                                 <Input type="number" value={op.position} onChange={(e) => {
-                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, position: parseInt(e.target.value) || 0 } : o);
+                                  const newVal = validateOpeningValue(wall, op.id, 'position', parseInt(e.target.value) || 0);
+                                  const newOps = wall.openings.map(o => o.id === op.id ? { ...o, position: newVal } : o);
                                   updateWall(wall.id, 'openings', newOps);
                                 }} className="h-6 text-[9px] font-bold" />
                               </div>
@@ -341,7 +356,8 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
                                 <div className="space-y-1">
                                   <Label className="text-[7px] font-black uppercase text-slate-400">Antepecho</Label>
                                   <Input type="number" value={op.sillHeight} onChange={(e) => {
-                                    const newOps = wall.openings.map(o => o.id === op.id ? { ...o, sillHeight: parseInt(e.target.value) || 0 } : o);
+                                    const newVal = validateOpeningValue(wall, op.id, 'sillHeight', parseInt(e.target.value) || 0);
+                                    const newOps = wall.openings.map(o => o.id === op.id ? { ...o, sillHeight: newVal } : o);
                                     updateWall(wall.id, 'openings', newOps);
                                   }} className="h-6 text-[9px] font-bold" />
                                 </div>
@@ -361,7 +377,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
           </AccordionItem>
         </Accordion>
 
-        {/* ACCIONES RÁPIDAS PIE DE PANEL */}
         <div className="p-4 bg-slate-50 border-t sticky bottom-0 z-20 space-y-2">
           <Button variant="outline" className="w-full h-9 text-[10px] font-black uppercase tracking-widest gap-2 bg-white" onClick={() => onConfigChange({ ...config })}>
             <Camera className="w-3.5 h-3.5 text-blue-600" /> Recentrar Cámara
