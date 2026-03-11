@@ -81,9 +81,8 @@ export class SteelSceneManager {
     this.input = new InputController();
     this.collisions = new CollisionSystem();
     this.player = new PlayerController(this.scene, this.input, this.collisions);
-    this.tpCamera = new ThirdPersonCamera(this.camera, this.player.mesh, this.input);
+    this.tpCamera = new ThirdPersonCamera(this.camera, this.player.mesh, this.input, this.collisions);
     
-    // Hide player initially
     this.player.mesh.visible = false;
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -107,10 +106,6 @@ export class SteelSceneManager {
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
-  }
-
-  public setMovement(direction: string, active: boolean) {
-    // Legacy support for manual calls, now handled by InputController keys
   }
 
   public updateJoystickMove(x: number, y: number) { this.input.joystickMove.set(x, y); }
@@ -139,7 +134,7 @@ export class SteelSceneManager {
   };
 
   private onDoubleClick = (event: MouseEvent) => {
-    if (this.isWalkModeActive) return; // Prevent editing in walk mode
+    if (this.isWalkModeActive) return; 
     
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -219,13 +214,11 @@ export class SteelSceneManager {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
 
-    // 1. Soleras PGU
     structuralGroup.add(this.createProfile(wall.length, 0, 0, 0, 'PGU'));
     structuralGroup.add(this.createProfile(wall.length, 0, wall.height - this.profileFlange, 0, 'PGU'));
 
     const studHeight = wall.height - (this.profileFlange * 2);
 
-    // 2. Estructura de Aberturas
     wall.openings.forEach(op => {
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerH = sill + op.height;
