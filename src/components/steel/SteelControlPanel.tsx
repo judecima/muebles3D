@@ -29,6 +29,12 @@ import { Switch } from '@/components/ui/switch';
 
 const EDGE_MARGIN = 150; 
 const HEADER_SPACE = 100;
+const MIN_SPACE_BETWEEN = 50;
+
+interface SteelControlPanelProps {
+  config: SteelHouseConfig;
+  onConfigChange: (config: SteelHouseConfig) => void;
+}
 
 export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelProps) {
   
@@ -63,18 +69,77 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
     });
   };
 
+  const checkOverlap = (wall: SteelWall, opId: string, pos: number, width: number): boolean => {
+    return wall.openings.some(o => {
+      if (o.id === opId) return false;
+      const startA = pos - MIN_SPACE_BETWEEN;
+      const endA = pos + width + MIN_SPACE_BETWEEN;
+      const startB = o.position;
+      const endB = o.position + o.width;
+      return (startA < endB && endA > startB);
+    });
+  };
+
+  const validateOpeningValue = (wall: SteelWall, opId: string, field: keyof SteelOpening, val: number): number => {
+    const opening = wall.openings.find(o => o.id === opId);
+    if (!opening) return val;
+
+    switch (field) {
+      case 'width': {
+        const maxW = wall.length - opening.position - EDGE_MARGIN;
+        const finalW = Math.max(0, Math.min(val, maxW));
+        if (checkOverlap(wall, opId, opening.position, finalW)) return opening.width;
+        return finalW;
+      }
+      case 'height': {
+        const maxH = wall.height - (opening.type === 'window' ? (opening.sillHeight || 0) : 0) - HEADER_SPACE;
+        return Math.max(0, Math.min(val, maxH));
+      }
+      case 'position': {
+        const maxP = wall.length - opening.width - EDGE_MARGIN;
+        const finalP = Math.max(EDGE_MARGIN, Math.min(val, maxP));
+        if (checkOverlap(wall, opId, finalP, opening.width)) return opening.position;
+        return finalP;
+      }
+      case 'sillHeight': {
+        const maxS = wall.height - opening.height - HEADER_SPACE;
+        return Math.max(0, Math.min(val, maxS));
+      }
+      default:
+        return val;
+    }
+  };
+
   const addOpening = (wallId: string, type: OpeningType) => {
     const wall = config.walls.find(w => w.id === wallId);
     if (!wall) return;
 
+    let w = type === 'door' ? 900 : 1200;
+    let h = type === 'door' ? 2050 : 1100;
+    
+    // Validar que quepa al menos lo básico
+    const maxW = wall.length - (EDGE_MARGIN * 2);
+    const maxH = wall.height - HEADER_SPACE;
+    
+    w = Math.min(w, maxW);
+    h = Math.min(h, maxH);
+    
+    if (w < 100) return; // Muro demasiado pequeño
+
     const newOpening: SteelOpening = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      width: type === 'door' ? 900 : 1200,
-      height: type === 'door' ? 2050 : 1100,
+      width: w,
+      height: h,
       position: EDGE_MARGIN,
-      sillHeight: type === 'window' ? 900 : 0
+      sillHeight: type === 'window' ? Math.min(900, wall.height - h - HEADER_SPACE) : 0
     };
+
+    if (checkOverlap(wall, newOpening.id, newOpening.position, newOpening.width)) {
+      // Intentar buscar una posición libre si el inicio está ocupado
+      // Para este MVP simplemente no añadimos si hay conflicto inicial directo
+      return;
+    }
 
     updateWall(wallId, 'openings', [...wall.openings, newOpening]);
   };
@@ -83,24 +148,6 @@ export function SteelControlPanel({ config, onConfigChange }: SteelControlPanelP
     const wall = config.walls.find(w => w.id === wallId);
     if (!wall) return;
     updateWall(wallId, 'openings', wall.openings.filter(op => op.id !== opId));
-  };
-
-  const validateOpeningValue = (wall: SteelWall, opId: string, field: keyof SteelOpening, val: number): number => {
-    const opening = wall.openings.find(o => o.id === opId);
-    if (!opening) return val;
-
-    switch (field) {
-      case 'width':
-        return Math.max(0, Math.min(val, wall.length - opening.position - EDGE_MARGIN));
-      case 'height':
-        return Math.max(0, Math.min(val, wall.height - HEADER_SPACE));
-      case 'position':
-        return Math.max(EDGE_MARGIN, Math.min(val, wall.length - opening.width - EDGE_MARGIN));
-      case 'sillHeight':
-        return Math.max(0, Math.min(val, wall.height - opening.height - HEADER_SPACE));
-      default:
-        return val;
-    }
   };
 
   const updateRoof = (field: string, value: any) => {

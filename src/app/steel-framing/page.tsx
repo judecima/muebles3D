@@ -35,6 +35,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 const EDGE_MARGIN = 150; // Margen mínimo estructural desde el borde del muro
 const HEADER_SPACE = 100; // Espacio mínimo superior para dintel y solera
+const MIN_SPACE_BETWEEN = 50; // Espacio mínimo entre aberturas para montantes
 
 const createInitialWalls = (w: number, l: number, h: number): SteelWall[] => [
   { id: 'w1', length: w, height: h, thickness: 100, x: -w/2, z: -l/2, rotation: 0, openings: [{ id: 'o1', type: 'door', width: 900, height: 2050, position: EDGE_MARGIN }], studSpacing: 400 },
@@ -109,6 +110,17 @@ export default function SteelFramingPage() {
     setIsWalkModeActive(locked);
   }, []);
 
+  const checkOverlap = (wall: SteelWall, opId: string, pos: number, width: number): boolean => {
+    return wall.openings.some(o => {
+      if (o.id === opId) return false;
+      const startA = pos - MIN_SPACE_BETWEEN;
+      const endA = pos + width + MIN_SPACE_BETWEEN;
+      const startB = o.position;
+      const endB = o.position + o.width;
+      return (startA < endB && endA > startB);
+    });
+  };
+
   const updateOpeningPosition = (val: number) => {
     if (!selectedOpening) return;
     const safeVal = isNaN(val) ? 0 : val;
@@ -118,16 +130,9 @@ export default function SteelFramingPage() {
     const maxPos = wall.length - selectedOpening.opening.width - EDGE_MARGIN;
     let newPos = Math.max(EDGE_MARGIN, Math.min(safeVal, maxPos));
 
-    const otherOpenings = wall.openings.filter(o => o.id !== selectedOpening.opening.id);
-    const hasOverlap = otherOpenings.some(o => {
-      const startA = newPos - 50; 
-      const endA = newPos + selectedOpening.opening.width + 50;
-      const startB = o.position;
-      const endB = o.position + o.width;
-      return (startA < endB && endA > startB);
-    });
-
-    if (hasOverlap) return;
+    if (checkOverlap(wall, selectedOpening.opening.id, newPos, selectedOpening.opening.width)) {
+      return;
+    }
 
     const newWalls = config.walls.map(w => {
       if (w.id === selectedOpening.wallId) {
@@ -153,10 +158,11 @@ export default function SteelFramingPage() {
     if (field === 'width') {
       const maxW = wall.length - newOpening.position - EDGE_MARGIN;
       newOpening.width = Math.max(0, Math.min(safeVal, maxW));
+      if (checkOverlap(wall, newOpening.id, newOpening.position, newOpening.width)) return;
     }
 
     if (field === 'height') {
-      const maxH = wall.height - HEADER_SPACE;
+      const maxH = wall.height - (newOpening.type === 'window' ? (newOpening.sillHeight || 0) : 0) - HEADER_SPACE;
       newOpening.height = Math.max(0, Math.min(safeVal, maxH));
     }
 
@@ -278,7 +284,7 @@ export default function SteelFramingPage() {
               {!isWalkModeActive && (
                 <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-200 shadow-sm pointer-events-none">
                   <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                    <MousePointer className="w-3 h-3 text-blue-500" /> DOBLE CLICK EN VANOS PARA DESPLAZAR
+                    <MousePointer className="w-3 h-3 text-blue-500" /> DOBLE CLICK EN VANOS PARA EDITAR
                   </p>
                 </div>
               )}
