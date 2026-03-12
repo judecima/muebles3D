@@ -1,277 +1,80 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ControlPanel } from '@/components/ControlPanel';
-import { FurnitureViewer } from '@/components/FurnitureViewer';
-import { CutlistTable } from '@/components/CutlistTable';
-import { OptimizerPanel } from '@/components/OptimizerPanel';
-import { FurnitureType, FurnitureDimensions, Part, FurnitureColor, AVAILABLE_PANELS, PanelSize, FurnitureModel } from '@/lib/types';
-import { 
-  FileDown,
-  LayoutGrid,
-  Box as BoxIcon,
-  Menu as MenuIcon,
-  Settings2
-} from 'lucide-react';
+import React from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import { Card, CardContent } from '@/components/ui/card';
+import { 
+  Box, 
+  Home, 
+  ArrowRight, 
+  Settings2,
+  Layers,
+  LayoutGrid,
+  ShieldCheck
+} from 'lucide-react';
 
-const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
-  bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
-  rackTV: { width: 1600, height: 500, depth: 400, thickness: 18, hasBack: true },
-  escritorio: { width: 1200, height: 750, depth: 600, thickness: 18 },
-  alacena: { width: 800, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
-  placard: { width: 1800, height: 2100, depth: 600, thickness: 18, hasBack: true },
-  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasBack: true },
-  alacenaFlip: { width: 500, height: 300, depth: 320, thickness: 18, hasBack: true, hasShelf: false },
-  'bajomesada-cajonera': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true },
-  'porta-anafe': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
-  // Nuevos modelos catálogo Dielfe
-  'cabinet_base_120_2p3c': { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
-  'cabinet_base_140_3p3c': { width: 1400, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
-  'cabinet_wall_60_1p': { width: 600, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
-  'cabinet_wall_120_3p': { width: 1200, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true, hasShelf2: true },
-  'cabinet_wall_140_3p': { width: 1400, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true, hasShelf2: true },
-  'cabinet_pantry_60_2p': { width: 600, height: 2100, depth: 600, thickness: 18, hasBack: true },
-  'cabinet_microwave_60': { width: 600, height: 2100, depth: 600, thickness: 18, hasBack: true },
-  'cabinet_hood_60': { width: 600, height: 300, depth: 320, thickness: 18, hasBack: true },
-  'cabinet_base_single_60_1p': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
-  'cabinet_base_double_80_2p': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
-};
-
-export default function Home() {
-  const [view, setView] = useState<'3d' | 'optimize'>('3d');
-  const [type, setType] = useState<FurnitureType>('bajoMesada');
-  const [color, setColor] = useState<FurnitureColor>('blanco');
-  const [dimensions, setDimensions] = useState<FurnitureDimensions>(DEFAULT_DIMENSIONS.bajoMesada);
-  const [action, setAction] = useState<string>('');
-  const [parts, setParts] = useState<Part[]>([]);
-  const [hasDoors, setHasDoors] = useState(false);
-  const [hasDrawers, setHasDrawers] = useState(false);
-  const [selectedPanel, setSelectedPanel] = useState<PanelSize>(AVAILABLE_PANELS[0]);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  const viewerRef = useRef<{ getScreenshot: () => string }>(null);
-
-  const getEngine = (t: FurnitureType) => {
-    if (t.startsWith('cabinet_')) {
-      return (d: FurnitureDimensions) => require('@/engines/kitchenCatalogEngine').kitchenCatalogEngine(t, d);
-    }
-    switch (t) {
-      case 'bajoMesada': return require('@/engines/kitchenBaseEngine').kitchenBaseEngine;
-      case 'escritorio': return require('@/engines/deskEngine').deskEngine;
-      case 'rackTV': return require('@/engines/tvRackEngine').tvRackEngine;
-      case 'alacena': return require('@/engines/kitchenWallEngine').kitchenWallEngine;
-      case 'placard': return require('@/engines/closetEngine').closetEngine;
-      case 'biblioteca': return require('@/engines/bookshelfEngine').bookshelfEngine;
-      case 'alacenaFlip': return require('@/engines/superiorWallFlipEngine').superiorWallFlipEngine;
-      case 'bajomesada-cajonera': return require('@/engines/kitchenDrawerEngine').kitchenDrawerEngine;
-      case 'porta-anafe': return require('@/engines/kitchenCooktopEngine').kitchenCooktopEngine;
-      default: return () => ({ parts: [], summary: '', hasDoors: false, hasDrawers: false });
-    }
-  };
-
-  useEffect(() => {
-    setDimensions(DEFAULT_DIMENSIONS[type]);
-    setAction('reset');
-  }, [type]);
-
-  const generateFurniture = () => {
-    const engine = getEngine(type);
-    const result: FurnitureModel = engine(dimensions);
-    setParts(result.parts);
-    setHasDoors(result.hasDoors);
-    setHasDrawers(result.hasDrawers);
-  };
-
-  useEffect(() => {
-    generateFurniture();
-  }, [type, dimensions]);
-
-  const handleAction = (act: string) => {
-    if (act === 'export-pdf') {
-      generatePDF();
-    } else {
-      setAction(act);
-      setTimeout(() => setAction(''), 100);
-    }
-    setIsMobileMenuOpen(false);
-  };
-
-  const drawWatermark = (doc: jsPDF) => {
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      doc.setTextColor(235, 235, 235);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(35);
-      for (let y = -100; y < 500; y += 120) {
-        for (let x = -100; x < 400; x += 180) {
-          doc.text("RED ARQUIMAX", x, y, { angle: 45 });
-        }
-      }
-    }
-  };
-
-  const generatePDF = async () => {
-    const doc = new jsPDF();
-    const BRAND_COLOR = [174, 26, 226];
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(26);
-    doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("RED ARQUIMAX", 105, 30, { align: 'center' });
-    
-    doc.setFontSize(14);
-    doc.setTextColor(80, 80, 80);
-    doc.text("Ficha Técnica de Fabricación", 105, 40, { align: 'center' });
-    
-    doc.setDrawColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.setLineWidth(1);
-    doc.line(20, 45, 190, 45);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Proyecto: ${type.toUpperCase()}`, 20, 60);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 67);
-    doc.text(`Dimensiones Totales: ${dimensions.width} x ${dimensions.height} x ${dimensions.depth} mm`, 20, 74);
-
-    if (viewerRef.current) {
-      const img = viewerRef.current.getScreenshot();
-      if (img) {
-        doc.addImage(img, 'PNG', 15, 85, 180, 120);
-      }
-    }
-
-    doc.addPage();
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("Listado Detallado de Cortes y Herrajes", 15, 20);
-    
-    const panelRows = parts.filter(p => !p.isHardware).map(p => [
-      p.name, p.cutLargo, p.cutAncho, p.cutEspesor, 1, p.grainDirection
-    ]);
-
-    (doc as any).autoTable({
-      head: [['Pieza', 'Largo (mm)', 'Ancho (mm)', 'Espesor', 'Cant.', 'Veta']],
-      body: panelRows,
-      startY: 30,
-      headStyles: { fillColor: BRAND_COLOR, font: 'helvetica', fontStyle: 'bold' },
-      styles: { font: 'helvetica', fontSize: 9 },
-      alternateRowStyles: { fillColor: [250, 250, 250] }
-    });
-
-    const aggregatedHardware = parts.filter(p => p.isHardware).reduce((acc, p) => {
-      acc[p.name] = (acc[p.name] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const hardwareRows = Object.entries(aggregatedHardware).map(([name, count]) => [name, count]);
-
-    if (hardwareRows.length > 0) {
-      (doc as any).autoTable({
-        head: [['Herraje', 'Cantidad']],
-        body: hardwareRows,
-        startY: (doc as any).lastAutoTable.finalY + 15,
-        headStyles: { fillColor: [80, 80, 80], font: 'helvetica', fontStyle: 'bold' },
-        styles: { font: 'helvetica', fontSize: 9 }
-      });
-    }
-
-    drawWatermark(doc);
-    doc.save(`tecnico-red-arquimax-${type}-${Date.now()}.pdf`);
-  };
-
+export default function LandingPage() {
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-100">
-      <aside className="hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0 z-40">
-        <ControlPanel 
-          type={type} 
-          dimensions={dimensions} 
-          color={color}
-          hasDoors={hasDoors}
-          hasDrawers={hasDrawers}
-          onTypeChange={setType} 
-          onDimensionsChange={setDimensions} 
-          onColorChange={setColor}
-          onAction={handleAction} 
-        />
-      </aside>
-
-      <main className="flex-1 flex flex-col relative overflow-hidden h-full min-h-0">
-        <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full h-full flex flex-col min-h-0">
-          <div className="flex items-center justify-between px-4 md:px-6 py-2 bg-white border-b shadow-sm z-30 shrink-0">
-            <div className="flex items-center gap-2">
-              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden">
-                    <MenuIcon className="w-5 h-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-80">
-                  <SheetHeader className="sr-only">
-                    <SheetTitle>Configuración</SheetTitle>
-                  </SheetHeader>
-                  <ControlPanel 
-                    type={type} 
-                    dimensions={dimensions} 
-                    color={color}
-                    hasDoors={hasDoors}
-                    hasDrawers={hasDrawers}
-                    onTypeChange={(v) => { setType(v); setIsMobileMenuOpen(false); }} 
-                    onDimensionsChange={setDimensions} 
-                    onColorChange={setColor}
-                    onAction={handleAction} 
-                  />
-                </SheetContent>
-              </Sheet>
-              <div className="flex items-center gap-1">
-                <Settings2 className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-black uppercase text-slate-800 hidden xs:inline tracking-tighter">RED ARQUIMAX</span>
-              </div>
-            </div>
-
-            <TabsList className="bg-slate-100 h-9 p-1">
-              <TabsTrigger value="3d" className="gap-2 text-[10px] md:text-xs h-7 px-3">
-                <BoxIcon className="w-3.5 h-3.5" /> 
-                <span className="uppercase font-bold">Diseño 3D</span>
-              </TabsTrigger>
-              <TabsTrigger value="optimize" className="gap-2 text-[10px] md:text-xs h-7 px-3">
-                <LayoutGrid className="w-3.5 h-3.5" /> 
-                <span className="uppercase font-bold">Optimizar</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="h-8 px-2 md:px-3 text-[10px] font-bold" onClick={() => handleAction('export-pdf')}>
-                <FileDown className="w-3.5 h-3.5 md:mr-2" /> 
-                <span className="hidden sm:inline">EXPORTAR PDF</span>
-              </Button>
-            </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-body">
+      <header className="mb-12 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="bg-primary p-3 rounded-2xl shadow-lg shadow-primary/20">
+            <Settings2 className="w-8 h-8 text-white" />
           </div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">JADSI</h1>
+        </div>
+        <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-xs">Industrial Technology & Design</p>
+      </header>
 
-          <TabsContent value="3d" className="flex-1 m-0 relative bg-slate-100 overflow-hidden flex flex-col data-[state=inactive]:hidden min-h-0">
-            <div className="flex-1 relative">
-              <FurnitureViewer ref={viewerRef} parts={parts} action={action} color={color} />
-              <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full border border-slate-200 shadow-sm pointer-events-none">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{type.replace(/_/g, ' ')}</span>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl w-full">
+        <Link href="/muebles" className="group">
+          <Card className="h-full border-none shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden bg-white group-hover:-translate-y-2">
+            <div className="h-48 bg-slate-900 relative overflow-hidden flex items-center justify-center">
+              <Box className="w-24 h-24 text-primary/40 absolute -right-4 -bottom-4 rotate-12 group-hover:scale-110 transition-transform duration-500" />
+              <Box className="w-20 h-20 text-white relative z-10" />
             </div>
-            <div className="h-1/3 border-t bg-white min-h-[200px] shrink-0">
-              <CutlistTable parts={parts} />
-            </div>
-          </TabsContent>
+            <CardContent className="p-8">
+              <h2 className="text-2xl font-black text-slate-900 uppercase mb-2">Diseño de Mobiliario</h2>
+              <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                Generador paramétrico de despiece industrial. Optimización de corte y visualización 3D en tiempo real.
+              </p>
+              <Button className="w-full h-12 bg-primary hover:bg-primary/90 font-black uppercase text-xs tracking-widest gap-2">
+                Entrar al Módulo <ArrowRight className="w-4 h-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
 
-          <TabsContent value="optimize" className="flex-1 m-0 overflow-hidden flex flex-col data-[state=inactive]:hidden min-h-0">
-            <OptimizerPanel parts={parts} selectedPanel={selectedPanel} onPanelChange={setSelectedPanel} />
-          </TabsContent>
-        </Tabs>
-      </main>
+        <Link href="/steel-framing" className="group">
+          <Card className="h-full border-none shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden bg-white group-hover:-translate-y-2">
+            <div className="h-48 bg-blue-600 relative overflow-hidden flex items-center justify-center">
+              <Layers className="w-24 h-24 text-white/20 absolute -right-4 -bottom-4 rotate-12 group-hover:scale-110 transition-transform duration-500" />
+              <Home className="w-20 h-20 text-white relative z-10" />
+            </div>
+            <CardContent className="p-8">
+              <h2 className="text-2xl font-black text-slate-900 uppercase mb-2">Steel Framing Engine</h2>
+              <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                Ingeniería estructural AISI. Cálculo de paneles, cargas y cómputo métrico detallado para obra.
+              </p>
+              <Button className="w-full h-12 bg-slate-900 hover:bg-black font-black uppercase text-xs tracking-widest gap-2">
+                Entrar al Módulo <ArrowRight className="w-4 h-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      <footer className="mt-16 flex items-center gap-8 text-slate-400">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-primary" />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Algoritmos Protegidos JADSI v29.0</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <LayoutGrid className="w-4 h-4 text-primary" />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Motor Industrial v15.2</span>
+        </div>
+      </footer>
     </div>
   );
 }
