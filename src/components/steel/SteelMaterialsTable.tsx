@@ -1,6 +1,5 @@
 import React from 'react';
-import { SteelHouseConfig } from '@/lib/steel/types';
-import { calculateSteelMaterials } from '@/utils/steel/materialCalculator';
+import { MaterialEstimate } from '@/lib/steel/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,21 +7,19 @@ import {
   ClipboardList, 
   Weight, 
   Package, 
-  AlertCircle,
   Layers,
   Wrench,
   ThermometerSnowflake,
   ShieldCheck,
-  FileText
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 
 interface SteelMaterialsTableProps {
-  config: SteelHouseConfig;
+  estimate: MaterialEstimate;
 }
 
-export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
-  const estimate = calculateSteelMaterials(config);
-
+export function SteelMaterialsTable({ estimate }: SteelMaterialsTableProps) {
   const categories = {
     perfileria: { label: 'Estructura Metálica', color: 'bg-slate-100 text-slate-700', icon: Layers },
     paneles: { label: 'Cerramientos y Placas', color: 'bg-blue-50 text-blue-700', icon: FileText },
@@ -97,7 +94,8 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
             </TableHeader>
             <TableBody>
               {estimate.items.map((item, idx) => {
-                const CatIcon = categories[item.category].icon;
+                const category = categories[item.category as keyof typeof categories] || categories.otros;
+                const CatIcon = category.icon;
                 return (
                   <TableRow key={idx} className="h-12 hover:bg-slate-50 transition-colors">
                     <TableCell className="py-2">
@@ -107,9 +105,9 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
                       </div>
                     </TableCell>
                     <TableCell className="py-2">
-                      <Badge variant="secondary" className={`text-[8px] font-black uppercase px-1.5 h-5 flex items-center gap-1 border-none shadow-none ${categories[item.category].color}`}>
+                      <Badge variant="secondary" className={`text-[8px] font-black uppercase px-1.5 h-5 flex items-center gap-1 border-none shadow-none ${category.color}`}>
                         <CatIcon className="w-3 h-3" />
-                        {categories[item.category].label}
+                        {category.label}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right text-[11px] font-black text-slate-900 py-2">

@@ -1,4 +1,3 @@
-
 import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall, InternalWall } from '@/lib/steel/types';
 import { StructuralEngine } from './structuralEngine';
 

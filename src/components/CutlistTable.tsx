@@ -1,10 +1,9 @@
-
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Part } from '@/lib/types';
-import { ListChecks, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 interface CutlistTableProps {
   parts: Part[];
