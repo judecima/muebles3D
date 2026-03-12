@@ -196,6 +196,7 @@ export class StructuralEngine {
         const xStart = x + 40; 
         const xEnd = x + studSpacing; 
         
+        // Verificamos colisión geométrica con aberturas
         const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
           const top = sill + op.height;

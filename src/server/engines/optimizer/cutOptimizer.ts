@@ -17,6 +17,10 @@ interface Strip {
   efficiency: number;
 }
 
+/**
+ * ArquiMax Industrial Engine v12.6 - Backend Implementation
+ * Optimización de corte industrial mediante algoritmo de guillotina.
+ */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
   panelWidth: number,
