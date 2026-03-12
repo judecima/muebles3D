@@ -1,4 +1,4 @@
-import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall } from '@/lib/steel/types';
+import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall } from '../../../lib/steel/types';
 
 export interface HeaderAnalysis {
   type: 'single' | 'double' | 'triple' | 'tube' | 'truss';

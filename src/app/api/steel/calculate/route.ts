@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { StructuralEngine } from '@/server/engines/steel/structuralEngine';
-import { calculateSteelMaterials } from '@/server/engines/steel/materialCalculator';
+import { StructuralEngine } from '../../../../server/engines/steel/structuralEngine';
+import { calculateSteelMaterials } from '../../../../server/engines/steel/materialCalculator';
 
 export async function POST(request: Request) {
   try {
     const config = await request.json();
 
-    // 1. Calcular Visuales del Muro (La IP de posicionamiento ahora es del servidor)
     const wallData = config.walls.map((wall: any) => {
       return {
         id: wall.id,
@@ -33,7 +32,6 @@ export async function POST(request: Request) {
       };
     });
 
-    // 2. Alertas y Materiales
     const alerts = StructuralEngine.validateStructure(config);
     const materials = calculateSteelMaterials(config);
 

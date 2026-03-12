@@ -1,9 +1,6 @@
-import { SteelHouseConfig, MaterialEstimate, MaterialItem, SteelWall, InternalWall } from '@/lib/steel/types';
+import { SteelHouseConfig, MaterialEstimate, MaterialItem } from '../../../lib/steel/types';
 import { StructuralEngine } from './structuralEngine';
 
-/**
- * Motor de Cómputo Métrico Industrial JADSI v16.0
- */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
   
