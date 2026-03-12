@@ -3,7 +3,6 @@ import { StructuralEngine } from './structuralEngine';
 
 /**
  * Motor de Cómputo Métrico Industrial JADSI v16.0
- * Incluye cuantificación de Vigas Reticuladas y refuerzos de grandes luces.
  */
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
@@ -25,7 +24,6 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   const WASTE_BOARDS = 1.12;
   const BOARD_AREA = 2.88; 
 
-  // --- 1. PROCESAMIENTO DE MUROS EXTERIORES (100mm) ---
   config.walls.forEach(wall => {
     const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - 80; 
@@ -44,17 +42,6 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     blockings.forEach(b => {
       pgu100Len += (b.xEnd - b.xStart);
       totalConnections += 2;
-    });
-
-    config.internalWalls.forEach(iw => {
-      if (iw.parentWallId === wall.id) {
-        pgc100Len += studHeight; 
-        const ladders = StructuralEngine.calculateLadderBacking(wall.height);
-        ladders.forEach(l => {
-          pgu100Len += (l.xEnd - l.xStart);
-          totalConnections += 2;
-        });
-      }
     });
 
     wall.openings.forEach(op => {
@@ -98,7 +85,6 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     areaInteriorTotal += wallArea; 
   });
 
-  // --- 2. PROCESAMIENTO DE MUROS INTERNOS (70mm) ---
   config.internalWalls.forEach(iw => {
     const studHeight = iw.height - 60;
     pgu70Len += iw.length * 2; 
@@ -110,13 +96,11 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     (iw.openings || []).forEach(op => {
       pgc70Len += 2 * studHeight; 
       pgc70Len += op.width; 
-      
       const cripples = StructuralEngine.calculateCrippleStuds(iw, op, config);
       cripples.forEach(c => {
         pgc70Len += (c.yEnd - c.yStart);
         totalConnections += 4;
       });
-      
       totalConnections += 16;
     });
 
@@ -124,13 +108,12 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     areaInteriorTotal += (wallArea * 2); 
   });
 
-  // --- 3. CONSOLIDACIÓN DE MATERIALES ---
   items.push({
     name: 'Perfiles PGC 100x0.90mm (6m)',
     category: 'perfileria',
     unit: 'un',
     quantity: Math.ceil((pgc100Len / BAR_LEN) * WASTE_STEEL),
-    description: 'Montantes estructurales, Kings reforzados y vigas reticuladas.'
+    description: 'Montantes estructurales y Kings reforzados.'
   });
   items.push({
     name: 'Perfiles PGU 100x0.90mm (6m)',
@@ -178,13 +161,6 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     quantity: Math.ceil(areaExteriorNet * 1.05),
     description: 'Aislación termoacústica.'
   });
-  items.push({
-    name: 'Barrera de Agua y Viento (WRB)',
-    category: 'aislacion',
-    unit: 'm²',
-    quantity: Math.ceil(areaExteriorGross * 1.15),
-    description: 'Membrana hidrófuga tipo Tyvek.'
-  });
 
   items.push({
     name: 'Tornillos T1 Punta Mecha',
@@ -192,20 +168,6 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     unit: 'un',
     quantity: Math.ceil(totalConnections * 1.1),
     description: 'Unión estructural metal-metal.'
-  });
-  items.push({
-    name: 'Tornillos T2 Punta Aguja/Mecha',
-    category: 'fijaciones',
-    unit: 'un',
-    quantity: Math.ceil(areaInteriorTotal * 25 + areaExteriorGross * 20),
-    description: 'Fijación de placas.'
-  });
-  items.push({
-    name: 'Anclajes Expansivos 3/8" x 3 3/4"',
-    category: 'fijaciones',
-    unit: 'un',
-    quantity: totalAnchors,
-    description: 'Anclaje a platea.'
   });
 
   return {

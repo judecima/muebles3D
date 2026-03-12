@@ -1,4 +1,3 @@
-
 import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall } from '@/lib/steel/types';
 
 export interface HeaderAnalysis {
