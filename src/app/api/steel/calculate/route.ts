@@ -11,7 +11,7 @@ export async function POST(request: Request) {
         id: wall.id,
         panels: StructuralEngine.calculateWallPanels(wall, config),
         blocking: StructuralEngine.calculateBlocking(wall),
-        openings: wall.openings.map((op: any) => ({
+        openings: (wall.openings || []).map((op: any) => ({
           ...op,
           id: op.id,
           analysis: StructuralEngine.calculateHeader(op, wall.length, config, wall.height),

@@ -1,5 +1,4 @@
-
-import { Part, FurnitureDimensions, FurnitureModel, FurnitureType } from '@/lib/types';
+import { Part, FurnitureDimensions, FurnitureModel, FurnitureType } from '../../../lib/types';
 
 export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensions): FurnitureModel {
   const T = dim.thickness || 18;
@@ -161,5 +160,5 @@ export function kitchenCatalogEngine(type: FurnitureType, dim: FurnitureDimensio
     }
   }
 
-  return { parts, summary: `Catálogo JADSI Industrial.`, hasDoors, hasDrawers };
+  return { parts, summary: `Catálogo JADSI Industrial v16.1.`, hasDoors, hasDrawers };
 }

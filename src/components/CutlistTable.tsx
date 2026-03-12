@@ -96,7 +96,7 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                     hardwareList.map((item, idx) => (
                       <TableRow key={idx} className="hover:bg-slate-50 transition-colors h-8">
                         <TableCell className="font-medium text-[10px] py-1 px-2">{item.name}</TableCell>
-                        <TableCell className="text-right text-[10px] py-1 px-2 font-bold text-accent">{Math.ceil(item.quantity)}</TableCell>
+                        <TableCell className="text-right text-[10px] py-1 px-2 font-bold text-primary">{Math.ceil(item.quantity)}</TableCell>
                       </TableRow>
                     ))
                   )}
