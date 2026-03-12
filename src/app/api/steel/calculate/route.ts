@@ -13,6 +13,7 @@ export async function POST(request: Request) {
         blocking: StructuralEngine.calculateBlocking(wall),
         openings: wall.openings.map((op: any) => ({
           ...op,
+          id: op.id,
           analysis: StructuralEngine.calculateHeader(op, wall.length, config, wall.height),
           cripples: StructuralEngine.calculateCrippleStuds(wall, op, config)
         }))
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
         blocking: StructuralEngine.calculateBlocking(iw),
         openings: (iw.openings || []).map((op: any) => ({
           ...op,
+          id: op.id,
           analysis: StructuralEngine.calculateHeader(op, iw.length, config, iw.height),
           cripples: StructuralEngine.calculateCrippleStuds(iw, op, config)
         }))
