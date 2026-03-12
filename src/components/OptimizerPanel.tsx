@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -5,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Part, AVAILABLE_PANELS, PanelSize, GrainDirection, OptimizationResult } from '@/lib/types';
-import { runOptimization } from '@/optimizer/cutOptimizer';
 import { generateCutListFromModel, CutlistPart } from '@/utils/cutlistGenerator';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -67,7 +67,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setResult(null);
   };
 
-  const handleOptimize = () => {
+  const handleOptimize = async () => {
     const filteredParts = localCutlist.filter(p => p.thickness === targetThickness);
     
     if (filteredParts.length === 0) {
@@ -78,44 +78,46 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setLoading(true);
     setError(null);
     
-    setTimeout(() => {
-      try {
-        const res = runOptimization(
-          localCutlist,
-          selectedPanel.width,
-          selectedPanel.height,
-          targetThickness,
-          4.5, 
-          10   
-        );
+    try {
+      const res = await fetch('/api/cutting/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parts: localCutlist,
+          panelWidth: selectedPanel.width,
+          panelHeight: selectedPanel.height,
+          thickness: targetThickness
+        })
+      });
+      
+      const data = await res.json();
 
-        if (res.optimizedLayout.length === 0) {
-          setError("Piezas demasiado grandes para el panel.");
-        } else {
-          setResult(res);
-        }
-      } catch (e) {
-        console.error(e);
-        setError("Error en cálculo industrial.");
-      } finally {
-        setLoading(false);
+      if (data.error || data.optimizedLayout.length === 0) {
+        setError(data.error || "Piezas demasiado grandes para el panel.");
+      } else {
+        setResult(data);
       }
-    }, 100);
+    } catch (e) {
+      console.error(e);
+      setError("Error de conexión con el motor industrial.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exportPDF = async () => {
     if (!result) return;
     const doc = new jsPDF('p', 'mm', 'a4');
-    const BRAND_COLOR = [174, 26, 226];
+    const BRAND_COLOR = [13, 110, 253];
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(24);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("RED ARQUIMAX", 105, 20, { align: 'center' });
+    doc.text("JADSI INDUSTRIAL", 105, 20, { align: 'center' });
     
     doc.setFontSize(14);
     doc.setTextColor(80, 80, 80);
-    doc.text("Plano de Optimización Industrial", 105, 28, { align: 'center' });
+    doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
     
     (doc as any).autoTable({
       head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
@@ -124,7 +126,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
       headStyles: { fillColor: BRAND_COLOR, fontStyle: 'bold' }
     });
 
-    doc.save(`arquimax-corte-${targetThickness}mm.pdf`);
+    doc.save(`jadsi-corte-${targetThickness}mm.pdf`);
   };
 
   return (
@@ -135,7 +137,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> ArquiMax v12.1.1 Industrial
+                <Settings2 className="w-4 h-4" /> JADSI Engine v12.1.1 Industrial
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -277,7 +279,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase">Calculando ArquiMax v12.1.1...</p>
+              <p className="font-black text-slate-700 uppercase">Procesando JADSI Engine...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -296,7 +298,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   <div className="relative bg-slate-200 shadow-2xl rounded-sm mx-auto overflow-hidden" 
                        style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                     
-                    {/* Área de Refilado (Trim) */}
                     <div className="absolute inset-0 bg-slate-400/20 pointer-events-none z-10" 
                          style={{ 
                            borderStyle: 'solid', 
@@ -304,7 +305,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                          }}>
                     </div>
 
-                    {/* Área Útil de Trabajo */}
                     <div className="absolute bg-white" style={{ 
                       left: `${(result.trim / selectedPanel.width) * 100}%`, 
                       top: `${(result.trim / selectedPanel.height) * 100}%`, 
@@ -321,14 +321,11 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                                top: `${(p.y / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
                                width: `${(p.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
                                height: `${(p.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
-                               backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
+                               backgroundColor: p.color || 'rgba(13, 110, 253, 0.15)'
                              }}>
                           <div className="relative w-full h-full overflow-hidden pointer-events-none">
-                            {/* Medida Base */}
                             <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">{p.width}</span>
-                            {/* Medida Altura */}
                             <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.8vw,10px)] font-black text-slate-900 leading-none whitespace-nowrap">{p.height}</span>
-                            {/* Nombre de Pieza */}
                             <div className="absolute inset-0 flex items-center justify-center p-1 text-center"><span className="text-[min(1.4vw,9px)] text-slate-700 uppercase font-bold truncate w-full px-2">{p.name}</span></div>
                           </div>
                         </div>
@@ -337,7 +334,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   </div>
                   <div className="flex gap-4 items-center px-2">
                     <Info className="w-3 h-3 text-slate-400" />
-                    <p className="text-[9px] text-slate-400 italic">Compactación perimetral (0,0). Guillotina estricta v12.1.1.</p>
+                    <p className="text-[9px] text-slate-400 italic">Cálculo por JADSI Industrial v12.1.1.</p>
                   </div>
                 </div>
               ))}

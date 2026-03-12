@@ -1,4 +1,5 @@
-import { SteelOpening, SteelHouseConfig, SteelWall, InternalWall } from '@/lib/steel/types';
+
+import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall } from '@/lib/steel/types';
 
 export interface HeaderAnalysis {
   type: 'single' | 'double' | 'triple' | 'tube' | 'truss';
@@ -8,89 +9,225 @@ export interface HeaderAnalysis {
   requiredIx: number;
   status: 'ok' | 'warning' | 'error';
   isFusedWithCorner: 'none' | 'left' | 'right';
-  actualHeight: number;
+  actualHeight: number; 
+  trussData?: {
+    height: number;
+    numDiagonals: number;
+    chordThickness: number;
+  };
+}
+
+export interface BlockingData {
+  xStart: number;
+  xEnd: number;
+  y: number;
+}
+
+export interface CrippleData {
+  x: number;
+  yStart: number;
+  yEnd: number;
+  type: 'upper' | 'lower';
 }
 
 export class StructuralEngine {
   private static readonly STEEL_MODULUS = 203000; 
   private static readonly PGC_IX_SINGLE = 185000; 
   private static readonly TUBE_IX = 1200000; 
+  
+  public static readonly CORNER_FUSION_THRESHOLD = 200; 
   private static readonly DEAD_LOAD_KPA = 0.5; 
   private static readonly LIVE_LOAD_ROOF_KPA = 1.0; 
+  private static readonly WIND_PRESSURE_KPA = 0.8; 
+  private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; 
 
-  static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): any[] {
-    const panels: any[] = [];
+  static analyzeOpeningFusion(op: SteelOpening, wallLen: number): 'none' | 'left' | 'right' {
+    if (op.position < this.CORNER_FUSION_THRESHOLD) return 'left';
+    if ((wallLen - (op.position + op.width)) < this.CORNER_FUSION_THRESHOLD) return 'right';
+    return 'none';
+  }
+
+  static calculateWallPanels(wall: SteelWall | InternalWall, config: SteelHouseConfig): WallPanelData[] {
+    const panels: WallPanelData[] = [];
     const maxPanelWidth = 4000; 
+    const minPanelWidth = 600;
+    const openings = wall.openings || [];
+    
     let currentX = 0;
-    let index = 0;
+    let panelIndex = 0;
 
     while (currentX < wall.length) {
       let targetX = Math.min(currentX + maxPanelWidth, wall.length);
+      
+      if (targetX < wall.length) {
+        for (const op of openings) {
+          const opStart = op.position;
+          const opEnd = op.position + op.width;
+          if (targetX > opStart && targetX < opEnd) {
+            targetX = opStart - 10; 
+            if (targetX - currentX < minPanelWidth) {
+              targetX = opEnd + 10;
+            }
+            break;
+          }
+        }
+      }
+
+      targetX = Math.min(targetX, wall.length);
       const width = targetX - currentX;
-      panels.push({ id: `${wall.id}-p${index}`, xStart: currentX, xEnd: targetX, width, isWallStart: currentX === 0, isWallEnd: targetX === wall.length });
+
+      if (width > 0) {
+        const loads = this.calculatePanelLoads(width, wall.height, config);
+        const needsBracing = (loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * width / 1000) || (currentX === 0 || targetX === wall.length);
+
+        panels.push({
+          id: `${wall.id}-p${panelIndex}`,
+          xStart: currentX,
+          xEnd: targetX,
+          width: width,
+          isWallStart: currentX === 0,
+          isWallEnd: targetX === wall.length,
+          needsBracing,
+          loads
+        });
+      }
+
       currentX = targetX;
-      index++;
+      panelIndex++;
+      if (panelIndex > 50) break;
     }
+
     return panels;
+  }
+
+  private static calculatePanelLoads(widthMm: number, heightMm: number, config: SteelHouseConfig): PanelLoads {
+    const widthM = widthMm / 1000;
+    const heightM = heightMm / 1000;
+    const tributaryWidthM = Math.max(2, config.length / 2000); 
+    const verticalLoadKN = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * widthM * tributaryWidthM;
+    const shearForceKN = this.WIND_PRESSURE_KPA * widthM * heightM;
+    return { verticalLoadN: verticalLoadKN * 1000, shearForceN: shearForceKN * 1000, overturningMomentNm: shearForceKN * heightM };
   }
 
   static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig, wallHeight: number): HeaderAnalysis {
     const L = opening.width;
-    const loadNmm = 0.001 * (config.length / 2); 
+    const tributaryWidth = config.length / 2; 
+    const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; 
+    const loadNmm = designLoadTotal * tributaryWidth; 
     const maxAllowableDeflection = L / 360;
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
+    const fusion = this.analyzeOpeningFusion(opening, wallLen);
     
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
-    const availH = Math.max(0, wallHeight - (sill + opening.height) - 40);
+    const headerBottom = sill + opening.height;
+    const availableHeight = Math.max(0, wallHeight - headerBottom - 40);
 
     let type: HeaderAnalysis['type'] = 'single';
-    if (L > 2500) type = 'truss';
-    else if (requiredIx > this.PGC_IX_SINGLE * 2) type = 'triple';
-    else if (requiredIx > this.PGC_IX_SINGLE) type = 'double';
+    let status: HeaderAnalysis['status'] = 'ok';
+    let actualHeight = Math.min(100, availableHeight);
+    let trussData: HeaderAnalysis['trussData'] = undefined;
 
-    return { 
-      type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, 
-      status: L > 3500 ? 'error' : (L > 2500 ? 'warning' : 'ok'), 
-      isFusedWithCorner: 'none', actualHeight: type === 'truss' ? availH : 100 
-    };
+    if (L > 2500 || requiredIx > this.TUBE_IX) {
+      type = 'truss';
+      status = L > 3500 ? 'error' : 'warning';
+      actualHeight = availableHeight;
+      trussData = {
+        height: availableHeight,
+        numDiagonals: Math.ceil(L / 400),
+        chordThickness: 1.25
+      };
+    } else if (requiredIx > (this.PGC_IX_SINGLE * 3)) {
+      type = 'tube';
+      actualHeight = Math.min(100, availableHeight);
+    } else if (requiredIx > (this.PGC_IX_SINGLE * 2)) {
+      type = 'triple';
+      actualHeight = Math.min(100, availableHeight);
+    } else if (requiredIx > this.PGC_IX_SINGLE) {
+      type = 'double';
+      actualHeight = Math.min(100, availableHeight);
+    }
+
+    if (L > 3500) status = 'error'; 
+
+    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData };
   }
 
-  static calculateCrippleStuds(wall: any, opening: SteelOpening, config: SteelHouseConfig): any[] {
-    const cripples = [];
+  static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
+    const cripples: CrippleData[] = [];
+    const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
+    const wallH = wall.height;
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-    const headerTop = headerBottom + 100;
 
-    for (let x = 400; x < wall.length; x += 400) {
-      if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
-        if (wall.height - headerTop > 50) cripples.push({ x, yStart: headerTop, yEnd: wall.height - 40 });
-        if (opening.type === 'window' && sill > 80) cripples.push({ x, yStart: 40, yEnd: sill - 40 });
+    const analysis = this.calculateHeader(opening, wall.length, config, wallH);
+    const headerHeight = analysis.actualHeight;
+    const headerTop = headerBottom + headerHeight;
+
+    const spaceAbove = (wallH - 40) - headerTop;
+
+    if (spaceAbove > 10) {
+      for (let x = spacing; x < wall.length; x += spacing) {
+        if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
+          cripples.push({ x, yStart: headerTop, yEnd: wallH - 40, type: 'upper' });
+        }
+      }
+    }
+
+    if (opening.type === 'window' && sill > 80) {
+      for (let x = spacing; x < wall.length; x += spacing) {
+        if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
+          cripples.push({ x, yStart: 40, yEnd: sill - 40, type: 'lower' });
+        }
       }
     }
     return cripples;
   }
 
-  static calculateBlocking(wall: any): any[] {
-    const blocks = [];
-    if (wall.height > 2400) {
-      const y = wall.height / 2;
-      for (let x = 0; x < wall.length - 400; x += 400) {
-        const inOp = (wall.openings || []).some((op: any) => {
+  static calculateBlocking(wall: SteelWall | InternalWall): BlockingData[] {
+    const blockings: BlockingData[] = [];
+    const numRows = wall.height > 2400 ? (wall.height > 3000 ? 2 : 1) : 0;
+    if (numRows === 0) return [];
+
+    const rowSpacing = wall.height / (numRows + 1);
+    const studSpacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
+
+    for (let row = 1; row <= numRows; row++) {
+      const y = row * rowSpacing;
+      for (let x = 0; x <= wall.length - studSpacing; x += studSpacing) {
+        const xStart = x + 40; 
+        const xEnd = x + studSpacing; 
+        const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-          return (x < op.position + op.width && x + 400 > op.position) && (y > sill && y < sill + op.height);
+          const top = sill + op.height + 100;
+          return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
         });
-        if (!inOp) blocks.push({ xStart: x + 40, xEnd: x + 400, y });
+        if (!intersects) blockings.push({ xStart, xEnd, y });
       }
     }
-    return blocks;
+    return blockings;
   }
 
-  static validateStructure(config: SteelHouseConfig): any[] {
+  static calculateLadderBacking(wallHeight: number): BlockingData[] {
+    const ladders: BlockingData[] = [];
+    const numBlocks = 4;
+    const spacing = wallHeight / (numBlocks + 1);
+    for (let i = 1; i <= numBlocks; i++) {
+      ladders.push({ xStart: -35, xEnd: 35, y: i * spacing });
+    }
+    return ladders;
+  }
+
+  static validateStructure(config: SteelHouseConfig): { wallId: string, status: 'ok' | 'warning' | 'error', message: string }[] {
     const alerts: any[] = [];
-    config.walls.forEach(w => {
-      w.openings.forEach(op => {
-        if (op.width > 3500) alerts.push({ status: 'error', message: `Vano crítico en ${w.id}: ${op.width}mm excede límite AISI.` });
-        else if (op.width > 2500) alerts.push({ status: 'warning', message: `Luz amplia en ${w.id}: Requiere viga reticulada.` });
+    config.walls.forEach(wall => {
+      wall.openings.forEach(op => {
+        const analysis = this.calculateHeader(op, wall.length, config, wall.height);
+        if (analysis.status !== 'ok') {
+          const msg = analysis.type === 'truss' 
+            ? `Vano ${op.width}mm en ${wall.id}: Requiere Viga Reticulada (Truss)`
+            : `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico' : 'Refuerzo Especial'}`;
+          alerts.push({ wallId: wall.id, status: analysis.status, message: msg });
+        }
       });
     });
     return alerts;

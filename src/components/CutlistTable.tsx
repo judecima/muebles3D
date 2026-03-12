@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -14,7 +15,6 @@ export function CutlistTable({ parts }: CutlistTableProps) {
   const hardware = parts.filter(p => p.isHardware);
 
   const aggregatedPanels = panels.reduce((acc, part) => {
-    // Forzar redondeo antes de agrupar para evitar duplicados por decimales
     const l = Math.round(part.cutLargo);
     const a = Math.round(part.cutAncho);
     const e = Math.round(part.cutEspesor);
@@ -44,8 +44,8 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
       <CardHeader className="py-2 px-4 md:px-6 bg-slate-50 shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-xs md:text-sm font-bold flex items-center gap-2 text-primary">
-          <point className="w-1 h-1 bg-primary rounded-full" />
-          Despiece Técnico (Red Arquimax v15.9)
+          <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+          Despiece Técnico (JADSI Industrial v15.9)
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex-1 overflow-hidden">
