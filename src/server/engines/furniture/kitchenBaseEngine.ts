@@ -1,5 +1,4 @@
-
-import { Part, FurnitureDimensions, FurnitureModel } from '@/lib/types';
+import { Part, FurnitureDimensions, FurnitureModel } from '../../../lib/types';
 
 export function kitchenBaseEngine(dim: FurnitureDimensions): FurnitureModel {
   const { width: W, height: H, depth: D, thickness: T, hasBack, hasShelf } = dim;

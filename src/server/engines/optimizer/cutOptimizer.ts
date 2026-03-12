@@ -1,5 +1,4 @@
-
-import { GrainDirection, OptimizationResult, OptimizedPanel, OptimizedPart } from '@/lib/types';
+import { GrainDirection, OptimizationResult, OptimizedPanel, OptimizedPart } from '../../../lib/types';
 
 interface InternalPart {
   name: string;
@@ -18,12 +17,6 @@ interface Strip {
   efficiency: number;
 }
 
-/**
- * ArquiMax Industrial Engine v12.6 - GLOBAL DENSITY STRATEGY
- * - Evalúa obligatoriamente Panel Horizontal vs Panel Vertical.
- * - Maximiza el llenado del primer panel mediante un selector de impacto.
- * - Garantiza guillotina estricta de 3 etapas.
- */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
   panelWidth: number,
@@ -41,66 +34,21 @@ export function runOptimization(
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
 
-  const sortStrategies = [
-    (a: InternalPart, b: InternalPart) => b.height - a.height, 
-    (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height),
-    (a: InternalPart, b: InternalPart) => b.width - a.width,
-  ];
-
-  let bestResult: OptimizationResult | null = null;
-  let bestScore = Infinity; 
   const partColors = generateColors(filteredParts);
+  const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
+    Array.from({ length: p.quantity }, () => ({
+      name: p.name,
+      width: p.width,
+      height: p.height,
+      grainDirection: p.grainDirection,
+      thickness: p.thickness,
+      originalIndex: idx,
+      placed: false
+    }))
+  );
 
-  for (const strategy of sortStrategies) {
-    for (const isVerticalPanel of [false, true]) {
-      const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
-        Array.from({ length: p.quantity }, () => ({
-          name: p.name,
-          width: p.width,
-          height: p.height,
-          grainDirection: p.grainDirection,
-          thickness: p.thickness,
-          originalIndex: idx,
-          placed: false
-        }))
-      );
+  pool.sort((a, b) => b.height - a.height);
 
-      pool.sort(strategy);
-
-      const algoW = isVerticalPanel ? usableH : usableW;
-      const algoH = isVerticalPanel ? usableW : usableH;
-
-      const currentResult = buildStripLayout(
-        pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalPanel
-      );
-      
-      if (currentResult.optimizedLayout.length > 0) {
-        const firstPanelEfficiency = currentResult.optimizedLayout[0]?.efficiency || 0;
-        const score = (currentResult.totalPanels * 1000000) - firstPanelEfficiency;
-
-        if (!bestResult || score < bestScore) {
-          bestResult = currentResult;
-          bestScore = score;
-        }
-      }
-    }
-  }
-
-  return bestResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error de cálculo", kerf, trim, selectedThickness };
-}
-
-function buildStripLayout(
-  pool: InternalPart[], 
-  algoW: number, 
-  algoH: number, 
-  kerf: number, 
-  trim: number, 
-  selectedThickness: number,
-  colors: Record<string, string>,
-  panelWidth: number,
-  panelHeight: number,
-  isVertical: boolean
-): OptimizationResult {
   const panels: OptimizedPanel[] = [];
   let workingPool = pool.map(p => ({ ...p }));
 
@@ -108,7 +56,7 @@ function buildStripLayout(
     const panelStrips: Strip[] = [];
     let currentPanelHeight = 0;
 
-    while (currentPanelHeight < algoH) {
+    while (currentPanelHeight < usableH) {
       let leaderIdx = -1;
       let leaderIsRotated = false;
 
@@ -116,12 +64,12 @@ function buildStripLayout(
         const p = workingPool[i];
         if (p.placed) continue;
 
-        if (p.width <= algoW && p.height <= (algoH - currentPanelHeight)) {
+        if (p.width <= usableW && p.height <= (usableH - currentPanelHeight)) {
           leaderIdx = i;
           leaderIsRotated = false;
           break;
         }
-        if (p.grainDirection === 'libre' && p.height <= algoW && p.width <= (algoH - currentPanelHeight)) {
+        if (p.grainDirection === 'libre' && p.height <= usableW && p.width <= (usableH - currentPanelHeight)) {
           leaderIdx = i;
           leaderIsRotated = true;
           break;
@@ -135,7 +83,7 @@ function buildStripLayout(
       const stripParts: OptimizedPart[] = [];
       let currentX = 0;
 
-      while (currentX < algoW) {
+      while (currentX < usableW) {
         let bestColIdx = -1;
         let colRotated = false;
 
@@ -143,12 +91,12 @@ function buildStripLayout(
           const p = workingPool[i];
           if (p.placed) continue;
 
-          if (p.width <= (algoW - currentX) && p.height <= stripH) {
+          if (p.width <= (usableW - currentX) && p.height <= stripH) {
             bestColIdx = i;
             colRotated = false;
             break;
           }
-          if (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= stripH) {
+          if (p.grainDirection === 'libre' && p.height <= (usableW - currentX) && p.width <= stripH) {
             bestColIdx = i;
             colRotated = true;
             break;
@@ -194,7 +142,7 @@ function buildStripLayout(
             width: colW,
             height: finalH,
             rotated: pRot,
-            color: colors[part.name]
+            color: partColors[part.name]
           });
 
           part.placed = true;
@@ -204,12 +152,11 @@ function buildStripLayout(
       }
 
       if (stripParts.length > 0) {
-        const stripUsedWidth = currentX - kerf;
         panelStrips.push({
           height: stripH,
-          width: stripUsedWidth,
+          width: currentX - kerf,
           parts: stripParts,
-          efficiency: stripUsedWidth / algoW
+          efficiency: (currentX - kerf) / usableW
         });
         currentPanelHeight += stripH + kerf;
       } else {
@@ -219,28 +166,14 @@ function buildStripLayout(
 
     if (panelStrips.length === 0) break;
 
-    panelStrips.sort((a, b) => b.efficiency - a.efficiency);
-
     const placedInPanel: OptimizedPart[] = [];
     let yOffset = 0;
 
     for (const strip of panelStrips) {
       for (const p of strip.parts) {
-        const finalX = p.x;
-        const finalY = yOffset + p.y;
-
-        const drawX = isVertical ? finalY : finalX;
-        const drawY = isVertical ? finalX : finalY;
-        const drawW = isVertical ? p.height : p.width;
-        const drawH = isVertical ? p.width : p.height;
-
         placedInPanel.push({
           ...p,
-          x: drawX,
-          y: drawY,
-          width: drawW,
-          height: drawH,
-          rotated: isVertical ? !p.rotated : p.rotated
+          y: yOffset + p.y
         });
       }
       yOffset += strip.height + kerf;
