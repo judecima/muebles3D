@@ -1,8 +1,8 @@
 import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Part } from '@/lib/types';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { ScrollArea } from './ui/scroll-area';
+import { Part } from '../lib/types';
 import { Settings } from 'lucide-react';
 
 interface CutlistTableProps {
@@ -43,7 +43,7 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
       <CardHeader className="py-2 px-4 md:px-6 bg-slate-50 shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-xs md:text-sm font-bold flex items-center gap-2 text-primary">
-          <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+          <div className="w-1 h-1 bg-primary rounded-full" />
           Despiece Técnico (JADSI Industrial v15.9)
         </CardTitle>
       </CardHeader>

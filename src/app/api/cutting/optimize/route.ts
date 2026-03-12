@@ -1,6 +1,5 @@
-
 import { NextResponse } from 'next/server';
-import { runOptimization } from '@/server/engines/optimizer/cutOptimizer';
+import { runOptimization } from '../../../../server/engines/optimizer/cutOptimizer';
 
 export async function POST(request: Request) {
   try {

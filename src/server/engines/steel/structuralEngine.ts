@@ -195,11 +195,20 @@ export class StructuralEngine {
       for (let x = 0; x <= wall.length - studSpacing; x += studSpacing) {
         const xStart = x + 40; 
         const xEnd = x + studSpacing; 
+        
+        // CORRECCIÓN: Validar estrictamente contra aberturas para evitar que el blocking las atraviese
         const intersects = (wall.openings || []).some(op => {
           const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-          const top = sill + op.height + 100;
-          return (xStart < op.position + op.width && xEnd > op.position) && (y > sill && y < top);
+          const top = sill + op.height;
+          
+          // Verificar colisión horizontal
+          const hOverlap = xStart < (op.position + op.width) && xEnd > op.position;
+          // Verificar colisión vertical (con margen)
+          const vOverlap = y > (sill - 10) && y < (top + 10);
+          
+          return hOverlap && vOverlap;
         });
+
         if (!intersects) blockings.push({ xStart, xEnd, y });
       }
     }
