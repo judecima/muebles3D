@@ -149,7 +149,7 @@ export function ControlPanel({
                   <Label className="text-xs font-bold uppercase text-slate-600">Fondo (MDF 3mm)</Label>
                 </div>
                 <Switch 
-                  checked={forceBack ? true : dimensions.hasBack} 
+                  checked={forceBack ? true : !!dimensions.hasBack} 
                   onCheckedChange={handleBackToggle} 
                   disabled={forceBack}
                 />
@@ -166,7 +166,7 @@ export function ControlPanel({
                     </Label>
                   </div>
                   <Switch 
-                    checked={dimensions.hasShelf} 
+                    checked={!!dimensions.hasShelf} 
                     onCheckedChange={handleShelfToggle} 
                   />
                 </div>
@@ -177,7 +177,7 @@ export function ControlPanel({
                       <Label className="text-xs font-bold uppercase text-slate-600">Estante Pequeño (R)</Label>
                     </div>
                     <Switch 
-                      checked={dimensions.hasShelf2} 
+                      checked={!!dimensions.hasShelf2} 
                       onCheckedChange={handleShelf2Toggle} 
                     />
                   </div>

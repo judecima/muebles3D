@@ -21,10 +21,10 @@ import 'jspdf-autotable';
 const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   bajoMesada: { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
   rackTV: { width: 1600, height: 500, depth: 400, thickness: 18, hasBack: true },
-  escritorio: { width: 1200, height: 750, depth: 600, thickness: 18 },
+  escritorio: { width: 1200, height: 750, depth: 600, thickness: 18, hasBack: false },
   alacena: { width: 800, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
   placard: { width: 1800, height: 2100, depth: 600, thickness: 18, hasBack: true },
-  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasBack: true },
+  biblioteca: { width: 800, height: 1800, depth: 300, thickness: 18, hasBack: true, hasShelf: true },
   alacenaFlip: { width: 500, height: 300, depth: 320, thickness: 18, hasBack: true, hasShelf: false },
   'bajomesada-cajonera': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true },
   'porta-anafe': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
@@ -55,13 +55,13 @@ export default function FurnitureDesignerPage() {
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
-  const generateFurniture = async () => {
+  const generateFurniture = async (currentType: FurnitureType, currentDims: FurnitureDimensions) => {
     setIsLoading(true);
     try {
       const res = await fetch('/api/furniture/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, dimensions })
+        body: JSON.stringify({ type: currentType, dimensions: currentDims })
       });
       const result: FurnitureModel = await res.json();
       setParts(result.parts);
@@ -74,14 +74,29 @@ export default function FurnitureDesignerPage() {
     }
   };
 
-  useEffect(() => {
-    setDimensions(DEFAULT_DIMENSIONS[type]);
+  // Función unificada para cambiar de tipo y resetear dimensiones
+  const handleTypeChange = (newType: FurnitureType) => {
+    const newDims = DEFAULT_DIMENSIONS[newType];
+    setType(newType);
+    setDimensions(newDims);
     setAction('reset');
-  }, [type]);
+    // Forzamos la generación inmediata con los nuevos valores para evitar el desfase de estado
+    generateFurniture(newType, newDims);
+    setIsMobileMenuOpen(false);
+  };
 
+  // Efecto para cambios manuales en dimensiones o color (sin cambiar tipo)
   useEffect(() => {
-    generateFurniture();
-  }, [type, dimensions]);
+    // Evitamos doble llamada en el montaje inicial ya que se dispara por el cambio de tipo
+    if (parts.length > 0) {
+      generateFurniture(type, dimensions);
+    }
+  }, [dimensions, color]);
+
+  // Carga inicial
+  useEffect(() => {
+    generateFurniture(type, dimensions);
+  }, []);
 
   const handleAction = (act: string) => {
     if (act === 'export-pdf') {
@@ -188,7 +203,7 @@ export default function FurnitureDesignerPage() {
           color={color}
           hasDoors={hasDoors}
           hasDrawers={hasDrawers}
-          onTypeChange={setType} 
+          onTypeChange={handleTypeChange} 
           onDimensionsChange={setDimensions} 
           onColorChange={setColor}
           onAction={handleAction} 
@@ -219,7 +234,7 @@ export default function FurnitureDesignerPage() {
                   color={color}
                   hasDoors={hasDoors}
                   hasDrawers={hasDrawers}
-                  onTypeChange={(v) => { setType(v); setIsMobileMenuOpen(false); }} 
+                  onTypeChange={handleTypeChange} 
                   onDimensionsChange={setDimensions} 
                   onColorChange={setColor}
                   onAction={handleAction} 
