@@ -2,8 +2,8 @@ import type {Metadata} from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Red Arquimax - Diseñador Técnico',
-  description: 'Optimizador de corte y diseñador de muebles industrial',
+  title: 'JADSI - Tecnología Industrial',
+  description: 'Sistema integral de ingeniería para Steel Framing, Mobiliario y Optimización de Corte.',
 };
 
 export default function RootLayout({

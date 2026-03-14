@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Part } from '@/lib/types';
-import { ListChecks, Settings } from 'lucide-react';
+import { Settings, Cpu } from 'lucide-react';
 
 interface CutlistTableProps {
   parts: Part[];
@@ -14,7 +14,6 @@ export function CutlistTable({ parts }: CutlistTableProps) {
   const hardware = parts.filter(p => p.isHardware);
 
   const aggregatedPanels = panels.reduce((acc, part) => {
-    // Forzar redondeo antes de agrupar para evitar duplicados por decimales
     const l = Math.round(part.cutLargo);
     const a = Math.round(part.cutAncho);
     const e = Math.round(part.cutEspesor);
@@ -44,9 +43,13 @@ export function CutlistTable({ parts }: CutlistTableProps) {
     <Card className="rounded-none border-t border-slate-200 shadow-none h-full overflow-hidden flex flex-col">
       <CardHeader className="py-2 px-4 md:px-6 bg-slate-50 shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-xs md:text-sm font-bold flex items-center gap-2 text-primary">
-          <point className="w-1 h-1 bg-primary rounded-full" />
-          Despiece Técnico (Red Arquimax v15.9)
+          <div className="w-2 h-2 bg-primary rounded-full" />
+          Despiece Industrial (JADSI Engine v16.5)
         </CardTitle>
+        <div className="flex items-center gap-1 opacity-40">
+          <Cpu className="w-3 h-3" />
+          <span className="text-[8px] font-bold uppercase tracking-widest">Calculado en Tiempo Real</span>
+        </div>
       </CardHeader>
       <CardContent className="p-0 flex-1 overflow-hidden">
         <div className="flex flex-col md:flex-row h-full">
@@ -97,7 +100,7 @@ export function CutlistTable({ parts }: CutlistTableProps) {
                     hardwareList.map((item, idx) => (
                       <TableRow key={idx} className="hover:bg-slate-50 transition-colors h-8">
                         <TableCell className="font-medium text-[10px] py-1 px-2">{item.name}</TableCell>
-                        <TableCell className="text-right text-[10px] py-1 px-2 font-bold text-accent">{Math.ceil(item.quantity)}</TableCell>
+                        <TableCell className="text-right text-[10px] py-1 px-2 font-bold text-primary">{Math.ceil(item.quantity)}</TableCell>
                       </TableRow>
                     ))
                   )}

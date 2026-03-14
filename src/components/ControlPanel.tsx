@@ -3,8 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItemGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FurnitureType, FurnitureDimensions, FurnitureColor } from '@/lib/types';
 import { 
@@ -14,11 +13,11 @@ import {
   Maximize, 
   RefreshCw, 
   Palette,
-  Settings2,
   Undo2,
   FileDown,
   Layout,
-  Layers
+  Layers,
+  Cpu
 } from 'lucide-react';
 
 interface ControlPanelProps {
@@ -49,10 +48,6 @@ export function ControlPanel({
     onDimensionsChange({ ...dimensions, [name]: parseFloat(value) || 0 });
   };
 
-  const handleSliderChange = (values: number[]) => {
-    onDimensionsChange({ ...dimensions, width: values[0] });
-  };
-
   const handleBackToggle = (checked: boolean) => {
     onDimensionsChange({ ...dimensions, hasBack: checked });
   };
@@ -68,7 +63,6 @@ export function ControlPanel({
   const isCatalog = type.startsWith('cabinet_');
   const is3Doors = type.includes('3p') && !type.includes('base_140');
   const isHeightFixed = isCatalog || type === 'rackTV' || type === 'escritorio' || type === 'bajoMesada' || type === 'bajomesada-cajonera' || type === 'porta-anafe';
-  const isWidthSlider = type === 'escritorio';
   const canHaveBack = type === 'bajoMesada' || type === 'alacena' || type === 'biblioteca' || type === 'alacenaFlip' || type === 'bajomesada-cajonera' || type === 'porta-anafe' || isCatalog;
   const forceBack = type === 'placard' || type === 'rackTV' || type.includes('pantry') || type.includes('wall');
   
@@ -78,13 +72,13 @@ export function ControlPanel({
 
   return (
     <Card className="h-full border-none shadow-none rounded-none bg-white overflow-y-auto">
-      <CardHeader className="bg-primary text-primary-foreground py-4 sticky top-0 z-10 shadow-sm">
+      <CardHeader className="bg-slate-900 text-white py-4 sticky top-0 z-10 shadow-sm">
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <Settings2 className="w-5 h-5" /> 
-            <span>Red Arquimax</span>
+            <Cpu className="w-5 h-5 text-primary" /> 
+            <span>JADSI DESIGNER</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal">DISEÑADOR TÉCNICO V15.2</span>
+          <span className="text-[10px] opacity-70 font-normal">SISTEMA PARAMÉTRICO V16.5</span>
         </CardTitle>
       </CardHeader>
       
@@ -107,7 +101,7 @@ export function ControlPanel({
               <SelectItem value="bajomesada-cajonera">Bajo Mesada Cajonera</SelectItem>
               <SelectItem value="porta-anafe">Porta-Anafe</SelectItem>
               
-              <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mt-2 mb-1">Catálogo Dielfe (Industrial)</div>
+              <div className="p-2 text-[10px] font-black text-primary uppercase tracking-widest border-b mt-2 mb-1">Catálogo Industrial JADSI</div>
               <SelectItem value="cabinet_base_120_2p3c">Bajo 1.20m (2P+3C)</SelectItem>
               <SelectItem value="cabinet_base_140_3p3c">Bajo 1.40m (2P+3C)</SelectItem>
               <SelectItem value="cabinet_base_single_60_1p">Bajo 0.60m (1P)</SelectItem>
@@ -213,7 +207,7 @@ export function ControlPanel({
         </div>
 
         <div className="space-y-2 pt-2">
-          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm" onClick={() => onAction('generate')}>
+          <Button className="w-full bg-primary hover:bg-primary/90 text-white font-bold shadow-sm" onClick={() => onAction('generate')}>
             <RefreshCw className="w-4 h-4 mr-2" /> Actualizar Modelo
           </Button>
           

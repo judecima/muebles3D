@@ -9,15 +9,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SteelHouseConfig, SteelWall, LayerVisibility } from '@/lib/steel/types';
 import { 
-  Plus, 
-  Trash2, 
   Home, 
   Layout,
   Layers,
   Maximize2,
   Camera,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Cpu
 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
@@ -47,10 +46,10 @@ export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: 
       <CardHeader className="bg-slate-900 text-white py-4 sticky top-0 z-10 shadow-sm">
         <CardTitle className="text-lg font-bold flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <Home className="w-5 h-5 text-blue-400" /> 
-            <span>ArquiMax Structural v10.0</span>
+            <Cpu className="w-5 h-5 text-primary" /> 
+            <span>JADSI STRUCTURAL</span>
           </div>
-          <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Motor de Auditoría AISI</span>
+          <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Motor AISI v16.0</span>
         </CardTitle>
       </CardHeader>
       
@@ -77,9 +76,9 @@ export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: 
           )}
 
           {structuralAlerts.length === 0 && (
-            <div className="px-4 py-3 bg-green-50 border-b flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
-              <span className="text-[10px] font-black text-green-700 uppercase">Estructura Validada</span>
+            <div className="px-4 py-3 bg-emerald-50 border-b flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Estructura Validada AISI</span>
             </div>
           )}
 
@@ -134,7 +133,7 @@ export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: 
                   { id: 'ext-pan', label: 'Placas Exteriores (OSB)', key: 'exteriorPanels' },
                   { id: 'int-pan', label: 'Placas Interiores (Yeso)', key: 'interiorPanels' },
                   { id: 'profiles', label: 'Perfilería PGC/PGU', key: 'steelProfiles' },
-                  { id: 'blocking', label: 'Blocking Estructural', key: 'horizontalBlocking', color: 'text-green-600' },
+                  { id: 'blocking', label: 'Blocking Estructural', key: 'horizontalBlocking', color: 'text-emerald-600' },
                   { id: 'bracing', label: 'Cruces de San Andrés', key: 'bracing', color: 'text-amber-600' },
                   { id: 'junctions', label: 'Uniones y Refuerzos', key: 'reinforcements', color: 'text-blue-600' }
                 ].map(layer => (
@@ -182,8 +181,8 @@ export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: 
         </Accordion>
 
         <div className="p-4 bg-slate-50 border-t sticky bottom-0 z-20">
-          <Button variant="outline" className="w-full h-9 text-[10px] font-black uppercase tracking-widest gap-2 bg-white" onClick={() => onConfigChange({ ...config })}>
-            <Camera className="w-3.5 h-3.5 text-blue-600" /> Recentrar Cámara
+          <Button variant="outline" className="w-full h-9 text-[10px] font-black uppercase tracking-widest gap-2 bg-white border-slate-200" onClick={() => onConfigChange({ ...config })}>
+            <Camera className="w-3.5 h-3.5 text-primary" /> Recentrar Cámara
           </Button>
         </div>
       </CardContent>

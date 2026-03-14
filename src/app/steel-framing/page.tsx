@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
 import { SteelMaterialsTable } from '@/components/steel/SteelMaterialsTable';
@@ -9,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Menu, 
-  Home, 
   Settings2,
   Compass,
   Box,
@@ -18,14 +18,12 @@ import {
   Trash2,
   DoorOpen,
   Settings,
-  ArrowRightToLine,
   Check,
   LayoutTemplate,
-  UnfoldHorizontal,
-  MoveLeft,
-  MoveRight,
   LogOut,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  Cpu
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -280,11 +278,21 @@ export default function SteelFramingPage() {
       <main className="flex-1 flex flex-col relative overflow-hidden h-full min-h-0">
         <header className={`flex items-center justify-between px-4 md:px-6 py-2 bg-white border-b shadow-sm z-30 shrink-0 transition-transform ${isWalkModeActive ? '-translate-y-full' : ''}`}>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" asChild className="mr-2">
+              <Link href="/">
+                <ChevronLeft className="w-5 h-5" />
+              </Link>
+            </Button>
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild><Button variant="ghost" size="icon" className="md:hidden"><Menu className="w-5 h-5" /></Button></SheetTrigger>
               <SheetContent side="left" className="p-0 w-80"><SteelControlPanel config={config} onConfigChange={setConfig} structuralAlerts={structuralAlerts} /></SheetContent>
             </Sheet>
-            <div className="flex items-center gap-1.5"><Home className="w-4 h-4 text-blue-600" /><span className="text-[10px] font-black uppercase text-slate-800 tracking-tighter">ARQUIMAX WALL ENGINE</span></div>
+            <div className="flex items-center gap-1.5">
+              <div className="bg-primary p-1 rounded">
+                <Cpu className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="text-[10px] font-black uppercase text-slate-800 tracking-tighter">JADSI WALL ENGINE</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="h-8">
@@ -293,7 +301,7 @@ export default function SteelFramingPage() {
                 <TabsTrigger value="materials" className="text-[10px] font-bold uppercase h-6 px-3"><ClipboardList className="w-3 h-3 mr-1.5" /> Listado Materiales</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button variant="default" size="sm" className="h-8 px-4 text-[10px] font-black uppercase bg-blue-600 hover:bg-blue-700 text-white" onClick={() => viewerRef.current?.enterWalkMode()}><Compass className="w-3.5 h-3.5 mr-2" /> Inspección 3P</Button>
+            <Button variant="default" size="sm" className="h-8 px-4 text-[10px] font-black uppercase bg-primary hover:bg-primary/90 text-white" onClick={() => viewerRef.current?.enterWalkMode()}><Compass className="w-3.5 h-3.5 mr-2" /> Inspección 3P</Button>
           </div>
         </header>
 
@@ -322,7 +330,7 @@ export default function SteelFramingPage() {
               />
               {isLoading && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border shadow-xl flex items-center gap-2 z-50">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
                   <span className="text-[10px] font-black uppercase text-slate-700">Analizando Ingeniería AISI...</span>
                 </div>
               )}
@@ -334,20 +342,20 @@ export default function SteelFramingPage() {
         <Dialog open={!!roomGenerator} onOpenChange={(open) => !open && setRoomGenerator(null)}>
           <DialogContent className="sm:max-w-[400px]">
             <DialogHeader>
-              <DialogTitle className="uppercase font-black text-blue-600 flex items-center gap-2">
+              <DialogTitle className="uppercase font-black text-primary flex items-center gap-2">
                 <LayoutTemplate className="w-5 h-5" /> Generar Ambiente
               </DialogTitle>
               <DialogDescription className="text-[10px] font-bold uppercase">Se han detectado tabiques paralelos libres. ¿Deseas unirlos para cerrar el recinto?</DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button onClick={closeRoomWithNewWall} className="w-full bg-blue-600 font-black uppercase text-xs h-11">Unir Tabiques y Cerrar</Button>
+              <Button onClick={closeRoomWithNewWall} className="w-full bg-primary font-black uppercase text-xs h-11">Unir Tabiques y Cerrar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         <Dialog open={!!editingInternalWall} onOpenChange={(open) => !open && setEditingInternalWall(null)}>
           <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader><DialogTitle className="uppercase font-black text-purple-600">Editar Tabique Interno</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="uppercase font-black text-slate-900">Editar Tabique Interno</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase">Largo (mm)</Label>
@@ -362,25 +370,25 @@ export default function SteelFramingPage() {
             </div>
             <DialogFooter className="flex gap-2">
               <Button variant="destructive" onClick={deleteInternalWall} className="flex-1 font-black uppercase text-[10px]"><Trash2 className="w-3 h-3 mr-2" /> Eliminar</Button>
-              <Button onClick={commitInternalWallChange} className="flex-1 bg-purple-600 font-black uppercase text-[10px]"><Check className="w-3 h-3 mr-2" /> Confirmar</Button>
+              <Button onClick={commitInternalWallChange} className="flex-1 bg-primary font-black uppercase text-[10px]"><Check className="w-3 h-3 mr-2" /> Confirmar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         <Dialog open={!!selectedOpening} onOpenChange={(open) => !open && setSelectedOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader><DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-blue-600"><Settings2 className="w-5 h-5" /> Editar Vano {selectedOpening?.isInternal ? '(Interno)' : ''}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black text-primary"><Settings2 className="w-5 h-5" /> Editar Vano {selectedOpening?.isInternal ? '(Interno)' : ''}</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4"><Label className="text-right text-[10px] font-black uppercase text-slate-500">Ancho</Label><Input type="number" value={localOpeningData?.width || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, width: e.target.value } : null)} className="col-span-3" /></div>
               <div className="grid grid-cols-4 items-center gap-4"><Label className="text-right text-[10px] font-black uppercase text-slate-500">Offset (mm)</Label><Input type="number" value={localOpeningData?.position || ''} onChange={(e) => setLocalOpeningData(prev => prev ? { ...prev, position: e.target.value } : null)} className="col-span-3" /></div>
             </div>
-            <DialogFooter className="flex gap-2"><Button variant="destructive" onClick={deleteOpening} className="flex-1 font-black uppercase text-[10px]"><Trash2 className="w-3 h-3 mr-2" /> Eliminar</Button><Button onClick={commitOpeningChange} className="flex-1 bg-blue-600 font-black uppercase text-[10px]">Guardar</Button></DialogFooter>
+            <DialogFooter className="flex gap-2"><Button variant="destructive" onClick={deleteOpening} className="flex-1 font-black uppercase text-[10px]"><Trash2 className="w-3 h-3 mr-2" /> Eliminar</Button><Button onClick={commitOpeningChange} className="flex-1 bg-primary font-black uppercase text-[10px]">Guardar</Button></DialogFooter>
           </DialogContent>
         </Dialog>
 
         <Dialog open={!!addingOpening} onOpenChange={(open) => !open && setAddingOpening(null)}>
           <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader><DialogTitle className="font-black text-green-600 uppercase">Nuevo Vano</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="font-black text-slate-900 uppercase">Nuevo Vano</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black">Tipo</Label>
@@ -392,7 +400,7 @@ export default function SteelFramingPage() {
               <div className="grid grid-cols-4 items-center gap-4"><Label className="text-right text-[10px] font-black">Ancho</Label><Input type="number" value={newOpData.width} onChange={(e) => setNewOpeningData({ ...newOpData, width: parseInt(e.target.value) || 0 })} className="col-span-3" /></div>
               <div className="grid grid-cols-4 items-center gap-4"><Label className="text-right text-[10px] font-black">Altura</Label><Input type="number" value={newOpData.height} onChange={(e) => setNewOpeningData({ ...newOpData, height: parseInt(e.target.value) || 0 })} className="col-span-3" /></div>
             </div>
-            <DialogFooter><Button onClick={createOpening} className="w-full bg-green-600 font-black uppercase text-xs h-11">Insertar</Button></DialogFooter>
+            <DialogFooter><Button onClick={createOpening} className="w-full bg-primary font-black uppercase text-xs h-11">Insertar</Button></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -400,8 +408,8 @@ export default function SteelFramingPage() {
           <DialogContent className="sm:max-w-[400px]">
             <DialogHeader><DialogTitle className="uppercase font-black text-slate-800 tracking-tighter">Opciones de Tabique</DialogTitle></DialogHeader>
             <div className="grid grid-cols-2 gap-4 py-6">
-              <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-blue-500 hover:bg-blue-50 transition-all group" onClick={() => { setAddingOpening({ wallId: wallActionChoice!.id, x: wallActionChoice!.lastClickX || wallActionChoice!.length / 2, isInternal: true }); setNewOpeningData({ type: 'door', width: 900, height: 2050, sill: 0 }); setWallActionChoice(null); }}><DoorOpen className="w-8 h-8 text-slate-400 group-hover:text-blue-600" /><span className="font-black uppercase text-[10px]">Sumar Puerta</span></Button>
-              <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-purple-500 hover:bg-blue-50 transition-all group" onClick={() => { setEditingInternalWall(wallActionChoice); setLocalIWData({ length: wallActionChoice!.length.toString(), xPosition: Math.round(wallActionChoice!.xPosition).toString() }); setWallActionChoice(null); }}><Settings className="w-8 h-8 text-slate-400 group-hover:text-purple-600" /><span className="font-black uppercase text-[10px]">Editar Estructura</span></Button>
+              <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-primary hover:bg-primary/5 transition-all group" onClick={() => { setAddingOpening({ wallId: wallActionChoice!.id, x: wallActionChoice!.lastClickX || wallActionChoice!.length / 2, isInternal: true }); setNewOpeningData({ type: 'door', width: 900, height: 2050, sill: 0 }); setWallActionChoice(null); }}><DoorOpen className="w-8 h-8 text-slate-400 group-hover:text-primary" /><span className="font-black uppercase text-[10px]">Sumar Puerta</span></Button>
+              <Button variant="outline" className="flex flex-col h-32 gap-3 border-2 hover:border-slate-900 hover:bg-slate-50 transition-all group" onClick={() => { setEditingInternalWall(wallActionChoice); setLocalIWData({ length: wallActionChoice!.length.toString(), xPosition: Math.round(wallActionChoice!.xPosition).toString() }); setWallActionChoice(null); }}><Settings className="w-8 h-8 text-slate-400 group-hover:text-slate-900" /><span className="font-black uppercase text-[10px]">Editar Estructura</span></Button>
             </div>
           </DialogContent>
         </Dialog>
