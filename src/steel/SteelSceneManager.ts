@@ -297,6 +297,11 @@ export class SteelSceneManager {
         structuralGroup.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, this.profileWidth, headerHeight));
       }
 
+      // RENDERIZADO DE SOLERA DE ANTEPECHO (PGU HORIZONTAL INFERIOR DE VENTANA)
+      if (op.type === 'window') {
+        structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
+      }
+
       headerData.cripples.forEach((c: any) => structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple)));
     });
   }
