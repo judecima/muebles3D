@@ -29,7 +29,6 @@ const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   alacenaFlip: { width: 500, height: 300, depth: 320, thickness: 18, hasBack: true, hasShelf: false },
   'bajomesada-cajonera': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true },
   'porta-anafe': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
-  // Nuevos modelos catálogo Dielfe
   'cabinet_base_120_2p3c': { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
   'cabinet_base_140_3p3c': { width: 1400, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
   'cabinet_wall_60_1p': { width: 600, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
@@ -40,6 +39,8 @@ const DEFAULT_DIMENSIONS: Record<FurnitureType, FurnitureDimensions> = {
   'cabinet_hood_60': { width: 600, height: 300, depth: 320, thickness: 18, hasBack: true },
   'cabinet_base_single_60_1p': { width: 600, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
   'cabinet_base_double_80_2p': { width: 800, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_base_3p': { width: 1200, height: 870, depth: 600, thickness: 18, hasBack: true, hasShelf: true },
+  'cabinet_wall_3p': { width: 1200, height: 600, depth: 320, thickness: 18, hasBack: true, hasShelf: true },
 };
 
 export default function Home() {
@@ -53,24 +54,26 @@ export default function Home() {
   const [hasDrawers, setHasDrawers] = useState(false);
   const [selectedPanel, setSelectedPanel] = useState<PanelSize>(AVAILABLE_PANELS[0]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const viewerRef = useRef<{ getScreenshot: () => string }>(null);
 
-  const getEngine = (t: FurnitureType) => {
-    if (t.startsWith('cabinet_')) {
-      return (d: FurnitureDimensions) => require('@/engines/kitchenCatalogEngine').kitchenCatalogEngine(t, d);
-    }
-    switch (t) {
-      case 'bajoMesada': return require('@/engines/kitchenBaseEngine').kitchenBaseEngine;
-      case 'escritorio': return require('@/engines/deskEngine').deskEngine;
-      case 'rackTV': return require('@/engines/tvRackEngine').tvRackEngine;
-      case 'alacena': return require('@/engines/kitchenWallEngine').kitchenWallEngine;
-      case 'placard': return require('@/engines/closetEngine').closetEngine;
-      case 'biblioteca': return require('@/engines/bookshelfEngine').bookshelfEngine;
-      case 'alacenaFlip': return require('@/engines/superiorWallFlipEngine').superiorWallFlipEngine;
-      case 'bajomesada-cajonera': return require('@/engines/kitchenDrawerEngine').kitchenDrawerEngine;
-      case 'porta-anafe': return require('@/engines/kitchenCooktopEngine').kitchenCooktopEngine;
-      default: return () => ({ parts: [], summary: '', hasDoors: false, hasDrawers: false });
+  const generateFurniture = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/furniture/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, dimensions })
+      });
+      const result: FurnitureModel = await res.json();
+      setParts(result.parts);
+      setHasDoors(result.hasDoors);
+      setHasDrawers(result.hasDrawers);
+    } catch (e) {
+      console.error("Error generating furniture:", e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -78,14 +81,6 @@ export default function Home() {
     setDimensions(DEFAULT_DIMENSIONS[type]);
     setAction('reset');
   }, [type]);
-
-  const generateFurniture = () => {
-    const engine = getEngine(type);
-    const result: FurnitureModel = engine(dimensions);
-    setParts(result.parts);
-    setHasDoors(result.hasDoors);
-    setHasDrawers(result.hasDrawers);
-  };
 
   useEffect(() => {
     generateFurniture();
@@ -261,6 +256,11 @@ export default function Home() {
               <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full border border-slate-200 shadow-sm pointer-events-none">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{type.replace(/_/g, ' ')}</span>
               </div>
+              {isLoading && (
+                <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-50">
+                  <Settings2 className="w-8 h-8 text-primary animate-spin" />
+                </div>
+              )}
             </div>
             <div className="h-1/3 border-t bg-white min-h-[200px] shrink-0">
               <CutlistTable parts={parts} />

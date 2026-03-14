@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -9,6 +8,7 @@ import { SteelJoystick } from './SteelJoystick';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
+  structuralResult?: any;
   onOpeningDoubleClick?: (wallId: string, opening: SteelOpening, isInternal?: boolean) => void;
   onInternalWallDoubleClick?: (iw: InternalWall, x: number) => void;
   onWallDoubleClick?: (wallId: string, x: number, side: 'exterior' | 'interior') => void;
@@ -18,6 +18,7 @@ interface SteelViewerProps {
 
 export const SteelViewer = forwardRef(({ 
   config, 
+  structuralResult,
   onOpeningDoubleClick, 
   onInternalWallDoubleClick,
   onWallDoubleClick, 
@@ -70,10 +71,10 @@ export const SteelViewer = forwardRef(({
   }, [onOpeningDoubleClick, onWallDoubleClick, onInternalWallDoubleClick, onFloorDoubleClick, onWalkModeLock]);
 
   useEffect(() => {
-    if (managerRef.current) {
-      managerRef.current.buildHouse(config);
+    if (managerRef.current && structuralResult) {
+      managerRef.current.buildHouse(config, structuralResult);
     }
-  }, [config]);
+  }, [config, structuralResult]);
 
   return (
     <div className="w-full h-full relative">

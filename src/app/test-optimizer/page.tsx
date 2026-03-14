@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { runOptimization } from '@/optimizer/cutOptimizer';
 import { OptimizationResult, GrainDirection } from '@/lib/types';
 import { 
   Target, 
@@ -30,7 +29,6 @@ interface PartInput {
   grainDirection: GrainDirection;
 }
 
-// DATASET MESOPOTAMIA GRIS TAPIR (23 PIEZAS EXACTAS XML)
 const MESOPOTAMIA_DATASET: PartInput[] = [
   { name: "(1) Lat Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
   { name: "(2) Lateral V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
@@ -64,21 +62,28 @@ export default function TestOptimizerPage() {
     setParts(newParts);
   };
 
-  const handleOptimize = () => {
+  const handleOptimize = async () => {
     setLoading(true);
-    setTimeout(() => {
-      try {
-        const res = runOptimization(
-          parts.map(p => ({ ...p, thickness: 18 })),
-          2750, 1830, 18, 4.5, 10
-        );
-        setResult(res);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    try {
+      const res = await fetch('/api/cutting/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parts: parts.map(p => ({ ...p, thickness: 18 })),
+          width: 2750,
+          height: 1830,
+          thickness: 18,
+          kerf: 4.5,
+          trim: 10
+        })
+      });
+      const data = await res.json();
+      setResult(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -244,7 +249,7 @@ export default function TestOptimizerPage() {
                                      left: `${(p.x / (2750 - result.trim * 2)) * 100}%`,
                                      top: `${(p.y / (1830 - result.trim * 2)) * 100}%`,
                                      width: `${(p.width / (2750 - result.trim * 2)) * 100}%`,
-                                     height: `${(p.height / (1830 - result.trim * 2)) * 100}%`,
+                                     height: `${(p.height / (2750 - result.trim * 2)) * 100}%`,
                                      backgroundColor: p.color || 'rgba(174, 26, 226, 0.2)'
                                    }}>
                                 {/* Base (Width) - Línea Inferior */}

@@ -5,8 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Part, AVAILABLE_PANELS, PanelSize, GrainDirection, OptimizationResult } from '@/lib/types';
-import { runOptimization } from '@/optimizer/cutOptimizer';
-import { generateCutListFromModel, CutlistPart } from '@/utils/cutlistGenerator';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +39,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [localCutlist, setLocalCutlist] = useState<CutlistPart[]>([]);
+  const [localCutlist, setLocalCutlist] = useState<any[]>([]);
   const [isPartsListOpen, setIsPartsListOpen] = useState(false);
   const [isDetailedListOpen, setIsDetailedListOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -50,8 +48,21 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   const availableThicknesses = Array.from(new Set(parts.map(p => p.cutEspesor))).sort((a, b) => b - a);
 
   useEffect(() => {
-    const newList = generateCutListFromModel(parts);
-    setLocalCutlist(newList);
+    // Generar lista de corte agrupada en el cliente
+    const woodParts = parts.filter(p => !p.isHardware);
+    const aggregated = woodParts.reduce((acc, part) => {
+      const l = Math.round(part.cutLargo);
+      const a = Math.round(part.cutAncho);
+      const e = Math.round(part.cutEspesor);
+      const key = `${part.name}-${l}-${a}-${e}-${part.grainDirection}`;
+      if (!acc[key]) {
+        acc[key] = { name: part.name, width: l, height: a, quantity: 0, grainDirection: part.grainDirection, thickness: e };
+      }
+      acc[key].quantity += 1;
+      return acc;
+    }, {} as Record<string, any>);
+
+    setLocalCutlist(Object.values(aggregated));
     setResult(null);
     setError(null);
     
@@ -67,7 +78,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setResult(null);
   };
 
-  const handleOptimize = () => {
+  const handleOptimize = async () => {
     const filteredParts = localCutlist.filter(p => p.thickness === targetThickness);
     
     if (filteredParts.length === 0) {
@@ -78,29 +89,31 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
     setLoading(true);
     setError(null);
     
-    setTimeout(() => {
-      try {
-        const res = runOptimization(
-          localCutlist,
-          selectedPanel.width,
-          selectedPanel.height,
-          targetThickness,
-          4.5, 
-          10   
-        );
-
-        if (res.optimizedLayout.length === 0) {
-          setError("Piezas demasiado grandes para el panel.");
-        } else {
-          setResult(res);
-        }
-      } catch (e) {
-        console.error(e);
-        setError("Error en cálculo industrial.");
-      } finally {
-        setLoading(false);
+    try {
+      const res = await fetch('/api/cutting/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parts: localCutlist,
+          width: selectedPanel.width,
+          height: selectedPanel.height,
+          thickness: targetThickness,
+          kerf: 4.5,
+          trim: 10
+        })
+      });
+      const data = await res.json();
+      if (data.optimizedLayout.length === 0) {
+        setError("Piezas demasiado grandes para el panel.");
+      } else {
+        setResult(data);
       }
-    }, 100);
+    } catch (e) {
+      console.error(e);
+      setError("Error en cálculo industrial.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exportPDF = async () => {
@@ -130,7 +143,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
   return (
     <div className="flex-1 w-full bg-slate-50 overflow-y-auto">
       <div className="flex flex-col gap-6 p-4 md:p-8 max-w-7xl mx-auto pb-40">
-        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-primary text-white rounded-t-lg flex flex-row items-center justify-between">
@@ -187,7 +199,7 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                     {localCutlist.filter(p => p.thickness === targetThickness).map((part, idx) => (
                       <div key={idx} className="p-2 bg-slate-50 rounded border flex flex-col gap-1">
                         <span className="text-[9px] font-bold truncate">{part.name} (x{part.quantity})</span>
-                        <Select value={part.grainDirection} onValueChange={(val) => updateGrain(localCutlist.findIndex(p => p === part), val as GrainDirection)}>
+                        <Select value={part.grainDirection} onValueChange={(val) => updateGrain(idx, val as GrainDirection)}>
                           <SelectTrigger className="h-7 text-[9px] bg-white"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="libre">Libre</SelectItem>
@@ -296,14 +308,6 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                   <div className="relative bg-slate-200 shadow-2xl rounded-sm mx-auto overflow-hidden" 
                        style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                     
-                    {/* Área de Refilado (Trim) */}
-                    <div className="absolute inset-0 bg-slate-400/20 pointer-events-none z-10" 
-                         style={{ 
-                           borderStyle: 'solid', 
-                           borderWidth: `${(result.trim / selectedPanel.height) * 100}% ${(result.trim / selectedPanel.width) * 100}%` 
-                         }}>
-                    </div>
-
                     {/* Área Útil de Trabajo */}
                     <div className="absolute bg-white" style={{ 
                       left: `${(result.trim / selectedPanel.width) * 100}%`, 
@@ -324,11 +328,8 @@ export function OptimizerPanel({ parts, selectedPanel, onPanelChange }: Optimize
                                backgroundColor: p.color || 'rgba(174, 26, 226, 0.15)'
                              }}>
                           <div className="relative w-full h-full overflow-hidden pointer-events-none">
-                            {/* Medida Base */}
                             <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">{p.width}</span>
-                            {/* Medida Altura */}
                             <span className="absolute left-0.5 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[min(1.8vw,10px)] font-black text-slate-900 leading-none whitespace-nowrap">{p.height}</span>
-                            {/* Nombre de Pieza */}
                             <div className="absolute inset-0 flex items-center justify-center p-1 text-center"><span className="text-[min(1.4vw,9px)] text-slate-700 uppercase font-bold truncate w-full px-2">{p.name}</span></div>
                           </div>
                         </div>

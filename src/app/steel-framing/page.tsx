@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { SteelViewer } from '@/components/steel/SteelViewer';
 import { SteelControlPanel } from '@/components/steel/SteelControlPanel';
 import { SteelMaterialsTable } from '@/components/steel/SteelMaterialsTable';
-import { SteelHouseConfig, SteelWall, SteelOpening, OpeningType, InternalWall } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelWall, SteelOpening, OpeningType, InternalWall, MaterialEstimate } from '@/lib/steel/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -24,14 +24,14 @@ import {
   UnfoldHorizontal,
   MoveLeft,
   MoveRight,
-  LogOut
+  LogOut,
+  Loader2
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { StructuralEngine } from '@/utils/steel/structuralEngine';
 
 const EDGE_MARGIN_EXTERIOR = 400; 
 const EDGE_MARGIN_INTERNAL = 50; 
@@ -67,8 +67,11 @@ const INITIAL_CONFIG: SteelHouseConfig = {
 
 export default function SteelFramingPage() {
   const [config, setConfig] = useState<SteelHouseConfig>(INITIAL_CONFIG);
+  const [structuralResult, setStructuralResult] = useState<any>(null);
   const [structuralAlerts, setStructuralAlerts] = useState<any[]>([]);
+  const [materialEstimate, setMaterialEstimate] = useState<MaterialEstimate | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening, isInternal?: boolean } | null>(null);
   const [localOpeningData, setLocalOpeningData] = useState<{ width: string, position: string } | null>(null);
@@ -87,6 +90,25 @@ export default function SteelFramingPage() {
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
   const viewerRef = useRef<{ enterWalkMode: () => void, exitWalkMode: () => void }>(null);
 
+  const fetchAnalysis = async (currentConfig: SteelHouseConfig) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/steel/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentConfig)
+      });
+      const data = await res.json();
+      setStructuralResult(data);
+      setStructuralAlerts(data.alerts || []);
+      setMaterialEstimate(data.estimate);
+    } catch (e) {
+      console.error("Error fetching structural analysis:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const newWalls = config.walls.map(w => {
       if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
@@ -95,19 +117,17 @@ export default function SteelFramingPage() {
       if (w.id === 'w4') return { ...w, length: config.length, x: -config.width/2, z: config.length/2 };
       return w;
     });
-    setConfig(prev => ({ ...prev, walls: newWalls }));
-    setStructuralAlerts(StructuralEngine.validateStructure(config));
+    const updatedConfig = { ...config, walls: newWalls };
+    setConfig(updatedConfig);
+    fetchAnalysis(updatedConfig);
   }, [config.width, config.length]);
 
-  const getWallSegments = useCallback((wallId: string, clickX: number, totalLength: number, isInternalWall: boolean) => {
+  const getWallSegments = (wallId: string, clickX: number, totalLength: number, isInternalWall: boolean) => {
     const baseMargin = isInternalWall ? EDGE_MARGIN_INTERNAL : EDGE_MARGIN_EXTERIOR;
     const boundaries = [0];
     
     config.internalWalls.forEach(iw => {
       if (iw.parentWallId === wallId) boundaries.push(iw.xPosition);
-      if (iw.id === wallId) {
-        // En caso de intersecciones cruzadas complejas
-      }
     });
 
     const sortedBounds = Array.from(new Set([...boundaries, totalLength])).sort((a, b) => a - b);
@@ -121,7 +141,7 @@ export default function SteelFramingPage() {
       }
     }
     return { start: 0, end: totalLength, min: baseMargin, max: totalLength - baseMargin };
-  }, [config.internalWalls]);
+  };
 
   const handleOpeningDoubleClick = useCallback((wallId: string, opening: SteelOpening, isInternal?: boolean) => {
     const wall = isInternal ? config.internalWalls.find(iw => iw.id === wallId) : config.walls.find(w => w.id === wallId);
@@ -129,7 +149,7 @@ export default function SteelFramingPage() {
     const bounds = getWallSegments(wallId, opening.position + opening.width / 2, wall.length, !!isInternal);
     setSelectedOpening({ wallId, opening, isInternal });
     setLocalOpeningData({ width: opening.width.toString(), position: Math.round(opening.position - bounds.start).toString() });
-  }, [config.walls, config.internalWalls, getWallSegments]);
+  }, [config.walls, config.internalWalls]);
 
   const commitOpeningChange = () => {
     if (!selectedOpening || !localOpeningData) return;
@@ -142,21 +162,27 @@ export default function SteelFramingPage() {
     const finalW = Math.min(inputW, bounds.max - bounds.min);
     const finalP = Math.max(bounds.min, Math.min(absPos, bounds.max - finalW));
 
+    let updatedConfig;
     if (selectedOpening.isInternal) {
-      setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : iw) }));
+      updatedConfig = { ...config, internalWalls: config.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : iw) };
     } else {
-      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : w) }));
+      updatedConfig = { ...config, walls: config.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : w) };
     }
+    setConfig(updatedConfig);
+    fetchAnalysis(updatedConfig);
     setSelectedOpening(null);
   };
 
   const deleteOpening = () => {
     if (!selectedOpening) return;
+    let updatedConfig;
     if (selectedOpening.isInternal) {
-      setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.filter(o => o.id !== selectedOpening.opening.id) } : iw) }));
+      updatedConfig = { ...config, internalWalls: config.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.filter(o => o.id !== selectedOpening.opening.id) } : iw) };
     } else {
-      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.filter(o => o.id !== selectedOpening.opening.id) } : w) }));
+      updatedConfig = { ...config, walls: config.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.filter(o => o.id !== selectedOpening.opening.id) } : w) };
     }
+    setConfig(updatedConfig);
+    fetchAnalysis(updatedConfig);
     setSelectedOpening(null);
   };
 
@@ -168,8 +194,6 @@ export default function SteelFramingPage() {
     const parent = config.walls.find(w => w.id === wallId);
     if (!parent) return;
 
-    const bounds = getWallSegments(wallId, x, parent.length, false);
-
     if (side === 'exterior') {
       setAddingOpening({ wallId, x, isInternal: false });
       setNewOpeningData({ type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL });
@@ -177,21 +201,27 @@ export default function SteelFramingPage() {
       const targetRot = (parent.rotation - 90 + 360) % 360;
       let maxLen = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
       const newIW: InternalWall = { id: Math.random().toString(36).substr(2, 9), parentWallId: wallId, xPosition: Math.round(x), length: Math.min(2000, maxLen), height: config.globalWallHeight, rotation: targetRot, x: 0, z: 0, openings: [] };
-      setConfig(prev => ({ ...prev, internalWalls: [...prev.internalWalls, newIW] }));
+      const updatedConfig = { ...config, internalWalls: [...config.internalWalls, newIW] };
+      setConfig(updatedConfig);
+      fetchAnalysis(updatedConfig);
       setEditingInternalWall(newIW);
       setLocalIWData({ length: newIW.length.toString(), xPosition: Math.round(x).toString() });
     }
-  }, [config.walls, config.globalWallHeight, config.width, config.length, getWallSegments]);
+  }, [config]);
 
   const commitInternalWallChange = () => {
     if (!editingInternalWall || !localIWData) return;
-    setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === editingInternalWall.id ? { ...iw, length: parseInt(localIWData.length) || 500, xPosition: parseInt(localIWData.xPosition) || 0 } : iw) }));
+    const updatedConfig = { ...config, internalWalls: config.internalWalls.map(iw => iw.id === editingInternalWall.id ? { ...iw, length: parseInt(localIWData.length) || 500, xPosition: parseInt(localIWData.xPosition) || 0 } : iw) };
+    setConfig(updatedConfig);
+    fetchAnalysis(updatedConfig);
     setEditingInternalWall(null);
   };
 
   const deleteInternalWall = () => {
     if (!editingInternalWall) return;
-    setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.filter(iw => iw.id !== editingInternalWall.id) }));
+    const updatedConfig = { ...config, internalWalls: config.internalWalls.filter(iw => iw.id !== editingInternalWall.id) };
+    setConfig(updatedConfig);
+    fetchAnalysis(updatedConfig);
     setEditingInternalWall(null);
   };
 
@@ -215,98 +245,10 @@ export default function SteelFramingPage() {
       rotation: (p1.rotation + 90) % 360,
       x: 0, z: 0, openings: []
     };
-    setConfig(prev => ({ ...prev, internalWalls: [...prev.internalWalls, newWall] }));
+    const updatedConfig = { ...config, internalWalls: [...config.internalWalls, newWall] };
+    setConfig(updatedConfig);
+    fetchAnalysis(updatedConfig);
     setRoomGenerator(null);
-  };
-
-  const extendToNextWall = () => {
-    if (!editingInternalWall || !localIWData) return;
-    const currentLength = parseInt(localIWData.length) || editingInternalWall.length;
-    
-    const getWallGlobalSegment = (wall: SteelWall | InternalWall) => {
-      if ('rotation' in wall && !('parentWallId' in wall)) {
-        const sw = wall as SteelWall;
-        const angle = (sw.rotation * Math.PI) / 180;
-        return {
-          p1: { x: sw.x, z: sw.z },
-          p2: { x: sw.x + Math.cos(angle) * sw.length, z: sw.z - Math.sin(angle) * sw.length }
-        };
-      }
-      const iw = wall as InternalWall;
-      const parent = config.walls.find(w => w.id === iw.parentWallId) || config.internalWalls.find(w => w.id === iw.parentWallId);
-      if (!parent) return { p1: {x:0, z:0}, p2: {x:0, z:0} };
-      const parentSeg = getWallGlobalSegment(parent);
-      const parentAngle = (parent.rotation * Math.PI) / 180;
-      const startX = parentSeg.p1.x + Math.cos(parentAngle) * iw.xPosition;
-      const startZ = parentSeg.p1.z - Math.sin(parentAngle) * iw.xPosition;
-      const angle = (iw.rotation * Math.PI) / 180;
-      return {
-        p1: { x: startX, z: startZ },
-        p2: { x: startX + Math.cos(angle) * iw.length, z: startZ - Math.sin(angle) * iw.length }
-      };
-    };
-
-    const seg = getWallGlobalSegment(editingInternalWall);
-    const dir = { x: Math.cos((editingInternalWall.rotation * Math.PI) / 180), z: -Math.sin((editingInternalWall.rotation * Math.PI) / 180) };
-    
-    const otherWalls = [
-      ...config.walls,
-      ...config.internalWalls.filter(iw => iw.id !== editingInternalWall.id && iw.id !== editingInternalWall.parentWallId)
-    ];
-
-    const intersections: number[] = [];
-    otherWalls.forEach(w => {
-      const otherSeg = getWallGlobalSegment(w);
-      const x1 = seg.p1.x, z1 = seg.p1.z, x2 = seg.p1.x + dir.x * 10000, z2 = seg.p1.z + dir.z * 10000;
-      const x3 = otherSeg.p1.x, z3 = otherSeg.p1.z, x4 = otherSeg.p2.x, z4 = otherSeg.p2.z;
-      const den = (x1 - x2) * (z3 - z4) - (z1 - z2) * (x3 - x4);
-      if (Math.abs(den) < 0.01) return;
-      const t = ((x1 - x3) * (z3 - z4) - (z1 - z3) * (x3 - x4)) / den;
-      const u = -((x1 - x2) * (z1 - z3) - (z1 - z2) * (x1 - x3)) / den;
-      if (t > 0 && u >= 0 && u <= 1) {
-        intersections.push(Math.round(t * 10000));
-      }
-    });
-
-    const sorted = Array.from(new Set(intersections)).sort((a, b) => a - b);
-    const next = sorted.find(d => d > currentLength + 50);
-    const finalLen = next || sorted[0] || currentLength;
-    
-    setLocalIWData(prev => prev ? { ...prev, length: finalLen.toString() } : null);
-  };
-
-  const joinWithParallel = (side: 'left' | 'right') => {
-    if (!editingInternalWall || !localIWData) return;
-    const currentLength = parseInt(localIWData.length) || editingInternalWall.length;
-    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId) || config.internalWalls.find(w => w.id === editingInternalWall.parentWallId);
-    if (!parent) return;
-
-    const parallels = config.internalWalls.filter(iw => iw.parentWallId === parent.id && iw.id !== editingInternalWall.id);
-    const sorted = parallels.sort((a, b) => a.xPosition - b.xPosition);
-    let target: InternalWall | null = null;
-    if (side === 'left') target = sorted.reverse().find(iw => iw.xPosition < editingInternalWall.xPosition) || null;
-    else target = sorted.find(iw => iw.xPosition > editingInternalWall.xPosition) || null;
-
-    let dist = 0;
-    if (target) {
-      dist = Math.abs(editingInternalWall.xPosition - target.xPosition);
-    } else {
-      dist = side === 'left' ? editingInternalWall.xPosition : (parent.length - editingInternalWall.xPosition);
-    }
-
-    if (dist > 0) {
-      const bridge: InternalWall = {
-        id: Math.random().toString(36).substr(2, 9),
-        parentWallId: editingInternalWall.id,
-        xPosition: currentLength,
-        length: dist,
-        height: editingInternalWall.height,
-        rotation: (editingInternalWall.rotation + (side === 'left' ? -90 : 90) + 360) % 360,
-        x: 0, z: 0, openings: []
-      };
-      setConfig(prev => ({ ...prev, internalWalls: [...prev.internalWalls, bridge] }));
-      setEditingInternalWall(null);
-    }
   };
 
   const createOpening = () => {
@@ -317,11 +259,15 @@ export default function SteelFramingPage() {
     const finalW = Math.min(newOpData.width, bounds.max - bounds.min);
     const finalP = Math.max(bounds.min, Math.min(addingOpening.x - finalW / 2, bounds.max - finalW));
     const newOp: SteelOpening = { id: Math.random().toString(36).substr(2, 9), type: newOpData.type, width: finalW, height: newOpData.height, position: finalP, sillHeight: newOpData.type === 'window' ? newOpData.sill : 0 };
+    
+    let updatedConfig;
     if (addingOpening.isInternal) {
-      setConfig(prev => ({ ...prev, internalWalls: prev.internalWalls.map(iw => iw.id === wall.id ? { ...iw, openings: [...iw.openings, newOp] } : iw) }));
+      updatedConfig = { ...config, internalWalls: config.internalWalls.map(iw => iw.id === wall.id ? { ...iw, openings: [...iw.openings, newOp] } : iw) };
     } else {
-      setConfig(prev => ({ ...prev, walls: prev.walls.map(w => w.id === wall.id ? { ...w, openings: [...w.openings, newOp] } : w) }));
+      updatedConfig = { ...config, walls: config.walls.map(w => w.id === wall.id ? { ...w, openings: [...w.openings, newOp] } : w) };
     }
+    setConfig(updatedConfig);
+    fetchAnalysis(updatedConfig);
     setAddingOpening(null);
   };
 
@@ -367,14 +313,21 @@ export default function SteelFramingPage() {
               <SteelViewer 
                 ref={viewerRef}
                 config={config} 
+                structuralResult={structuralResult}
                 onOpeningDoubleClick={handleOpeningDoubleClick}
                 onInternalWallDoubleClick={handleInternalWallDoubleClick}
                 onWallDoubleClick={handleWallDoubleClick}
                 onFloorDoubleClick={handleFloorDoubleClick}
                 onWalkModeLock={(locked) => setIsWalkModeActive(locked)}
               />
+              {isLoading && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border shadow-xl flex items-center gap-2 z-50">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <span className="text-[10px] font-black uppercase text-slate-700">Analizando Ingeniería AISI...</span>
+                </div>
+              )}
             </TabsContent>
-            <TabsContent value="materials" className="w-full h-full m-0 bg-slate-50 overflow-y-auto p-4 md:p-8"><div className="max-w-4xl mx-auto"><SteelMaterialsTable config={config} /></div></TabsContent>
+            <TabsContent value="materials" className="w-full h-full m-0 bg-slate-50 overflow-y-auto p-4 md:p-8"><div className="max-w-4xl mx-auto"><SteelMaterialsTable estimate={materialEstimate} /></div></TabsContent>
           </Tabs>
         </div>
 
@@ -400,23 +353,11 @@ export default function SteelFramingPage() {
                 <Label className="text-right text-[10px] font-black uppercase">Largo (mm)</Label>
                 <div className="col-span-3 flex gap-2">
                   <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} className="flex-1" />
-                  <Button variant="outline" size="icon" onClick={extendToNextWall} title="Proyectar a próxima pared"><ArrowRightToLine className="w-4 h-4" /></Button>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black uppercase">Posición (mm)</Label>
                 <Input type="number" value={localIWData?.xPosition || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, xPosition: e.target.value } : null)} className="col-span-3" />
-              </div>
-              <div className="space-y-3 mt-2 border-t pt-4">
-                <Label className="text-[9px] font-black uppercase text-slate-400">Uniones Inteligentes</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" onClick={() => joinWithParallel('left')} className="text-[10px] font-black uppercase h-10 gap-2">
-                    <MoveLeft className="w-3 h-3" /> Cerrar Izquierda
-                  </Button>
-                  <Button variant="outline" onClick={() => joinWithParallel('right')} className="text-[10px] font-black uppercase h-10 gap-2">
-                    Cerrar Derecha <MoveRight className="w-3 h-3" />
-                  </Button>
-                </div>
               </div>
             </div>
             <DialogFooter className="flex gap-2">

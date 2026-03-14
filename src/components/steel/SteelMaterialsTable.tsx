@@ -1,6 +1,5 @@
 import React from 'react';
-import { SteelHouseConfig } from '@/lib/steel/types';
-import { calculateSteelMaterials } from '@/utils/steel/materialCalculator';
+import { MaterialEstimate } from '@/lib/steel/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,11 +16,11 @@ import {
 } from 'lucide-react';
 
 interface SteelMaterialsTableProps {
-  config: SteelHouseConfig;
+  estimate: MaterialEstimate | null;
 }
 
-export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
-  const estimate = calculateSteelMaterials(config);
+export function SteelMaterialsTable({ estimate }: SteelMaterialsTableProps) {
+  if (!estimate) return <div className="p-8 text-center text-slate-400 font-bold uppercase">Esperando análisis estructural...</div>;
 
   const categories = {
     perfileria: { label: 'Estructura Metálica', color: 'bg-slate-100 text-slate-700', icon: Layers },
@@ -36,7 +35,6 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
 
   return (
     <div className="space-y-6">
-      {/* Resumen Ejecutivo de Obra */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-none border-slate-200 bg-white">
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
@@ -78,7 +76,6 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
         </Card>
       </div>
 
-      {/* Listado Detallado por Rubro */}
       <Card className="shadow-none border-slate-200 overflow-hidden">
         <CardHeader className="bg-slate-900 text-white py-3 px-4">
           <CardTitle className="text-xs font-bold flex items-center gap-2">
@@ -97,7 +94,7 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
             </TableHeader>
             <TableBody>
               {estimate.items.map((item, idx) => {
-                const CatIcon = categories[item.category].icon;
+                const CatIcon = categories[item.category as keyof typeof categories].icon;
                 return (
                   <TableRow key={idx} className="h-12 hover:bg-slate-50 transition-colors">
                     <TableCell className="py-2">
@@ -107,9 +104,9 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
                       </div>
                     </TableCell>
                     <TableCell className="py-2">
-                      <Badge variant="secondary" className={`text-[8px] font-black uppercase px-1.5 h-5 flex items-center gap-1 border-none shadow-none ${categories[item.category].color}`}>
+                      <Badge variant="secondary" className={`text-[8px] font-black uppercase px-1.5 h-5 flex items-center gap-1 border-none shadow-none ${categories[item.category as keyof typeof categories].color}`}>
                         <CatIcon className="w-3 h-3" />
-                        {categories[item.category].label}
+                        {categories[item.category as keyof typeof categories].label}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right text-[11px] font-black text-slate-900 py-2">
@@ -125,28 +122,6 @@ export function SteelMaterialsTable({ config }: SteelMaterialsTableProps) {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Notas Técnicas de Obra */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
-          <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="text-[10px] text-blue-700 leading-relaxed font-bold uppercase">Criterio de Cálculo de Placas:</p>
-            <p className="text-[10px] text-blue-600 leading-relaxed font-medium">
-              Se descuenta el 100% del área de vanos para placas de yeso y OSB. El cómputo incluye un factor de desperdicio del 12% para recortes en obra. Formato estándar 2.40m x 1.20m.
-            </p>
-          </div>
-        </div>
-        <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3">
-          <Wrench className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="text-[10px] text-amber-700 leading-relaxed font-bold uppercase">Especificación de Fijaciones:</p>
-            <p className="text-[10px] text-amber-600 leading-relaxed font-medium">
-              Tornillos T1 (Hex/Wafer) calculados para cada encuentro de alma de perfil. Tornillos T2/T3 calculados para fijación perimetral cada 20cm y central cada 30cm sobre montantes.
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
