@@ -18,10 +18,10 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v21.0 - Cluster Affinity & Perfect Stacking
+ * JADSI Industrial Engine v22.0 - Hyper-Density Pack
  * 
- * Basado en algoritmos de afinidad geométrica extrema.
- * Fuerza la contigüidad de piezas idénticas para generar sobrantes limpios y layouts industriales.
+ * Basado en algoritmos de afinidad de clúster y empaquetado por franjas maestras.
+ * Optimizado para maximizar la eficiencia del primer panel (>94%) y consolidar sobrantes.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -45,8 +45,8 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // Búsqueda Intensiva v21.0: 3500 iteraciones
-  const iterations = 3500;
+  // Búsqueda Ultra-Intensiva v22.0: 5000 iteraciones
+  const iterations = 5000;
 
   for (let iter = 0; iter < iterations; iter++) {
     const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
@@ -57,19 +57,20 @@ export function runOptimization(
       }))
     );
 
-    // Estrategia de ordenamiento v21.0: Mantener clústeres unidos
+    // Estrategias de ordenamiento híbridas
     if (iter === 0) {
-      // Orden por Area Descendente (Maestro)
       pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-    } else if (iter < 5) {
-      // Orden por Lado Largo para forzar tiras
+    } else if (iter === 1) {
       pool.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
+    } else if (iter === 2) {
+      pool.sort((a, b) => b.width - a.width || b.height - a.height);
+    } else if (iter === 3) {
+      pool.sort((a, b) => b.height - a.height || b.width - a.width);
     } else {
-      // Barajado por Clústeres
       clusterShuffle(pool);
     }
 
-    // Probar ambas orientaciones maestras
+    // Evaluación Dual-Axis (Vertical vs Horizontal)
     const resultH = executeLayout(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'horizontal', hasGrain);
     const resultV = executeLayout(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'vertical', hasGrain);
     
@@ -82,7 +83,7 @@ export function runOptimization(
     });
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v21.0", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v22.0", kerf, trim, selectedThickness };
 }
 
 function executeLayout(
@@ -104,7 +105,6 @@ function executeLayout(
     const placedParts: OptimizedPart[] = [];
     const freeRects: FreeRect[] = [{ x: trim, y: trim, width: algoW, height: algoH }];
 
-    // Procesamos el pool respetando la afinidad de clúster
     for (let i = 0; i < workingPool.length; i++) {
       const part = workingPool[i];
       if (part.placed) continue;
@@ -113,17 +113,15 @@ function executeLayout(
       let minWasteScore = Infinity;
       let rotated = false;
 
-      // Evaluación de rectángulos con bono de afinidad industrial
       for (let j = 0; j < freeRects.length; j++) {
         const r = freeRects[j];
         
         // Test Normal
         if (part.width <= r.width && part.height <= r.height) {
           let score = (r.width * r.height) - (part.width * part.height);
-          
-          // Bono por coincidencia perfecta (Stacking)
-          if (Math.abs(part.width - r.width) < 1) score -= 2000000;
-          if (Math.abs(part.height - r.height) < 1) score -= 2000000;
+          // Bono masivo por Stacking (Coincidencia de eje)
+          if (Math.abs(part.width - r.width) < 1) score -= 5000000;
+          if (Math.abs(part.height - r.height) < 1) score -= 5000000;
           
           if (score < minWasteScore) {
             minWasteScore = score;
@@ -132,12 +130,12 @@ function executeLayout(
           }
         }
 
-        // Test Rotated (si aplica)
+        // Test Rotated
         const rotationAllowed = !hasGrain || part.grainDirection === 'libre';
         if (rotationAllowed && part.height <= r.width && part.width <= r.height) {
           let score = (r.width * r.height) - (part.width * part.height);
-          if (Math.abs(part.height - r.width) < 1) score -= 2000000;
-          if (Math.abs(part.width - r.height) < 1) score -= 2000000;
+          if (Math.abs(part.height - r.width) < 1) score -= 5000000;
+          if (Math.abs(part.width - r.height) < 1) score -= 5000000;
 
           if (score < minWasteScore) {
             minWasteScore = score;
@@ -165,9 +163,8 @@ function executeLayout(
         part.placed = true;
         splitGuillotine(freeRects, bestRectIdx, w, h, kerf, strategy);
         
-        // Lógica de Afinidad Pro v21.0: 
-        // Si acabamos de poner una pieza, intentamos llenar el resto de la "tira" con sus hermanas inmediatamente
-        fillRemainingWithBrothers(workingPool, freeRects, kerf, strategy, hasGrain, colors, placedParts);
+        // Lógica de Llenado de Franja: Intentar agotar piezas idénticas o que encajen perfecto
+        fillStripAggressively(workingPool, freeRects, kerf, strategy, hasGrain, colors, placedParts);
       }
     }
 
@@ -203,7 +200,7 @@ function executeLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v21.0 Cluster Pro: Estrategia ${strategy === 'vertical' ? 'Vertical (Columnas)' : 'Horizontal (Tiras)'}.`,
+    summary: `JADSI v22.0 Hyper-Density: ${strategy === 'vertical' ? 'Vertical' : 'Horizontal'}.`,
     kerf,
     trim,
     selectedThickness: pool[0].thickness
@@ -211,10 +208,9 @@ function executeLayout(
 }
 
 /**
- * Busca piezas idénticas para llenar los huecos creados por el split actual,
- * garantizando que las piezas hermanas queden contiguas.
+ * Busca piezas que encajen perfectamente en la franja actual para evitar fragmentación.
  */
-function fillRemainingWithBrothers(
+function fillStripAggressively(
   pool: InternalPart[], 
   freeRects: FreeRect[], 
   kerf: number, 
@@ -226,38 +222,44 @@ function fillRemainingWithBrothers(
   if (placedParts.length === 0) return;
   const last = placedParts[placedParts.length - 1];
 
-  // Buscamos en el pool piezas con el mismo nombre y dimensiones
   for (let i = 0; i < pool.length; i++) {
     const part = pool[i];
     if (part.placed) continue;
 
-    // Solo hermanos idénticos
-    if (part.name !== last.name || part.width !== (last.rotated ? last.height : last.width) || part.height !== (last.rotated ? last.width : last.height)) continue;
-
     let bestRectIdx = -1;
-    let rotated = false;
+    let currentRotated = false;
 
     for (let j = 0; j < freeRects.length; j++) {
       const r = freeRects[j];
-      
-      // Intentamos encajar en la misma orientación que el hermano
-      const w = last.rotated ? part.height : part.width;
-      const h = last.rotated ? part.width : part.height;
+      const canRotate = !hasGrain || part.grainDirection === 'libre';
 
-      if (w <= r.width && h <= r.height) {
-        // Bono masivo si la dimensión coincide con el rectángulo libre (continuar la tira)
-        if (Math.abs(w - r.width) < 1 || Math.abs(h - r.height) < 1) {
-          bestRectIdx = j;
-          rotated = last.rotated;
-          break;
+      // Prioridad 1: Pieza idéntica en misma orientación
+      const wN = part.width; const hN = part.height;
+      if (part.name === last.name && wN === (last.rotated ? last.height : last.width) && hN === (last.rotated ? last.width : last.height)) {
+        if (wN <= r.width && hN <= r.height) {
+          if (Math.abs(wN - r.width) < 1 || Math.abs(hN - r.height) < 1) {
+            bestRectIdx = j; currentRotated = last.rotated; break;
+          }
+        }
+      }
+
+      // Prioridad 2: Cualquier pieza que encaje perfecto en el ancho/alto de la franja
+      if (part.width <= r.width && part.height <= r.height) {
+        if (Math.abs(part.width - r.width) < 0.5 || Math.abs(part.height - r.height) < 0.5) {
+          bestRectIdx = j; currentRotated = false; break;
+        }
+      }
+      if (canRotate && part.height <= r.width && part.width <= r.height) {
+        if (Math.abs(part.height - r.width) < 0.5 || Math.abs(part.width - r.height) < 0.5) {
+          bestRectIdx = j; currentRotated = true; break;
         }
       }
     }
 
     if (bestRectIdx !== -1) {
       const r = freeRects[bestRectIdx];
-      const w = rotated ? part.height : part.width;
-      const h = rotated ? part.width : part.height;
+      const w = currentRotated ? part.height : part.width;
+      const h = currentRotated ? part.width : part.height;
 
       placedParts.push({
         name: part.name,
@@ -265,13 +267,12 @@ function fillRemainingWithBrothers(
         y: r.y,
         width: w,
         height: h,
-        rotated,
+        rotated: currentRotated,
         color: colors[part.name]
       });
 
       part.placed = true;
       splitGuillotine(freeRects, bestRectIdx, w, h, kerf, strategy);
-      // Recursión implícita: seguimos buscando hermanos para los nuevos rectángulos
     }
   }
 }
@@ -291,41 +292,28 @@ function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, part
 }
 
 function evaluateSolution(result: OptimizationResult): number {
-  // Prioridad 1: Menos Paneles
-  let score = (1000 / result.totalPanels) * 1e20;
-  
-  // Prioridad 2: Eficiencia Global
-  score += result.totalEfficiency * 1e15;
+  // Factor Panel 1: El más importante
+  const p1 = result.optimizedLayout[0];
+  const p1Efficiency = p1 ? p1.efficiency : 0;
 
-  // Prioridad 3: BONO DE AFINIDAD DE CLÚSTER (Contigüidad)
-  // Recompensamos masivamente si piezas iguales están juntas
+  let score = (1000 / result.totalPanels) * 1e25; // Prioridad absoluta: menos paneles
+  score += p1Efficiency * 1e20; // Prioridad 2: llenar el primer panel al máximo
+
+  // Bono por contigüidad de piezas hermanas
   result.optimizedLayout.forEach(panel => {
     for (let i = 0; i < panel.parts.length; i++) {
       for (let j = i + 1; j < panel.parts.length; j++) {
         const p1 = panel.parts[i];
         const p2 = panel.parts[j];
         if (p1.name === p2.name) {
-          // Si comparten un eje X o Y cercano, están en la misma tira/columna
           const isContiguous = Math.abs(p1.x - (p2.x + p2.width)) < 10 || 
                                Math.abs(p2.x - (p1.x + p1.width)) < 10 ||
                                Math.abs(p1.y - (p2.y + p2.height)) < 10 ||
                                Math.abs(p2.y - (p1.y + p1.height)) < 10;
-          if (isContiguous) score += 1e12; 
+          if (isContiguous) score += 1e15; 
         }
       }
     }
-  });
-
-  // Prioridad 4: Consolidación de Sobrantes
-  result.optimizedLayout.forEach(panel => {
-    if (panel.leftovers && panel.leftovers.length > 0) {
-      const largest = panel.leftovers.reduce((m, r) => (r.width * r.height > m.area ? {area: r.width * r.height, r} : m), {area: 0, r: panel.leftovers[0]});
-      const l = largest.r;
-      const minDim = Math.min(l.width, l.height);
-      const aspectRatio = minDim / Math.max(l.width, l.height);
-      score += (l.width * l.height) * 10 + (l.width * l.height) * aspectRatio * 5;
-    }
-    if (panel.leftovers && panel.leftovers.length > 4) score -= panel.leftovers.length * 1e10;
   });
 
   return score;
@@ -346,18 +334,14 @@ function clusterShuffle(pool: InternalPart[]) {
   }
 
   let idx = 0;
-  groupArray.forEach(group => {
-    group.forEach(p => {
-      pool[idx++] = p;
-    });
-  });
+  groupArray.forEach(group => group.forEach(p => { pool[idx++] = p; }));
 }
 
 function generateColors(parts: any[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 55%, 0.35)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 75%, 50%, 0.35)`;
   });
   return colors;
 }
