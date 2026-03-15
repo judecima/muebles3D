@@ -10,21 +10,9 @@ interface InternalPart {
   placed: boolean;
 }
 
-interface Column {
-  width: number;
-  parts: OptimizedPart[];
-}
-
-interface Strip {
-  height: number;
-  columns: Column[];
-  efficiency: number;
-  remainingW: number;
-}
-
 /**
- * JADSI Industrial Engine v14.0 - WASTE INTELLIGENCE
- * Simula estrategias Horizontal vs Vertical y evalúa la reusabilidad del desperdicio.
+ * JADSI Industrial Engine v15.0 - HIGH DENSITY DGP
+ * Implementa empaquetado de alta densidad con minimización de entropía de desperdicio.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -42,21 +30,21 @@ export function runOptimization(
 
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
-
   const partColors = generateColors(filteredParts);
-  let bestGlobalResult: (OptimizationResult & { wasteScore: number }) | null = null;
+
+  let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // SIMULACIÓN DUAL: Probar orientaciones maestras (X-Rip vs Y-Rip)
-  for (const isVerticalMaster of [false, true]) {
-    
-    // Probar diferentes heurísticas de empaquetado
-    const heuristics = [
-      (a: InternalPart, b: InternalPart) => b.height - a.height || b.width - a.width,
-      (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height)
-    ];
+  // SIMULACIÓN MULTI-ESTRATEGIA (DGP Analysis)
+  const masterOrientations = [false, true]; // Horizontal vs Vertical
+  const sortingHeuristics = [
+    (a: InternalPart, b: InternalPart) => b.height - a.height || b.width - a.width,
+    (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height),
+    (a: InternalPart, b: InternalPart) => b.width - a.width || b.height - a.height
+  ];
 
-    for (const sortFn of heuristics) {
+  for (const isVerticalMaster of masterOrientations) {
+    for (const sortFn of sortingHeuristics) {
       const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
         Array.from({ length: p.quantity }, () => ({
           ...p,
@@ -67,31 +55,29 @@ export function runOptimization(
 
       pool.sort(sortFn);
 
+      // En el algoritmo interno, siempre trabajamos con W como dirección de la tira y H como profundidad
       const algoW = isVerticalMaster ? usableH : usableW;
       const algoH = isVerticalMaster ? usableW : usableH;
 
       const currentResult = executeNesting(pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalMaster);
       
-      // EVALUACIÓN DE CALIDAD DE DESPERDICIO (Waste Quality Score)
-      // Premiamos el área del bloque vacío más grande y su dimensión mínima.
+      // EVALUACIÓN DE CALIDAD JADSI v15
+      // 1. Menos paneles (Factor 10^9)
+      // 2. Eficiencia global (Factor 10^6)
+      // 3. Área del bloque de desperdicio más grande (Factor 1)
       const wasteScore = calculateWasteQuality(currentResult, algoW, algoH);
-
-      // PUNTUACIÓN JADSI v14: 
-      // 1. Prioridad máxima: Menos paneles.
-      // 2. Prioridad media: Eficiencia global.
-      // 3. Prioridad desempate: Calidad del desperdicio (bloques grandes vs tiras).
-      const score = (100 / currentResult.totalPanels) * 1000000 + 
-                    (currentResult.totalEfficiency * 1000) + 
+      const score = (1000 / currentResult.totalPanels) * 1000000000 + 
+                    (currentResult.totalEfficiency * 1000000) + 
                     wasteScore;
 
       if (!bestGlobalResult || score > bestGlobalScore) {
-        bestGlobalResult = { ...currentResult, wasteScore };
+        bestGlobalResult = currentResult;
         bestGlobalScore = score;
       }
     }
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor v14", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor v15", kerf, trim, selectedThickness };
 }
 
 function executeNesting(
@@ -110,138 +96,166 @@ function executeNesting(
   let workingPool = pool.map(p => ({ ...p }));
 
   while (workingPool.some(p => !p.placed)) {
-    const strips: Strip[] = [];
-    let remainingH = algoH;
+    const placedParts: OptimizedPart[] = [];
+    let currentY = 0;
 
-    while (remainingH > 0) {
+    // Llenar un panel
+    while (currentY < algoH) {
+      // 1. Encontrar el "Líder de Tira" (la pieza más alta disponible)
       let leaderIdx = -1;
       let leaderRotated = false;
 
       for (let i = 0; i < workingPool.length; i++) {
         const p = workingPool[i];
         if (p.placed) continue;
-        if (p.height <= remainingH && p.width <= algoW) {
+        
+        // Intentar normal
+        if (p.height <= (algoH - currentY) && p.width <= algoW) {
           leaderIdx = i; leaderRotated = false; break;
         }
-        if (p.grainDirection === 'libre' && p.width <= remainingH && p.height <= algoW) {
+        // Intentar rotado (si es libre)
+        if (p.grainDirection === 'libre' && p.width <= (algoH - currentY) && p.height <= algoW) {
           leaderIdx = i; leaderRotated = true; break;
         }
       }
 
-      if (leaderIdx === -1) break;
+      if (leaderIdx === -1) break; // No caben más tiras
 
       const leader = workingPool[leaderIdx];
       const stripH = leaderRotated ? leader.width : leader.height;
-      const columns: Column[] = [];
-      let remainingW = algoW;
-
-      while (remainingW > 0) {
-        let colLeaderIdx = -1;
-        let colLeaderRotated = false;
-
-        for (let i = 0; i < workingPool.length; i++) {
-          const p = workingPool[i];
-          if (p.placed) continue;
-          if (p.width <= remainingW && p.height <= stripH) {
-            colLeaderIdx = i; colLeaderRotated = false; break;
-          }
-          if (p.grainDirection === 'libre' && p.height <= remainingW && p.width <= stripH) {
-            colLeaderIdx = i; colLeaderRotated = true; break;
-          }
-        }
-
-        if (colLeaderIdx === -1) break;
-
-        const colLeader = workingPool[colLeaderIdx];
-        const colW = colLeaderRotated ? colLeader.height : colLeader.width;
-        const colParts: OptimizedPart[] = [];
-        let colRemainingH = stripH;
-
-        for (let i = 0; i < workingPool.length; i++) {
-          const p = workingPool[i];
-          if (p.placed) continue;
-          let fit = false; let rot = false;
-          if (p.width === colW && p.height <= colRemainingH) { fit = true; rot = false; } 
-          else if (p.grainDirection === 'libre' && p.height === colW && p.width <= colRemainingH) { fit = true; rot = true; }
-
-          if (fit) {
-            const h = rot ? p.width : p.height;
-            colParts.push({
-              name: p.name, x: 0, y: stripH - colRemainingH, width: colW, height: h, rotated: rot, color: colors[p.name]
-            });
-            p.placed = true;
-            colRemainingH -= (h + kerf);
-          }
-        }
-        columns.push({ width: colW, parts: colParts });
-        remainingW -= (colW + kerf);
-      }
-
-      if (columns.length > 0) {
-        strips.push({ height: stripH, columns, efficiency: 0, remainingW: Math.max(0, remainingW) });
-        remainingH -= (stripH + kerf);
-      } else { break; }
-    }
-
-    if (strips.length === 0) break;
-
-    const placedParts: OptimizedPart[] = [];
-    let currentY = 0;
-    for (const strip of strips) {
       let currentX = 0;
-      for (const col of strip.columns) {
-        for (const p of col.parts) {
-          const absX = currentX + p.x; const absY = currentY + p.y;
-          const finalX = isVertical ? absY : absX; const finalY = isVertical ? absX : absY;
-          const finalW = isVertical ? p.height : p.width; const finalH = isVertical ? p.width : p.height;
-          placedParts.push({ ...p, x: finalX, y: finalY, width: finalW, height: finalH, rotated: isVertical ? !p.rotated : p.rotated });
+
+      // 2. Llenar la tira horizontalmente
+      while (currentX < algoW) {
+        let bestPartIdx = -1;
+        let bestPartRotated = false;
+
+        // Estrategia "Best Fit" para la tira: buscar la pieza que mejor llene el alto de la tira
+        for (let i = 0; i < workingPool.length; i++) {
+          const p = workingPool[i];
+          if (p.placed) continue;
+
+          // Caso A: Pieza cabe en la tira
+          if (p.width <= (algoW - currentX) && p.height <= stripH) {
+            bestPartIdx = i; bestPartRotated = false; break;
+          }
+          // Caso B: Pieza rotada cabe en la tira
+          if (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= stripH) {
+            bestPartIdx = i; bestPartRotated = true; break;
+          }
         }
-        currentX += col.width + kerf;
+
+        if (bestPartIdx === -1) break; // No caben más piezas en esta tira
+
+        const p = workingPool[bestPartIdx];
+        const pW = bestPartRotated ? p.height : p.width;
+        const pH = bestPartRotated ? p.width : p.height;
+
+        // Antes de colocar, verificar si podemos apilar piezas verticalmente dentro de este ancho X (Sub-columnas)
+        let subY = 0;
+        while (subY < stripH) {
+          let stackPartIdx = -1;
+          let stackRotated = false;
+
+          for (let j = 0; j < workingPool.length; j++) {
+            const sp = workingPool[j];
+            if (sp.placed) continue;
+
+            if (sp.width === pW && sp.height <= (stripH - subY)) {
+              stackPartIdx = j; stackRotated = false; break;
+            }
+            if (sp.grainDirection === 'libre' && sp.height === pW && sp.width <= (stripH - subY)) {
+              stackPartIdx = j; stackRotated = true; break;
+            }
+          }
+
+          if (stackPartIdx === -1) break;
+
+          const sp = workingPool[stackPartIdx];
+          const spH = stackRotated ? sp.width : sp.height;
+
+          // Mapear coordenadas finales según orientación maestra
+          const absX = currentX;
+          const absY = currentY + subY;
+
+          const finalX = isVertical ? absY : absX;
+          const finalY = isVertical ? absX : absY;
+          const finalW = isVertical ? spH : pW;
+          const finalH = isVertical ? pW : spH;
+
+          placedParts.push({
+            name: sp.name,
+            x: finalX,
+            y: finalY,
+            width: finalW,
+            height: finalH,
+            rotated: isVertical ? !stackRotated : stackRotated,
+            color: colors[sp.name]
+          });
+
+          sp.placed = true;
+          subY += spH + kerf;
+        }
+
+        currentX += pW + kerf;
       }
-      currentY += strip.height + kerf;
+
+      currentY += stripH + kerf;
     }
+
+    if (placedParts.length === 0) break; // Evitar bucle infinito
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
     const totalArea = panelWidth * panelHeight;
-    panels.push({ panelNumber: panels.length + 1, parts: placedParts, efficiency: (usedArea / totalArea) * 100, usedArea, totalArea });
-    if (panels.length > 20) break; 
+    
+    panels.push({
+      panelNumber: panels.length + 1,
+      parts: placedParts,
+      efficiency: (usedArea / totalArea) * 100,
+      usedArea,
+      totalArea
+    });
+
+    if (panels.length > 50) break; // Límite de seguridad
   }
 
   const totalUsed = panels.reduce((acc, p) => acc + p.usedArea, 0);
   const totalAvail = panels.length * panelWidth * panelHeight;
 
   return {
-    optimizedLayout: panels, totalPanels: panels.length, totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v14.0 WasteIntelligence: ${isVertical ? 'Vertical' : 'Horizontal'} Master. Eficiencia: ${(totalUsed / totalAvail * 100).toFixed(1)}%.`,
-    kerf, trim, selectedThickness
+    optimizedLayout: panels,
+    totalPanels: panels.length,
+    totalEfficiency: (totalUsed / totalAvail) * 100,
+    summary: `JADSI v15.0 HighDensity: ${isVertical ? 'Corte Vertical' : 'Corte Horizontal'} optimizado.`,
+    kerf,
+    trim,
+    selectedThickness
   };
 }
 
 /**
- * Calcula un puntaje basado en la utilidad de los sobrantes.
- * Premia sobrantes grandes y con dimensiones mínimas amplias.
+ * Calcula la calidad del sobrante basándose en el rectángulo libre más grande.
  */
 function calculateWasteQuality(result: OptimizationResult, algoW: number, algoH: number): number {
   let score = 0;
   result.optimizedLayout.forEach(panel => {
-    // Calculamos el sobrante principal al final del panel (el rectángulo más grande posible)
-    // Asumiendo Shelf-Algorithm, el sobrante es el área no ocupada por las tiras.
-    const lastPartY = panel.parts.reduce((max, p) => Math.max(max, p.y + p.height), 0);
-    const lastPartX = panel.parts.reduce((max, p) => Math.max(max, p.x + p.width), 0);
+    // Encontramos el límite del empaquetado en X e Y
+    const maxX = panel.parts.reduce((max, p) => Math.max(max, p.x + p.width), 0);
+    const maxY = panel.parts.reduce((max, p) => Math.max(max, p.y + p.height), 0);
     
-    const remainingH = algoH - lastPartY;
-    const remainingW = algoW - lastPartX;
+    const remainingW = algoW - maxX;
+    const remainingH = algoH - maxY;
 
-    // Área del sobrante vertical y horizontal
-    const wasteAreaH = algoW * remainingH;
-    const wasteAreaV = algoH * remainingW;
+    // Área del sobrante lateral y superior
+    const areaSide = remainingW * algoH;
+    const areaTop = remainingH * algoW;
 
-    // Usamos el área y penalizamos si la dimensión más corta es muy pequeña (menos de 100mm no es reutilizable)
-    const bestWasteArea = Math.max(wasteAreaH, wasteAreaV);
-    const minDim = bestWasteArea === wasteAreaH ? remainingH : remainingW;
-    
-    if (minDim > 100) {
-      score += (bestWasteArea * minDim); 
+    // Premiamos el área más grande y penalizamos si la dimensión es muy pequeña
+    const bestArea = Math.max(areaSide, areaTop);
+    const minDim = bestArea === areaSide ? remainingW : remainingH;
+
+    if (minDim > 150) { // Bloque realmente útil
+      score += (bestArea * minDim);
     }
   });
   return score;
@@ -251,7 +265,7 @@ function generateColors(parts: any[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 55%, 0.25)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 65%, 60%, 0.3)`;
   });
   return colors;
 }
