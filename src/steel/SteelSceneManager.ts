@@ -198,7 +198,7 @@ export class SteelSceneManager {
     this.collisions.clear();
 
     config.walls.forEach(wall => {
-      const processed = structuralResult.processedWalls.find((pw: any) => pw.id === wall.id);
+      const processed = structuralResult?.processedWalls?.find((pw: any) => pw.id === wall.id);
       const wallGroup = new THREE.Group();
       wallGroup.position.set(wall.x, 0, wall.z);
       wallGroup.rotation.y = (wall.rotation * Math.PI) / 180;
@@ -217,7 +217,7 @@ export class SteelSceneManager {
     });
 
     config.internalWalls.forEach(iw => {
-      const processed = structuralResult.processedInternalWalls.find((piw: any) => piw.id === iw.id);
+      const processed = structuralResult?.processedInternalWalls?.find((piw: any) => piw.id === iw.id);
       const iwGroup = new THREE.Group();
       iwGroup.userData = { isInternalWall: true, internalWall: iw };
       const globalPos = this.calculateGlobalPosition(iw, config);
@@ -350,27 +350,83 @@ export class SteelSceneManager {
   }
 
   private drawTrussHeader(group: THREE.Group, x: number, y: number, w: number, h: number, thickness: number) {
-    group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    group.add(this.createProfile(w, x, y + h - 40, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    const numDivisions = Math.ceil(w / 400);
-    const divW = w / numDivisions;
-    for (let i = 0; i <= numDivisions; i++) {
-      const posX = x + (i * divW);
-      if (posX >= x + w - 5) break;
-      group.add(this.createProfile(h - 80, posX, y + 40, 90, 'PGC', this.colors.header_truss, 0, thickness));
-      if (i < numDivisions) {
-        const diagH = h - 80;
-        const diagLen = Math.sqrt(divW * divW + diagH * diagH);
-        const angle = Math.atan2(diagH, divW);
-        const diagGeom = new THREE.BoxGeometry(diagLen, 15, thickness - 10);
-        const diagMesh = new THREE.Mesh(diagGeom, new THREE.MeshStandardMaterial({ color: this.colors.header_truss, metalness: 0.8 }));
-        diagMesh.position.set(posX + divW/2, y + h/2, 0);
-        diagMesh.rotation.z = i % 2 === 0 ? angle : -angle;
-        group.add(diagMesh);
-      }
+
+    const chordHeight = this.profileFlange;
+    const webOffset = chordHeight;
+  
+    // cordón inferior
+    group.add(this.createProfile(
+      w,
+      x,
+      y,
+      0,
+      'PGC',
+      this.colors.header_truss,
+      0,
+      thickness
+    ));
+  
+    // cordón superior
+    group.add(this.createProfile(
+      w,
+      x,
+      y + h - chordHeight,
+      0,
+      'PGC',
+      this.colors.header_truss,
+      0,
+      thickness
+    ));
+  
+    // número de módulos del reticulado
+    const moduleSize = 400;
+    const numModules = Math.max(1, Math.ceil(w / moduleSize));
+    const step = w / numModules;
+  
+    const webHeight = h - chordHeight * 2;
+  
+    for (let i = 1; i < numModules; i++) {
+  
+      const posX = x + i * step;
+  
+      // montante vertical
+      group.add(this.createProfile(
+        webHeight,
+        posX,
+        y + webOffset,
+        90,
+        'PGC',
+        this.colors.header_truss,
+        0,
+        thickness
+      ));
+  
+      // diagonales tipo Warren
+      const prevX = x + (i - 1) * step;
+  
+      const diagLen = Math.sqrt(step * step + webHeight * webHeight);
+      const angle = Math.atan2(webHeight, step);
+  
+      const diagGeom = new THREE.BoxGeometry(diagLen, 15, thickness - 10);
+      const mat = new THREE.MeshStandardMaterial({
+        color: this.colors.header_truss,
+        metalness: 0.8
+      });
+  
+      const diag = new THREE.Mesh(diagGeom, mat);
+  
+      diag.position.set(
+        prevX + step / 2,
+        y + webOffset + webHeight / 2,
+        0
+      );
+  
+      diag.rotation.z = (i % 2 === 0) ? angle : -angle;
+  
+      group.add(diag);
     }
   }
-
+  
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number, customHeight?: number): THREE.Mesh {
     const width = customWidth || this.profileWidth;
     const flangeHeight = customHeight || this.profileFlange;

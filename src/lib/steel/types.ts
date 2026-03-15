@@ -1,4 +1,3 @@
-
 export type OpeningType = 'door' | 'window';
 
 export interface SteelOpening {
@@ -6,15 +5,15 @@ export interface SteelOpening {
   type: OpeningType;
   width: number;
   height: number;
-  position: number; 
-  sillHeight?: number; 
+  position: number;
+  sillHeight?: number;
   status?: 'ok' | 'warning' | 'error';
 }
 
 export interface InternalWall {
   id: string;
-  parentWallId: string; // Puede ser ID de SteelWall o de otra InternalWall
-  xPosition: number; // Posición a lo largo del muro padre
+  parentWallId: string;
+  xPosition: number;
   length: number;
   height: number;
   rotation: number;
@@ -85,4 +84,20 @@ export interface WallPanelData {
   isWallEnd: boolean;
   needsBracing: boolean;
   loads: PanelLoads;
+}
+
+export interface HeaderAnalysis {
+  type: 'single' | 'double' | 'triple' | 'tube' | 'truss';
+  loadNmm: number;
+  deflectionMm: number;
+  maxAllowableDeflection: number;
+  requiredIx: number;
+  status: 'ok' | 'warning' | 'error';
+  isFusedWithCorner: 'none' | 'left' | 'right';
+  actualHeight: number;
+  trussData?: {
+    height: number;
+    numDiagonals: number;
+    chordThickness: number;
+  };
 }

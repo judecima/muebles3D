@@ -110,48 +110,101 @@ export class StructuralEngine {
   }
 
   static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig, wallHeight: number): HeaderAnalysis {
-    const L = opening.width;
-    const tributaryWidth = config.length / 2; 
-    const designLoadTotal = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * 0.001; 
-    const loadNmm = designLoadTotal * tributaryWidth; 
+
+    const L = opening.width; // mm
+  
+    const tributaryWidthM = Math.max(2, config.length / 2000);
+    const dead = this.DEAD_LOAD_KPA;
+    const live = this.LIVE_LOAD_ROOF_KPA;
+  
+    const loadKNm = (dead + live) * tributaryWidthM;
+    const loadNmm = (loadKNm * 1000) / 1000; // kN/m → N/mm
+  
     const maxAllowableDeflection = L / 360;
-    const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
+  
+    const requiredIx =
+      (5 * loadNmm * Math.pow(L, 4)) /
+      (384 * this.STEEL_MODULUS * maxAllowableDeflection);
+  
     const fusion = this.analyzeOpeningFusion(opening, wallLen);
-    
+  
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-    const availableHeight = Math.max(0, wallHeight - headerBottom - 40);
-
+  
+    const availableHeight = Math.max(
+      120,
+      wallHeight - headerBottom - 40
+    );
+  
     let type: HeaderAnalysis['type'] = 'single';
     let status: HeaderAnalysis['status'] = 'ok';
-    let actualHeight = Math.min(100, availableHeight);
-    let trussData: HeaderAnalysis['trussData'] = undefined;
-
-    if (L > 2500 || requiredIx > this.TUBE_IX) {
-      type = 'truss';
-      status = L > 3500 ? 'error' : 'warning';
-      actualHeight = availableHeight;
-      trussData = {
-        height: availableHeight,
-        numDiagonals: Math.ceil(L / 400),
-        chordThickness: 1.25
-      };
-    } else if (requiredIx > (this.PGC_IX_SINGLE * 3)) {
-      type = 'tube';
-      actualHeight = Math.min(100, availableHeight);
-    } else if (requiredIx > (this.PGC_IX_SINGLE * 2)) {
-      type = 'triple';
-      actualHeight = Math.min(100, availableHeight);
-    } else if (requiredIx > this.PGC_IX_SINGLE) {
-      type = 'double';
-      actualHeight = Math.min(100, availableHeight);
+    let actualHeight = 100;
+    let trussData: HeaderAnalysis['trussData'] | undefined;
+  
+    const pgcIx = this.PGC_IX_SINGLE;
+  
+    if (requiredIx <= pgcIx) {
+      type = 'single';
+      actualHeight = 100;
     }
-
-    if (L > 3500) status = 'error'; 
-
-    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData };
+  
+    else if (requiredIx <= pgcIx * 2) {
+      type = 'double';
+      actualHeight = 100;
+    }
+  
+    else if (requiredIx <= pgcIx * 3) {
+      type = 'triple';
+      actualHeight = 100;
+    }
+  
+    else if (requiredIx <= this.TUBE_IX) {
+      type = 'tube';
+      actualHeight = 120;
+    }
+  
+    else {
+  
+      type = 'truss';
+  
+      const trussHeight = Math.min(
+        Math.max(L / 8, 200),
+        availableHeight
+      );
+  
+      const panelSize = 400;
+      const numPanels = Math.max(2, Math.round(L / panelSize));
+  
+      let thickness = 1.25;
+  
+      if (L > 3000) thickness = 1.6;
+      if (L > 4500) thickness = 2;
+  
+      trussData = {
+        height: trussHeight,
+        numDiagonals: numPanels,
+        chordThickness: thickness
+      };
+  
+      actualHeight = trussHeight;
+  
+      if (L > 4000) status = 'warning';
+      if (L > 5500) status = 'error';
+    }
+  
+    return {
+      type,
+      loadNmm,
+      deflectionMm: 0,
+      maxAllowableDeflection,
+      requiredIx,
+      status,
+      isFusedWithCorner: fusion,
+      actualHeight,
+      trussData
+    };
   }
-
+  
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
     const cripples: CrippleData[] = [];
     const spacing = ('studSpacing' in wall) ? wall.studSpacing : 400;

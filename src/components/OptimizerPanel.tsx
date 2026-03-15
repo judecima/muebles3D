@@ -46,7 +46,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [targetThickness, setTargetThickness] = useState<number>(18);
 
   useEffect(() => {
-    // Agrupar piezas si vienen de un mueble, o mantener las actuales
     const woodParts = initialParts.filter(p => !p.isHardware);
     if (woodParts.length > 0) {
       const aggregated = woodParts.reduce((acc, part) => {
@@ -62,7 +61,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
       }, {} as Record<string, any>);
       setLocalCutlist(Object.values(aggregated));
     } else if (localCutlist.length === 0) {
-      // Ejemplo inicial si no hay piezas
       setLocalCutlist([
         { name: "Lateral Izquierdo", width: 720, height: 560, quantity: 4, grainDirection: 'vertical', thickness: 18 },
         { name: "Piso/Techo", width: 1164, height: 560, quantity: 2, grainDirection: 'horizontal', thickness: 18 },
@@ -72,8 +70,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   }, [initialParts]);
 
   const availableThicknesses = Array.from(new Set(localCutlist.map(p => p.thickness))).sort((a, b) => b - a);
-  const safeThickness = availableThicknesses.length > 0 ? (availableThicknesses.includes(targetThickness) ? targetThickness : availableThicknesses[0]) : 18;
-
+  
   const updatePart = (index: number, field: string, value: any) => {
     const updated = [...localCutlist];
     updated[index] = { ...updated[index], [field]: value };
@@ -110,14 +107,17 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
         })
       });
       const data = await res.json();
-      if (data.optimizedLayout.length === 0) {
+      
+      if (!res.ok || !data || data.error) {
+        setError(data?.error || "Error en el cálculo industrial.");
+      } else if (!data.optimizedLayout || data.optimizedLayout.length === 0) {
         setError("Piezas demasiado grandes para el panel.");
       } else {
         setResult(data);
       }
     } catch (e) {
       console.error(e);
-      setError("Error en cálculo industrial.");
+      setError("Error de comunicación con el motor de optimización.");
     } finally {
       setLoading(false);
     }
@@ -329,7 +329,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                   <div className="relative bg-white shadow-2xl rounded-sm mx-auto overflow-hidden border border-slate-300" 
                        style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
                     
-                    {/* Área Útil de Trabajo (Considerando Trim) */}
                     <div className="absolute bg-slate-50" style={{ 
                       left: `${(result.trim / selectedPanel.width) * 100}%`, 
                       top: `${(result.trim / selectedPanel.height) * 100}%`, 
