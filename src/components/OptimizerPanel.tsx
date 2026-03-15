@@ -235,32 +235,45 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     if (!result) return;
     
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<project>\n`;
+    let nodeCounter = 1;
     
     result.optimizedLayout.forEach((panel, pIdx) => {
+      const isVertical = panel.strategy === 'vertical';
+      
+      // Según Lepton: En vertical se intercambian l y w del nodo raíz
+      const rootL = isVertical ? selectedPanel.width : selectedPanel.height;
+      const rootW = isVertical ? selectedPanel.height : selectedPanel.width;
+
       xml += `  <panel${pIdx + 1} l="${selectedPanel.width}" w="${selectedPanel.height}" material="${selectedPanel.name}" thickness="${selectedPanel.thickness}" saw="${result.kerf}" num="${panel.panelNumber}" strategy="${panel.strategy}">\n`;
       
-      // Nodo Jerárquico Principal
-      xml += `    <no.1 l="${selectedPanel.height}" w="${selectedPanel.width}" trim="${result.trim}" x="0" y="0" layer="1" id="0">\n`;
+      const rootNodeId = nodeCounter++;
+      xml += `    <no.${rootNodeId} l="${rootL}" w="${rootW}" trim="${result.trim}" x="0" y="0" layer="1" id="0">\n`;
       
-      // Agrupamos piezas por capas jerárquicas según la estrategia ganadora
-      const isVertical = panel.strategy === 'vertical';
       const uniqueStrips = Array.from(new Set(panel.parts.map(p => isVertical ? p.x : p.y))).sort((a,b) => a-b);
       
       uniqueStrips.forEach((coord, coordIdx) => {
         const partsInStrip = panel.parts.filter(p => (isVertical ? p.x : p.y) === coord);
-        const stripW = isVertical ? partsInStrip[0].width : selectedPanel.width;
-        const stripH = isVertical ? selectedPanel.height : partsInStrip[0].height;
         
-        xml += `      <no.${coordIdx + 2} l="${stripH}" w="${stripW}" trim="0" x="${isVertical ? coord : 0}" y="${isVertical ? 0 : coord}" layer="2" id="${coordIdx + 1}">\n`;
+        // Strip Node: l es la dimensión de corte (fija), w es el ancho de la franja (variable)
+        const stripL = isVertical ? selectedPanel.height : selectedPanel.width;
+        const stripW = isVertical ? partsInStrip[0].width : partsInStrip[0].height;
+        
+        const stripX = isVertical ? coord : 0;
+        const stripY = isVertical ? 0 : coord;
+        
+        const stripNodeId = nodeCounter++;
+        xml += `      <no.${stripNodeId} l="${stripL}" w="${stripW}" trim="0" x="${stripX}" y="${stripY}" layer="2" id="${coordIdx + 1}">\n`;
         
         partsInStrip.forEach((part, partIdx) => {
-          xml += `        <part cut="${isVertical ? part.height : part.width}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
+          // 'cut' es el avance de la sierra en la franja
+          const cutDim = isVertical ? part.height : part.width;
+          xml += `        <part cut="${cutDim}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
         });
         
-        xml += `      </no.${coordIdx + 2}>\n`;
+        xml += `      </no.${stripNodeId}>\n`;
       });
       
-      xml += `    </no.1>\n`;
+      xml += `    </no.${rootNodeId}>\n`;
       xml += `  </panel${pIdx + 1}>\n`;
     });
     
@@ -314,7 +327,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v33.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v36.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -666,7 +679,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v33.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v36.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -700,7 +713,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         </div>
                       </div>
                       
-                      {/* Telemetría Industrial v33.0 - Analytics Pro */}
                       <div className="bg-slate-800/50 px-6 py-2 grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4 border-b border-white/5">
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] font-black text-amber-500 uppercase">Desperdicio =</span>
@@ -744,7 +756,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         backgroundImage: 'linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px)',
                         backgroundSize: '50px 50px'
                       }}>
-                        {/* Renderizado de Piezas */}
                         {panel.parts.map((p, pIdx) => (
                           <div key={`p-${pIdx}`} title={`${p.name}: ${p.width}x${p.height}mm`}
                                className="absolute border border-slate-900/60 shadow-sm transition-all hover:brightness-90 flex flex-col justify-center items-center overflow-hidden" 
@@ -760,7 +771,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                           </div>
                         ))}
 
-                        {/* Renderizado de Sobrantes (S1, S2...) */}
                         {panel.leftovers?.map((l, lIdx) => (
                           <div key={`l-${lIdx}`} title={`Sobrante ${l.name}: ${l.width}x${l.height}mm`}
                                className="absolute border border-dashed border-slate-400 bg-white/90 flex flex-col justify-center items-center overflow-hidden group/stock" 
@@ -780,7 +790,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
                       <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">
-                        Estrategia JADSI v33.0: Optimización mediante {isVertical ? 'columnas verticales' : 'filas horizontales'} para maximizar bloques remantes reutilizables.
+                        Estrategia JADSI v36.0: Optimización mediante {isVertical ? 'columnas verticales' : 'filas horizontales'} para maximizar bloques remantes reutilizables.
                       </p>
                     </div>
                   </div>
