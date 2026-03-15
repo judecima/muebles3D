@@ -18,10 +18,10 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v25.0 - High Performance Architect
+ * JADSI Industrial Engine v26.0 - Master Bench Optimizer
  * 
- * Este motor implementa búsqueda intensiva de 10,000 iteraciones por panel
- * con salida anticipada al alcanzar el 95% de eficiencia.
+ * Arquitectura de Simulación de Eje Dual con Ordenamiento Jerárquico.
+ * Diseñado para maximizar la densidad en el Panel 1 (>94%) y consolidar bloques.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -54,25 +54,31 @@ export function runOptimization(
   const finalPanels: OptimizedPanel[] = [];
   let panelCounter = 1;
 
-  // Optimización secuencial: Panel por Panel
+  // Optimización secuencial: Panel por Panel para garantizar la perfección en el Panel 1
   while (pool.some(p => !p.placed)) {
     let bestPanelForThisStep: OptimizedPanel | null = null;
     let bestPanelScore = -Infinity;
 
-    // Búsqueda de alta intensidad: 10,000 iteraciones por panel
+    // Búsqueda Ultra-Intensiva: 10,000 iteraciones probando ambos ejes de guillotina
     const maxIterations = 10000; 
     
     for (let iter = 0; iter < maxIterations; iter++) {
       const currentTryPool = pool.filter(p => !p.placed).map(p => ({ ...p }));
       
-      if (iter > 0) {
-        if (iter % 5 === 0) clusterShuffle(currentTryPool);
-        else shuffle(currentTryPool);
-      } else {
+      // ESTRATEGIA DE ORDENAMIENTO
+      if (iter === 0) {
+        // Primera iteración: Siempre piezas más grandes primero (Área Descendente)
         currentTryPool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+      } else if (iter < 10) {
+        // Variaciones determinísticas basadas en dimensiones
+        if (iter === 1) currentTryPool.sort((a, b) => b.width - a.width || b.height - a.height);
+        if (iter === 2) currentTryPool.sort((a, b) => b.height - a.height || b.width - a.width);
+      } else {
+        // Mutaciones estocásticas que tienden a mantener las piezas grandes al inicio
+        smartShuffle(currentTryPool);
       }
 
-      // Evaluamos ambas estrategias, pero el scoring favorecerá la que pidas (Horizontal por defecto en tie-break)
+      // Probar ambos sentidos de corte para este ordenamiento
       const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
       
       for (const strategy of strategies) {
@@ -98,13 +104,14 @@ export function runOptimization(
         }
       }
 
-      // SHORT-CIRCUIT: Si alcanzamos > 95% de eficiencia, consideramos el panel óptimo y saltamos el resto de iteraciones
-      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= 95) {
+      // SHORT-CIRCUIT: Si alcanzamos > 95.5% de eficiencia, el panel es excelente.
+      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= 95.5) {
         break;
       }
     }
 
     if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
+      // Marcar piezas como colocadas en el pool principal
       bestPanelForThisStep.parts.forEach(placedPart => {
         if (placedPart.isLeftover) return;
         const indexInPool = pool.findIndex(p => 
@@ -132,7 +139,7 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: (totalUsedArea / totalAvailArea) * 100,
-    summary: `JADSI v25.0: Optimización completada con ${finalPanels.length} paneles.`,
+    summary: `JADSI v26.0: Panel 1 optimizado al ${finalPanels[0]?.efficiency.toFixed(1)}%. Total: ${finalPanels.length} paneles.`,
     kerf,
     trim,
     selectedThickness
@@ -176,7 +183,7 @@ function fillSinglePanel(
         }
       }
 
-      // EVALUAR ROTADO: Solo si el material es liso o el usuario activó "Rotar"
+      // EVALUAR ROTADO: Solo si el material es liso o el usuario DESMARCÓ "Resp. Veta"
       const canRotate = !hasGrain || part.grainDirection === 'libre';
       if (canRotate && part.height <= r.width && part.width <= r.height) {
         const cp = calculateContactScore(r.x, r.y, part.height, part.width, panelWidth, panelHeight, trim, r);
@@ -201,6 +208,8 @@ function fillSinglePanel(
 
       part.placed = true;
       splitGuillotine(freeRects, bestRectIdx, w, h, kerf, strategy);
+      
+      // Lógica de Clúster: Llenar inmediatamente con piezas hermanas para maximizar alineación
       fillRemainingWithBrothers(pool, freeRects, kerf, strategy, hasGrain, colors, placedParts, panelWidth, panelHeight, trim);
     }
   }
@@ -225,19 +234,28 @@ function fillSinglePanel(
   };
 }
 
+/**
+ * Scoring de Punto de Contacto (Contact Point)
+ * Premia piezas pegadas a bordes o esquinas para consolidar el aire sobrante.
+ */
 function calculateContactScore(x: number, y: number, w: number, h: number, pW: number, pH: number, trim: number, r: FreeRect): number {
   let score = 0;
-  if (Math.abs(x - trim) < 0.5) score += h * 2;
-  if (Math.abs(y - trim) < 0.5) score += w * 2;
-  if (Math.abs(x + w - (pW - trim)) < 0.5) score += h;
-  if (Math.abs(y + h - (pH - trim)) < 0.5) score += w;
+  // Contacto con bordes externos (Prioridad 1)
+  if (Math.abs(x - trim) < 0.5) score += h * 10;
+  if (Math.abs(y - trim) < 0.5) score += w * 10;
+  if (Math.abs(x + w - (pW - trim)) < 0.5) score += h * 2;
+  if (Math.abs(y + h - (pH - trim)) < 0.5) score += w * 2;
   
-  if (Math.abs(w - r.width) < 0.5) score += h * 5; // Premio masivo por alineación perfecta de ancho
-  if (Math.abs(h - r.height) < 0.5) score += w * 5; // Premio masivo por alineación perfecta de alto
+  // Coincidencia exacta con el contenedor (Elimina fragmentación)
+  if (Math.abs(w - r.width) < 0.5) score += h * 50; 
+  if (Math.abs(h - r.height) < 0.5) score += w * 50; 
   
   return score;
 }
 
+/**
+ * Forzar apilamiento de piezas idénticas (Afinidad de Clúster)
+ */
 function fillRemainingWithBrothers(
   pool: InternalPart[], 
   freeRects: FreeRect[], 
@@ -255,18 +273,18 @@ function fillRemainingWithBrothers(
     const part = pool[i];
     if (part.placed) continue;
 
-    let bestRectIdx = -1;
-    let currentRotated = false;
+    const isSameSize = (part.width === (last.rotated ? last.height : last.width) && part.height === (last.rotated ? last.width : last.height));
+    if (!isSameSize) continue;
 
+    let bestRectIdx = -1;
     for (let j = 0; j < freeRects.length; j++) {
       const r = freeRects[j];
-      const wN = part.width; const hN = part.height;
-      const isSameSize = (wN === (last.rotated ? last.height : last.width) && hN === (last.rotated ? last.width : last.height));
+      const wN = last.width; const hN = last.height;
       
-      if (isSameSize && wN <= r.width && hN <= r.height) {
+      if (wN <= r.width && hN <= r.height) {
+        // Solo colocar si mantiene la alineación de la franja/columna
         if (Math.abs(wN - r.width) < 0.5 || Math.abs(hN - r.height) < 0.5) {
           bestRectIdx = j;
-          currentRotated = last.rotated;
           break;
         }
       }
@@ -274,18 +292,14 @@ function fillRemainingWithBrothers(
 
     if (bestRectIdx !== -1) {
       const r = freeRects[bestRectIdx];
-      const w = currentRotated ? part.height : part.width;
-      const h = currentRotated ? part.width : part.height;
-
       placedParts.push({
         name: part.name,
-        x: r.x, y: r.y, width: w, height: h,
-        rotated: currentRotated,
+        x: r.x, y: r.y, width: last.width, height: last.height,
+        rotated: last.rotated,
         color: colors[part.name]
       });
-
       part.placed = true;
-      splitGuillotine(freeRects, bestRectIdx, w, h, kerf, strategy);
+      splitGuillotine(freeRects, bestRectIdx, last.width, last.height, kerf, strategy);
     }
   }
 }
@@ -296,52 +310,48 @@ function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, part
   const remH = r.height - partH - kerf;
 
   if (strategy === 'vertical') {
+    // Primero dividir verticalmente (crear columna lateral)
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: r.height });
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: partW, height: remH });
   } else {
+    // Primero dividir horizontalmente (crear tira superior)
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: r.width, height: remH });
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: partH });
   }
 }
 
+/**
+ * Evaluación de calidad del panel
+ * Penaliza fuertemente la fragmentación y premia bloques sobrantes masivos.
+ */
 function evaluatePanelQuality(panel: OptimizedPanel, strategy: 'vertical' | 'horizontal'): number {
-  let score = panel.efficiency * 1e18;
+  let score = panel.efficiency * 1e20;
   
-  // Bono por estrategia horizontal (transversal) si empatan en eficiencia
-  if (strategy === 'horizontal') score += 1e12;
+  // Bono por estrategia horizontal (pedida por el usuario)
+  if (strategy === 'horizontal') score += 1e15;
 
-  // Bono por consolidación de sobrante masivo
+  // Bono masivo por el tamaño del sobrante más grande (Consolidación)
   const largestLeftover = Math.max(0, ...(panel.leftovers?.map(l => l.width * l.height) || [0]));
-  score += largestLeftover * 1e8;
+  score += largestLeftover * 1e10;
 
-  // Penalización por fragmentación excesiva
-  const uselessLeftovers = panel.leftovers?.filter(l => Math.min(l.width, l.height) < 100).length || 0;
-  score -= uselessLeftovers * 1e14;
+  // Penalización por cada corte adicional (menor cantidad de piezas en el panel es mejor si la eficiencia es igual)
+  score -= panel.parts.length * 1e8;
 
   return score;
 }
 
-function shuffle(pool: InternalPart[]) {
+function smartShuffle(pool: InternalPart[]) {
+  // Ordenamiento ponderado: las piezas grandes tienen 90% probabilidad de quedar arriba
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
+    const areaI = pool[i].width * pool[i].height;
+    const areaJ = pool[j].width * pool[j].height;
+    
+    // Si la pieza en J es más grande, es menos probable que la movamos hacia atrás
+    if (areaJ > areaI && Math.random() > 0.2) continue;
+    
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-}
-
-function clusterShuffle(pool: InternalPart[]) {
-  const groups = new Map<string, InternalPart[]>();
-  pool.forEach(p => {
-    const key = `${p.width}x${p.height}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(p);
-  });
-  const groupList = Array.from(groups.values());
-  for (let i = groupList.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [groupList[i], groupList[j]] = [groupList[j], groupList[i]];
-  }
-  let idx = 0;
-  groupList.forEach(g => g.forEach(p => { pool[idx++] = p; }));
 }
 
 function generateColors(parts: any[]): Record<string, string> {

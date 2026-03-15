@@ -53,75 +53,37 @@ const FURNITURE_PRESETS = [
     id: 'test-dataset',
     name: "Valores de Prueba (73 Piezas)",
     parts: [
-      { name: "Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-      { name: "Lateral V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
-      { name: "Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'libre' },
-      { name: "Piso/Techo 582", width: 500, height: 582, quantity: 2, grainDirection: 'libre' },
-      { name: "Piso/Techo 562", width: 500, height: 562, quantity: 1, grainDirection: 'libre' },
-      { name: "Amarre 582", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-      { name: "Amarre 463", width: 463, height: 150, quantity: 3, grainDirection: 'libre' },
-      { name: "Amarre 562", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'libre' },
-      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 382x117", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 177x117", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'libre' }
-    ]
-  },
-  {
-    id: 'bajo-120',
-    name: "Bajo Mesada 1.20m (Base)",
-    parts: [
-      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'vertical' },
-      { name: "Piso", width: 1164, height: 560, quantity: 1, grainDirection: 'vertical' },
-      { name: "Estante", width: 1164, height: 500, quantity: 1, grainDirection: 'vertical' },
-      { name: "Amarre Frontal/Trasero", width: 1164, height: 60, quantity: 2, grainDirection: 'vertical' }
-    ]
-  },
-  {
-    id: 'ala-80',
-    name: "Alacena 0.80m (Standard)",
-    parts: [
-      { name: "Lateral Izq/Der", width: 600, height: 300, quantity: 2, grainDirection: 'vertical' },
-      { name: "Piso/Techo", width: 764, height: 300, quantity: 2, grainDirection: 'vertical' },
-      { name: "Estante", width: 764, height: 280, quantity: 1, grainDirection: 'vertical' }
-    ]
-  },
-  {
-    id: 'caj-60',
-    name: "Cajonera 0.60m (3 Cajones)",
-    parts: [
-      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'vertical' },
-      { name: "Piso", width: 564, height: 560, quantity: 1, grainDirection: 'vertical' },
-      { name: "Amarre Trasero", width: 564, height: 60, quantity: 1, grainDirection: 'vertical' },
-      { name: "Frente Cajón", width: 596, height: 235, quantity: 3, grainDirection: 'vertical' }
-    ]
-  },
-  {
-    id: 'pla-mod',
-    name: "Placard (Módulo Central)",
-    parts: [
-      { name: "Lateral", width: 2100, height: 580, quantity: 2, grainDirection: 'vertical' },
-      { name: "Techo/Piso", width: 564, height: 580, quantity: 2, grainDirection: 'vertical' },
-      { name: "Divisor Estantes", width: 564, height: 500, quantity: 4, grainDirection: 'vertical' }
+      { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'vertical' },
+      { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'vertical' },
+      { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'vertical' },
+      { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'vertical' },
+      { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'vertical' },
+      { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'vertical' },
+      { name: "(8) Amarre(8)", width: 562, height: 150, quantity: 2, grainDirection: 'vertical' },
+      { name: "(15) Divisor V-Caj Cent2", width: 578, height: 470, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'vertical' },
+      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'vertical' },
+      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'vertical' },
+      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'vertical' },
+      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'vertical' },
+      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'vertical' },
+      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'vertical' },
+      { name: "(22) Contrafrente v1 v2 caj", width: 382, height: 117, quantity: 2, grainDirection: 'vertical' },
+      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'vertical' },
+      { name: "(24) Taco Pieza 2", width: 177, height: 117, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'vertical' },
+      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'vertical' },
+      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'vertical' }
     ]
   }
 ];
@@ -243,7 +205,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
     (doc as any).autoTable({
       head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
-      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Ignorar' : 'Respetar']),
+      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Rotación Libre' : 'Respetar Veta']),
       startY: 40,
       headStyles: { fillColor: BRAND_COLOR, fontStyle: 'bold' }
     });
@@ -268,7 +230,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v25.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v26.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -607,7 +569,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v25.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v26.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
