@@ -18,11 +18,11 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v28.0 - Gap-First Intelligence
+ * JADSI Industrial Engine v28.1 - Precision Threshold
  * 
- * Implementa una optimización "Rect-First". En lugar de iterar piezas, 
+ * Implementa una optimización "Rect-First". In lugar de iterar piezas, 
  * itera sobre los rectángulos libres (huecos) y busca la mejor pieza para cada uno.
- * Esto garantiza que huecos como "S3" se llenen antes de abrir nuevas filas.
+ * Umbral de eficiencia elevado al 95.3% para máxima densidad.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -99,7 +99,8 @@ export function runOptimization(
         bestPanelForThisStep = attempt;
       }
 
-      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= 95.0) break;
+      // Umbral de eficiencia ajustado a 95.3%
+      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= 95.3) break;
     }
 
     if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
@@ -128,7 +129,7 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: finalPanels.length > 0 ? (totalUsedArea / totalAvailArea) * 100 : 0,
-    summary: `JADSI v28.0 Master: ${finalPanels.length} paneles. Eficiencia Global: ${((totalUsedArea / totalAvailArea) * 100).toFixed(1)}%.`,
+    summary: `JADSI v28.1 Master: ${finalPanels.length} paneles. Eficiencia Global: ${((totalUsedArea / totalAvailArea) * 100).toFixed(1)}%.`,
     kerf,
     trim,
     selectedThickness
