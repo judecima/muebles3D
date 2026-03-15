@@ -11,8 +11,9 @@ interface InternalPart {
 }
 
 /**
- * JADSI Industrial Engine v15.0 - HIGH DENSITY DGP
- * Implementa empaquetado de alta densidad con minimización de entropía de desperdicio.
+ * JADSI Industrial Engine v16.5 - ULTRA-ITERATIVE NESTING
+ * Implementa búsqueda estocástica de alta intensidad para encontrar layouts de guillotina perfectos.
+ * Optimizado para consolidar "Bloques Maestros" de desperdicio reutilizable.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -35,16 +36,15 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // SIMULACIÓN MULTI-ESTRATEGIA (DGP Analysis)
+  // CONFIGURACIÓN DE INTENSIDAD JADSI v16.5
+  const iterationsPerStrategy = 60; 
   const masterOrientations = [false, true]; // Horizontal vs Vertical
-  const sortingHeuristics = [
-    (a: InternalPart, b: InternalPart) => b.height - a.height || b.width - a.width,
-    (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height),
-    (a: InternalPart, b: InternalPart) => b.width - a.width || b.height - a.height
-  ];
 
   for (const isVerticalMaster of masterOrientations) {
-    for (const sortFn of sortingHeuristics) {
+    const algoW = isVerticalMaster ? usableH : usableW;
+    const algoH = isVerticalMaster ? usableW : usableH;
+
+    for (let iter = 0; iter < iterationsPerStrategy; iter++) {
       const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
         Array.from({ length: p.quantity }, () => ({
           ...p,
@@ -53,21 +53,25 @@ export function runOptimization(
         }))
       );
 
-      pool.sort(sortFn);
-
-      // En el algoritmo interno, siempre trabajamos con W como dirección de la tira y H como profundidad
-      const algoW = isVerticalMaster ? usableH : usableW;
-      const algoH = isVerticalMaster ? usableW : usableH;
+      // Estrategias de ordenamiento dinámicas
+      if (iter === 0) pool.sort((a, b) => b.height - a.height || b.width - a.width);
+      else if (iter === 1) pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+      else if (iter === 2) pool.sort((a, b) => b.width - a.width || b.height - a.height);
+      else {
+        // Shuffle aleatorio para buscar el "cisne negro" de la optimización (Monte Carlo)
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+      }
 
       const currentResult = executeNesting(pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalMaster);
       
-      // EVALUACIÓN DE CALIDAD JADSI v15
-      // 1. Menos paneles (Factor 10^9)
-      // 2. Eficiencia global (Factor 10^6)
-      // 3. Área del bloque de desperdicio más grande (Factor 1)
+      // EVALUACIÓN DE CALIDAD JADSI v16.5
       const wasteScore = calculateWasteQuality(currentResult, algoW, algoH);
-      const score = (1000 / currentResult.totalPanels) * 1000000000 + 
-                    (currentResult.totalEfficiency * 1000000) + 
+      // Puntuación: Prioridad extrema a reducir paneles, luego eficiencia, luego calidad de sobrante
+      const score = (1000 / currentResult.totalPanels) * 1e12 + 
+                    (currentResult.totalEfficiency * 1e8) + 
                     wasteScore;
 
       if (!bestGlobalResult || score > bestGlobalScore) {
@@ -77,7 +81,7 @@ export function runOptimization(
     }
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor v15", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor v16.5", kerf, trim, selectedThickness };
 }
 
 function executeNesting(
@@ -99,59 +103,52 @@ function executeNesting(
     const placedParts: OptimizedPart[] = [];
     let currentY = 0;
 
-    // Llenar un panel
     while (currentY < algoH) {
-      // 1. Encontrar el "Líder de Tira" (la pieza más alta disponible)
       let leaderIdx = -1;
       let leaderRotated = false;
 
+      // Buscar el mejor líder para la columna/fila actual
       for (let i = 0; i < workingPool.length; i++) {
         const p = workingPool[i];
         if (p.placed) continue;
         
-        // Intentar normal
         if (p.height <= (algoH - currentY) && p.width <= algoW) {
           leaderIdx = i; leaderRotated = false; break;
         }
-        // Intentar rotado (si es libre)
         if (p.grainDirection === 'libre' && p.width <= (algoH - currentY) && p.height <= algoW) {
           leaderIdx = i; leaderRotated = true; break;
         }
       }
 
-      if (leaderIdx === -1) break; // No caben más tiras
+      if (leaderIdx === -1) break;
 
       const leader = workingPool[leaderIdx];
       const stripH = leaderRotated ? leader.width : leader.height;
       let currentX = 0;
 
-      // 2. Llenar la tira horizontalmente
       while (currentX < algoW) {
         let bestPartIdx = -1;
         let bestPartRotated = false;
 
-        // Estrategia "Best Fit" para la tira: buscar la pieza que mejor llene el alto de la tira
         for (let i = 0; i < workingPool.length; i++) {
           const p = workingPool[i];
           if (p.placed) continue;
 
-          // Caso A: Pieza cabe en la tira
           if (p.width <= (algoW - currentX) && p.height <= stripH) {
             bestPartIdx = i; bestPartRotated = false; break;
           }
-          // Caso B: Pieza rotada cabe en la tira
           if (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= stripH) {
             bestPartIdx = i; bestPartRotated = true; break;
           }
         }
 
-        if (bestPartIdx === -1) break; // No caben más piezas en esta tira
+        if (bestPartIdx === -1) break;
 
         const p = workingPool[bestPartIdx];
         const pW = bestPartRotated ? p.height : p.width;
         const pH = bestPartRotated ? p.width : p.height;
 
-        // Antes de colocar, verificar si podemos apilar piezas verticalmente dentro de este ancho X (Sub-columnas)
+        // Apilamiento vertical dentro de la columna (Sub-stacking)
         let subY = 0;
         while (subY < stripH) {
           let stackPartIdx = -1;
@@ -161,6 +158,7 @@ function executeNesting(
             const sp = workingPool[j];
             if (sp.placed) continue;
 
+            // Buscamos piezas que coincidan con el ancho de la columna actual
             if (sp.width === pW && sp.height <= (stripH - subY)) {
               stackPartIdx = j; stackRotated = false; break;
             }
@@ -174,7 +172,6 @@ function executeNesting(
           const sp = workingPool[stackPartIdx];
           const spH = stackRotated ? sp.width : sp.height;
 
-          // Mapear coordenadas finales según orientación maestra
           const absX = currentX;
           const absY = currentY + subY;
 
@@ -203,7 +200,7 @@ function executeNesting(
       currentY += stripH + kerf;
     }
 
-    if (placedParts.length === 0) break; // Evitar bucle infinito
+    if (placedParts.length === 0) break;
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
     const totalArea = panelWidth * panelHeight;
@@ -216,7 +213,7 @@ function executeNesting(
       totalArea
     });
 
-    if (panels.length > 50) break; // Límite de seguridad
+    if (panels.length > 50) break;
   }
 
   const totalUsed = panels.reduce((acc, p) => acc + p.usedArea, 0);
@@ -226,36 +223,33 @@ function executeNesting(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v15.0 HighDensity: ${isVertical ? 'Corte Vertical' : 'Corte Horizontal'} optimizado.`,
+    summary: `JADSI v16.5 Ultra-Iterative: Nesting de alta densidad con consolidación de bloques.`,
     kerf,
     trim,
     selectedThickness
   };
 }
 
-/**
- * Calcula la calidad del sobrante basándose en el rectángulo libre más grande.
- */
 function calculateWasteQuality(result: OptimizationResult, algoW: number, algoH: number): number {
   let score = 0;
   result.optimizedLayout.forEach(panel => {
-    // Encontramos el límite del empaquetado en X e Y
     const maxX = panel.parts.reduce((max, p) => Math.max(max, p.x + p.width), 0);
     const maxY = panel.parts.reduce((max, p) => Math.max(max, p.y + p.height), 0);
     
-    const remainingW = algoW - maxX;
-    const remainingH = algoH - maxY;
+    const remainingW = Math.max(0, algoW - maxX);
+    const remainingH = Math.max(0, algoH - maxY);
 
-    // Área del sobrante lateral y superior
     const areaSide = remainingW * algoH;
     const areaTop = remainingH * algoW;
 
-    // Premiamos el área más grande y penalizamos si la dimensión es muy pequeña
     const bestArea = Math.max(areaSide, areaTop);
     const minDim = bestArea === areaSide ? remainingW : remainingH;
 
-    if (minDim > 150) { // Bloque realmente útil
-      score += (bestArea * minDim);
+    // JADSI v16.5 premia exponencialmente los bloques donde el ancho es suficiente para una pieza estándar (>300mm)
+    if (minDim > 300) {
+      score += (bestArea * minDim * 2);
+    } else if (minDim > 100) {
+      score += bestArea;
     }
   });
   return score;
