@@ -27,7 +27,10 @@ import {
   Maximize,
   Trash2,
   Database,
-  RotateCcw
+  RotateCcw,
+  ArrowDownToLine,
+  ArrowRightToLine,
+  PackageCheck
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -92,6 +95,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [localCutlist, setLocalCutlist] = useState<any[]>([]);
   const [isPartsListOpen, setIsPartsListOpen] = useState(true);
   const [isDetailedListOpen, setIsDetailedListOpen] = useState(false);
+  const [isStockOpen, setIsStockOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [targetThickness, setTargetThickness] = useState<number>(18);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -457,50 +461,84 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
             </Card>
 
             {result && (
-              <Card className="shadow-sm border-slate-200 bg-white">
-                <Collapsible open={isDetailedListOpen} onOpenChange={setIsDetailedListOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" className="w-full flex justify-between px-4 py-4 text-slate-600">
-                      <div className="flex items-center gap-2"><List className="w-4 h-4 text-primary" /><span className="text-[10px] font-black uppercase">Detalle de Posiciones</span></div>
-                      {isDetailedListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="p-0 border-t">
-                    <div className="max-h-[400px] overflow-auto">
-                      <Table>
-                        <TableHeader className="bg-slate-50 sticky top-0">
-                          <TableRow className="h-7">
-                            <TableHead className="text-[9px] py-1 px-2 font-black">Pieza</TableHead>
-                            <TableHead className="text-[9px] py-1 px-2 text-right font-black">Ancho</TableHead>
-                            <TableHead className="text-[9px] py-1 px-2 text-right font-black">Alto</TableHead>
-                            <TableHead className="text-[9px] py-1 px-2 text-center font-black">Tipo</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {result.optimizedLayout.flatMap(panel => [
-                            ...panel.parts.map((p, i) => (
-                              <TableRow key={`${panel.panelNumber}-p-${i}`} className="h-7">
-                                <TableCell className="text-[9px] py-1 px-2 font-medium truncate max-w-[100px]">{p.name}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-right">{Math.round(p.width)}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-right">{Math.round(p.height)}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-center">PIEZA</TableCell>
-                              </TableRow>
-                            )),
-                            ...(panel.leftovers?.map((l, i) => (
-                              <TableRow key={`${panel.panelNumber}-l-${i}`} className="h-7 bg-slate-50/50">
-                                <TableCell className="text-[9px] py-1 px-2 font-black text-slate-400">{l.name}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-right text-slate-400">{Math.round(l.width)}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-right text-slate-400">{Math.round(l.height)}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-center text-slate-400 font-bold">SOBRANTE</TableCell>
-                              </TableRow>
-                            )) || [])
-                          ])}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </Card>
+              <div className="space-y-4">
+                <Card className="shadow-sm border-slate-200 bg-white">
+                  <Collapsible open={isDetailedListOpen} onOpenChange={setIsDetailedListOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full flex justify-between px-4 py-4 text-slate-600">
+                        <div className="flex items-center gap-2"><List className="w-4 h-4 text-primary" /><span className="text-[10px] font-black uppercase">Detalle de Posiciones</span></div>
+                        {isDetailedListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-0 border-t">
+                      <div className="max-h-[300px] overflow-auto">
+                        <Table>
+                          <TableHeader className="bg-slate-50 sticky top-0">
+                            <TableRow className="h-7">
+                              <TableHead className="text-[9px] py-1 px-2 font-black">Pieza</TableHead>
+                              <TableHead className="text-[9px] py-1 px-2 text-right font-black">Ancho</TableHead>
+                              <TableHead className="text-[9px] py-1 px-2 text-right font-black">Alto</TableHead>
+                              <TableHead className="text-[9px] py-1 px-2 text-center font-black">Tipo</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {result.optimizedLayout.flatMap(panel => [
+                              ...panel.parts.map((p, i) => (
+                                <TableRow key={`${panel.panelNumber}-p-${i}`} className="h-7">
+                                  <TableCell className="text-[9px] py-1 px-2 font-medium truncate max-w-[100px]">{p.name}</TableCell>
+                                  <TableCell className="text-[9px] py-1 px-2 text-right">{Math.round(p.width)}</TableCell>
+                                  <TableCell className="text-[9px] py-1 px-2 text-right">{Math.round(p.height)}</TableCell>
+                                  <TableCell className="text-[9px] py-1 px-2 text-center text-primary font-bold">PIEZA</TableCell>
+                                </TableRow>
+                              ))
+                            ])}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
+
+                <Card className="shadow-sm border-slate-200 bg-white">
+                  <Collapsible open={isStockOpen} onOpenChange={setIsStockOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full flex justify-between px-4 py-4 text-slate-600">
+                        <div className="flex items-center gap-2"><PackageCheck className="w-4 h-4 text-emerald-600" /><span className="text-[10px] font-black uppercase">Inventario de Sobrantes</span></div>
+                        {isStockOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-0 border-t">
+                      <div className="max-h-[300px] overflow-auto">
+                        <Table>
+                          <TableHeader className="bg-slate-50 sticky top-0">
+                            <TableRow className="h-7">
+                              <TableHead className="text-[9px] py-1 px-2 font-black">ID</TableHead>
+                              <TableHead className="text-[9px] py-1 px-2 text-right font-black">Base</TableHead>
+                              <TableHead className="text-[9px] py-1 px-2 text-right font-black">Altura</TableHead>
+                              <TableHead className="text-[9px] py-1 px-2 text-center font-black">Panel</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {result.optimizedLayout.flatMap(panel => 
+                              (panel.leftovers || []).map((l, i) => (
+                                <TableRow key={`${panel.panelNumber}-l-${i}`} className="h-7 bg-emerald-50/20">
+                                  <TableCell className="text-[9px] py-1 px-2 font-black text-emerald-700">{l.name}</TableCell>
+                                  <TableCell className="text-[9px] py-1 px-2 text-right font-bold">{Math.round(l.width)}</TableCell>
+                                  <TableCell className="text-[9px] py-1 px-2 text-right font-bold">{Math.round(l.height)}</TableCell>
+                                  <TableCell className="text-[9px] py-1 px-2 text-center text-slate-400">#{panel.panelNumber}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                            {result.optimizedLayout.every(p => !p.leftovers || p.leftovers.length === 0) && (
+                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables (>60mm)</TableCell></TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
+              </div>
             )}
           </div>
         </div>
@@ -525,62 +563,76 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
             </div>
           ) : (
             <div className="space-y-12 py-8 px-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-              {result.optimizedLayout.map((panel, idx) => (
-                <div key={idx} className="space-y-4">
-                  <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
-                    <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — {selectedPanel.width}x{selectedPanel.height}mm</h3>
-                    <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
-                  </div>
-                  
-                  <div className="relative bg-white shadow-2xl rounded-sm mx-auto overflow-hidden border border-slate-300" 
-                       style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
+              {result.optimizedLayout.map((panel, idx) => {
+                const isVertical = result.summary.toLowerCase().includes('vertical');
+                return (
+                  <div key={idx} className="space-y-4">
+                    <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
+                      <div className="flex flex-col gap-0.5">
+                        <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — {selectedPanel.width}x{selectedPanel.height}mm</h3>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={`border-primary text-primary text-[8px] font-black uppercase px-1.5 h-4 flex items-center gap-1 bg-primary/10`}>
+                            {isVertical ? <ArrowDownToLine className="w-2.5 h-2.5" /> : <ArrowRightToLine className="w-2.5 h-2.5" />}
+                            Primer Corte: {isVertical ? 'Vertical (Columna)' : 'Horizontal (Tira)'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
+                    </div>
                     
-                    <div className="absolute bg-slate-50" style={{ 
-                      left: `${(result.trim / selectedPanel.width) * 100}%`, 
-                      top: `${(result.trim / selectedPanel.height) * 100}%`, 
-                      width: `${((selectedPanel.width - 2 * result.trim) / selectedPanel.width) * 100}%`, 
-                      height: `${((selectedPanel.height - 2 * result.trim) / selectedPanel.height) * 100}%`,
-                      backgroundImage: 'linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px)',
-                      backgroundSize: '50px 50px'
-                    }}>
-                      {/* Renderizado de Piezas */}
-                      {panel.parts.map((p, pIdx) => (
-                        <div key={`p-${pIdx}`} title={`${p.name}: ${p.width}x${p.height}mm`}
-                             className="absolute border border-slate-900/60 transition-all hover:brightness-90 flex flex-col justify-center items-center overflow-hidden" 
-                             style={{ 
-                               left: `${((p.x - result.trim) / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
-                               top: `${((p.y - result.trim) / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
-                               width: `${(p.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
-                               height: `${(p.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
-                               backgroundColor: p.color || 'rgba(13, 110, 253, 0.15)'
-                             }}>
-                          <span className="text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">{Math.round(p.width)} x {Math.round(p.height)}</span>
-                          <span className="text-[min(1.4vw,8px)] text-slate-600 uppercase font-bold truncate block w-full px-1 text-center mt-1">{p.name}</span>
-                        </div>
-                      ))}
+                    <div className="relative bg-white shadow-2xl rounded-sm mx-auto overflow-hidden border border-slate-300" 
+                         style={{ width: '100%', aspectRatio: `${selectedPanel.width} / ${selectedPanel.height}` }}>
+                      
+                      <div className="absolute bg-slate-50" style={{ 
+                        left: `${(result.trim / selectedPanel.width) * 100}%`, 
+                        top: `${(result.trim / selectedPanel.height) * 100}%`, 
+                        width: `${((selectedPanel.width - 2 * result.trim) / selectedPanel.width) * 100}%`, 
+                        height: `${((selectedPanel.height - 2 * result.trim) / selectedPanel.height) * 100}%`,
+                        backgroundImage: 'linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px)',
+                        backgroundSize: '50px 50px'
+                      }}>
+                        {/* Renderizado de Piezas */}
+                        {panel.parts.map((p, pIdx) => (
+                          <div key={`p-${pIdx}`} title={`${p.name}: ${p.width}x${p.height}mm`}
+                               className="absolute border border-slate-900/60 shadow-sm transition-all hover:brightness-90 flex flex-col justify-center items-center overflow-hidden" 
+                               style={{ 
+                                 left: `${((p.x - result.trim) / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                                 top: `${((p.y - result.trim) / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
+                                 width: `${(p.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                                 height: `${(p.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
+                                 backgroundColor: p.color || 'rgba(13, 110, 253, 0.15)'
+                               }}>
+                            <span className="text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">{Math.round(p.width)} x {Math.round(p.height)}</span>
+                            <span className="text-[min(1.4vw,8px)] text-slate-600 uppercase font-bold truncate block w-full px-1 text-center mt-1">{p.name}</span>
+                          </div>
+                        ))}
 
-                      {/* Renderizado de Sobrantes (S1, S2...) */}
-                      {panel.leftovers?.map((l, lIdx) => (
-                        <div key={`l-${lIdx}`} title={`Sobrante ${l.name}: ${l.width}x${l.height}mm`}
-                             className="absolute border border-dashed border-slate-400 bg-white/80 flex flex-col justify-center items-center overflow-hidden" 
-                             style={{ 
-                               left: `${((l.x - result.trim) / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
-                               top: `${((l.y - result.trim) / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
-                               width: `${(l.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
-                               height: `${(l.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
-                             }}>
-                          <span className="text-[min(1.8vw,10px)] font-black text-slate-400 leading-none">({l.name})</span>
-                          <span className="text-[min(1.2vw,7px)] text-slate-400 font-bold uppercase mt-1">{Math.round(l.width)}x{Math.round(l.height)}</span>
-                        </div>
-                      ))}
+                        {/* Renderizado de Sobrantes (S1, S2...) */}
+                        {panel.leftovers?.map((l, lIdx) => (
+                          <div key={`l-${lIdx}`} title={`Sobrante ${l.name}: ${l.width}x${l.height}mm`}
+                               className="absolute border border-dashed border-slate-400 bg-white/90 flex flex-col justify-center items-center overflow-hidden group/stock" 
+                               style={{ 
+                                 left: `${((l.x - result.trim) / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                                 top: `${((l.y - result.trim) / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
+                                 width: `${(l.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                                 height: `${(l.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
+                               }}>
+                            <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover/stock:opacity-100 transition-opacity" />
+                            <span className="text-[min(1.8vw,10px)] font-black text-emerald-600 leading-none">({l.name})</span>
+                            <span className="text-[min(1.2vw,7px)] text-slate-400 font-bold uppercase mt-1">{Math.round(l.width)}x{Math.round(l.height)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-4 items-center px-2">
+                      <Info className="w-3 h-3 text-slate-400" />
+                      <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">
+                        Flujo JADSI Industrial: Las líneas de guillotina {isVertical ? 'verticales' : 'horizontales'} definen los cortes primarios de seccionadora.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex gap-4 items-center px-2">
-                    <Info className="w-3 h-3 text-slate-400" />
-                    <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">Motor JADSI v18.5: Nesting recursivo con extracción de bloques sobrantes útiles.</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
