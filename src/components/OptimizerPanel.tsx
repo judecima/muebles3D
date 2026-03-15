@@ -115,7 +115,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
       }, {} as Record<string, any>);
       setLocalCutlist(Object.values(aggregated));
     } else if (localCutlist.length === 0) {
-      // Valor por defecto inicial
       loadPreset('bajo-120');
     }
   }, [initialParts]);
@@ -317,8 +316,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                             <ChevronRight className="w-4 h-4" />
                           </Button>
                         </div>
-                      </DialogContent>
-                    </Dialog>
+                      </div>
+                    </DialogContent>
                   </Dialog>
                 </div>
 
