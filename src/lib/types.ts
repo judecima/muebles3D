@@ -87,6 +87,7 @@ export interface PanelSize {
 }
 
 export const AVAILABLE_PANELS: PanelSize[] = [
+  { id: 'standard-4', width: 2750, height: 1830, name: '2750 x 1830 mm (Industrial)' },
   { id: 'standard-1', width: 2600, height: 1830, name: '2600 x 1830 mm' },
   { id: 'standard-2', width: 2440, height: 1830, name: '2440 x 1830 mm' },
   { id: 'standard-3', width: 2800, height: 2100, name: '2800 x 2100 mm' },
