@@ -18,8 +18,8 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v34.0 - Lepton Logic Alignment
- * Optimización secuencial independiente con enfoque en consolidación de stock reutilizable (Engine B).
+ * JADSI Industrial Engine v35.0 - X-Rip Dominance (Lepton Logic Alignment)
+ * Optimización de alto rendimiento con prioridad en consolidación de stock vertical.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -59,20 +59,21 @@ export function runOptimization(
     const maxIterations = 10000;
     const targetEfficiency = 95.3;
 
-    // Evaluamos el panel actual de forma totalmente independiente
+    // Evaluamos el panel actual de forma independiente
     for (let iter = 0; iter < maxIterations; iter++) {
       const currentAvailablePieces = globalPool.filter(p => !p.placed).map(p => ({ ...p }));
       
-      // Heurísticas de ordenamiento para explorar el espacio de soluciones
+      // Ordenamiento base: Área descendente
       if (iter === 0) {
         currentAvailablePieces.sort((a, b) => (b.width * b.height) - (a.width * a.height));
       } else if (iter < 2000) {
+        // Ordenamiento secundario: Lado mayor descendente
         currentAvailablePieces.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
       } else {
         smartShuffle(currentAvailablePieces);
       }
 
-      // IMPORTANTE: Cada panel evalúa ambas estrategias (X-Rip y Y-Rip)
+      // Probar ambas estrategias por cada panel
       const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
       
       for (const strategy of strategies) {
@@ -90,7 +91,7 @@ export function runOptimization(
           panelCounter
         );
 
-        const currentScore = evaluatePanelQuality(attempt, panelWidth);
+        const currentScore = evaluatePanelQuality(attempt, panelWidth, panelHeight);
         
         if (currentScore > bestScore) {
           bestScore = currentScore;
@@ -98,12 +99,12 @@ export function runOptimization(
         }
       }
 
-      // Si alcanzamos la meta de eficiencia industrial, cerramos el panel
+      // Short-circuit de eficiencia industrial
       if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= targetEfficiency) break;
     }
 
     if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
-      // Marcar piezas como colocadas y eliminarlas del pool para el siguiente panel
+      // Marcar piezas como colocadas para el siguiente panel
       bestPanelForThisStep.parts.forEach(placedPart => {
         if (placedPart.isLeftover) return;
         
@@ -130,7 +131,7 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: finalPanels.length > 0 ? (totalUsedArea / totalAvailArea) * 100 : 0,
-    summary: `JADSI v34.0 Industrial (Engine B): Análisis de stock masivo y dominancia vertical.`,
+    summary: `JADSI v35.0 Industrial (Engine B): X-Rip Dominance & Stock Consolidation.`,
     kerf,
     trim,
     selectedThickness
@@ -154,11 +155,12 @@ function fillSinglePanel(
   const freeRects: FreeRect[] = [{ x: trim, y: trim, width: usableW, height: usableH }];
   const leftovers: OptimizedPart[] = [];
   
-  // Logística inicial
+  // Telemetría inicial
   let linearMeters = (panelWidth * 2 + panelHeight * 2) / 1000;
   let displacements = 4;
 
   while (freeRects.length > 0) {
+    // Prioridad de huecos según estrategia
     freeRects.sort((a, b) => {
       if (strategy === 'horizontal') return (a.y - b.y) || (a.x - b.x);
       return (a.x - b.x) || (a.y - b.y);
@@ -175,6 +177,7 @@ function fillSinglePanel(
       const part = pieces[i];
       if (part.placed) continue;
 
+      // Intentar sin rotar
       if (part.width <= r.width && part.height <= r.height) {
         const score = calculateIndustrialScore(part.width, part.height, r, strategy);
         if (score > bestScore) {
@@ -182,6 +185,7 @@ function fillSinglePanel(
         }
       }
 
+      // Intentar rotado
       const canRotate = !hasGrain || part.grainDirection === 'libre';
       if (canRotate && part.height <= r.width && part.width <= r.height) {
         const score = calculateIndustrialScore(part.height, part.width, r, strategy);
@@ -220,6 +224,7 @@ function fillSinglePanel(
     }
   }
 
+  // Reset flag temporal de piezas para la siguiente iteración de simulación
   pieces.forEach(p => p.placed = false);
 
   const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
@@ -251,13 +256,17 @@ function fillSinglePanel(
 
 function calculateIndustrialScore(w: number, h: number, r: FreeRect, strategy: 'vertical' | 'horizontal'): number {
   let score = 0;
+  // Bono crítico de alineación industrial
   if (strategy === 'horizontal') {
-    if (Math.abs(h - r.height) < 0.5) score += 50000000;
+    if (Math.abs(h - r.height) < 0.5) score += 100000000;
   } else {
-    if (Math.abs(w - r.width) < 0.5) score += 50000000;
+    if (Math.abs(w - r.width) < 0.5) score += 100000000;
   }
-  score += (w * h) * 5; 
-  if (r.x === 10 || r.y === 10) score += 1000000; 
+  
+  // Priorizar área grande y cercanía al origen (Estabilidad)
+  score += (w * h) * 10;
+  if (r.x === 10 || r.y === 10) score += 5000000; 
+  
   return score;
 }
 
@@ -275,36 +284,36 @@ function splitGuillotine(freeRects: FreeRect[], r: FreeRect, pW: number, pH: num
 }
 
 /**
- * Función de Calidad Industrial (Engine B)
- * Prioriza la consolidación de stock reutilizable sobre la densidad bruta.
+ * Función de Calidad Industrial v35.0 (Engine B)
+ * Prioriza la dominancia de eje vertical y consolidación de stock masivo.
  */
-function evaluatePanelQuality(panel: OptimizedPanel, panelWidth: number): number {
-  // 1. Puntaje Base por Eficiencia (Lineal)
-  let score = panel.efficiency * 100000;
+function evaluatePanelQuality(panel: OptimizedPanel, panelWidth: number, panelHeight: number): number {
+  // 1. Eficiencia base (Factor 1M)
+  let score = panel.efficiency * 1000000;
   
-  // 2. Bono por Sobrante Único Masivo (Factor Engine B: 200,000,000)
+  // 2. Bono por bloque sobrante masivo (Stock Reutilizable)
   const leftovers = panel.leftovers || [];
   const maxLeftoverArea = Math.max(0, ...leftovers.map(l => l.width * l.height));
-  score += (maxLeftoverArea / panel.totalArea) * 200000000;
+  score += (maxLeftoverArea / panel.totalArea) * 500000000;
 
-  // 3. Bonos por Calidad de Stock Reutilizable
+  // 3. Bonos por calidad de retazos
   leftovers.forEach(l => {
     const minDim = Math.min(l.width, l.height);
-    if (minDim >= 400) score += 10000000;
-    else if (minDim >= 250) score += 5000000;
+    if (minDim >= 400) score += 20000000;
+    else if (minDim >= 250) score += 10000000;
   });
 
-  // 4. Regla de Dominancia de Medio Panel Vertical
-  // Si todo cabe en el primer 50% del ancho del tablero usando guillotina vertical, es el layout ideal.
+  // 4. REGLA MAESTRA: Dominancia de Medio Panel Vertical (X-Rip)
+  // Si todo cabe en el primer 50% del ancho del tablero, el bono es imbatible.
   if (panel.strategy === 'vertical' && panel.parts.length > 0) {
     const maxX = Math.max(...panel.parts.map(p => p.x + p.width));
-    if (maxX <= (panelWidth / 2) + 10) {
-      score += 1000000000; // Bono de prioridad industrial absoluta
+    if (maxX <= (panelWidth / 2) + 20) {
+      score += 2000000000; // Bono de prioridad industrial absoluta
     }
   }
   
   // Penalización por fragmentación (cada sobrante extra resta puntos)
-  score -= (leftovers.length * 1000000);
+  score -= (leftovers.length * 5000000);
   
   return score;
 }
