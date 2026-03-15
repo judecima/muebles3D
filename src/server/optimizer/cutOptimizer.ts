@@ -10,18 +10,20 @@ interface InternalPart {
   placed: boolean;
 }
 
-interface Strip {
-  height: number;
+interface Column {
   width: number;
   parts: OptimizedPart[];
+}
+
+interface Strip {
+  height: number;
+  columns: Column[];
   efficiency: number;
 }
 
 /**
- * ArquiMax Industrial Engine v12.6 - GLOBAL DENSITY STRATEGY
- * - Evalúa obligatoriamente Panel Horizontal vs Panel Vertical.
- * - Maximiza el llenado del primer panel mediante un selector de impacto.
- * - Garantiza guillotina estricta de 3 etapas.
+ * JADSI Industrial Engine v13.0 - RECURSIVE CONSOLIDATION STRATEGY
+ * Optimiza para fabricación real y maximización de sobrantes útiles (offcuts).
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -34,65 +36,60 @@ export function runOptimization(
   const filteredParts = parts.filter(p => p.thickness === selectedThickness);
   
   if (filteredParts.length === 0) {
-    return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas", kerf, trim, selectedThickness };
+    return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas del espesor seleccionado", kerf, trim, selectedThickness };
   }
 
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
 
-  // Estrategias de ordenamiento para probar cuál consolida mejor
-  const sortStrategies = [
-    (a: InternalPart, b: InternalPart) => b.height - a.height, 
-    (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height),
-    (a: InternalPart, b: InternalPart) => b.width - a.width,
-  ];
-
-  let bestResult: OptimizationResult | null = null;
-  let bestScore = Infinity; 
   const partColors = generateColors(filteredParts);
+  let bestGlobalResult: OptimizationResult | null = null;
+  let bestGlobalScore = -Infinity;
 
-  // PROBAR TODAS LAS COMBINACIONES: Estrategia de Orden vs Orientación de Panel
-  for (const strategy of sortStrategies) {
-    for (const isVerticalPanel of [false, true]) {
+  // PROBAR ORIENTACIÓN DE TABLERO: Horizontal (X-Rip) vs Vertical (Y-Rip)
+  // Esto es vital para que los sobrantes queden en el eje largo o corto según convenga
+  for (const isVerticalMaster of [false, true]) {
+    
+    // Probar diferentes heurísticas de ordenamiento (Alto, Área, Ancho)
+    const heuristics = [
+      (a: InternalPart, b: InternalPart) => b.height - a.height || b.width - a.width,
+      (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height),
+      (a: InternalPart, b: InternalPart) => b.width - a.width || b.height - a.height
+    ];
+
+    for (const sortFn of heuristics) {
       const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
         Array.from({ length: p.quantity }, () => ({
-          name: p.name,
-          width: p.width,
-          height: p.height,
-          grainDirection: p.grainDirection,
-          thickness: p.thickness,
+          ...p,
           originalIndex: idx,
           placed: false
         }))
       );
 
-      pool.sort(strategy);
+      pool.sort(sortFn);
 
-      // Si es vertical, invertimos las dimensiones de trabajo
-      const algoW = isVerticalPanel ? usableH : usableW;
-      const algoH = isVerticalPanel ? usableW : usableH;
+      const algoW = isVerticalMaster ? usableH : usableW;
+      const algoH = isVerticalMaster ? usableW : usableH;
 
-      const currentResult = buildStripLayout(
-        pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalPanel
-      );
+      const currentResult = executeNesting(pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalMaster);
       
-      if (currentResult.optimizedLayout.length > 0) {
-        // Puntuamos: menos paneles es mejor. A igualdad de paneles, mayor eficiencia en el primer panel es mejor.
-        const firstPanelEfficiency = currentResult.optimizedLayout[0]?.efficiency || 0;
-        const score = (currentResult.totalPanels * 1000000) - firstPanelEfficiency;
+      // PUNTUACIÓN DE CALIDAD JADSI:
+      // 1. Prioridad: Menos paneles.
+      // 2. Prioridad: Mayor eficiencia en el primer panel.
+      // 3. Prioridad: Compactación (Sobrante más grande).
+      const score = (100 / currentResult.totalPanels) * 10000 + (currentResult.optimizedLayout[0]?.efficiency || 0);
 
-        if (!bestResult || score < bestScore) {
-          bestResult = currentResult;
-          bestScore = score;
-        }
+      if (!bestGlobalResult || score > bestGlobalScore) {
+        bestGlobalResult = currentResult;
+        bestGlobalScore = score;
       }
     }
   }
 
-  return bestResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error de cálculo", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor", kerf, trim, selectedThickness };
 }
 
-function buildStripLayout(
+function executeNesting(
   pool: InternalPart[], 
   algoW: number, 
   algoH: number, 
@@ -108,173 +105,157 @@ function buildStripLayout(
   let workingPool = pool.map(p => ({ ...p }));
 
   while (workingPool.some(p => !p.placed)) {
-    const panelStrips: Strip[] = [];
-    let currentPanelHeight = 0;
+    const strips: Strip[] = [];
+    let remainingH = algoH;
 
-    // Llenar un panel con tiras
-    while (currentPanelHeight < algoH) {
+    // Generar tiras (Etapa 1 Guillotina)
+    while (remainingH > 0) {
+      // 1. Buscar líder de tira (la pieza más alta que quepa)
       let leaderIdx = -1;
-      let leaderIsRotated = false;
+      let leaderRotated = false;
 
-      // Buscar el mejor líder de tira (el que mejor encaje en el alto restante)
       for (let i = 0; i < workingPool.length; i++) {
         const p = workingPool[i];
         if (p.placed) continue;
 
-        if (p.width <= algoW && p.height <= (algoH - currentPanelHeight)) {
-          leaderIdx = i;
-          leaderIsRotated = false;
-          break;
+        if (p.height <= remainingH && p.width <= algoW) {
+          leaderIdx = i; leaderRotated = false; break;
         }
-        if (p.grainDirection === 'libre' && p.height <= algoW && p.width <= (algoH - currentPanelHeight)) {
-          leaderIdx = i;
-          leaderIsRotated = true;
-          break;
+        if (p.grainDirection === 'libre' && p.width <= remainingH && p.height <= algoW) {
+          leaderIdx = i; leaderRotated = true; break;
         }
       }
 
       if (leaderIdx === -1) break;
 
       const leader = workingPool[leaderIdx];
-      const stripH = leaderIsRotated ? leader.width : leader.height;
-      const stripParts: OptimizedPart[] = [];
-      let currentX = 0;
+      const stripH = leaderRotated ? leader.width : leader.height;
+      const columns: Column[] = [];
+      let remainingW = algoW;
 
-      // Llenar la tira horizontalmente
-      while (currentX < algoW) {
-        let bestColIdx = -1;
-        let colRotated = false;
+      // 2. Llenar la tira con columnas (Etapa 2 Guillotina)
+      while (remainingW > 0) {
+        let colLeaderIdx = -1;
+        let colLeaderRotated = false;
 
         for (let i = 0; i < workingPool.length; i++) {
           const p = workingPool[i];
           if (p.placed) continue;
 
-          if (p.width <= (algoW - currentX) && p.height <= stripH) {
-            bestColIdx = i;
-            colRotated = false;
-            break;
+          if (p.width <= remainingW && p.height <= stripH) {
+            colLeaderIdx = i; colLeaderRotated = false; break;
           }
-          if (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= stripH) {
-            bestColIdx = i;
-            colRotated = true;
-            break;
+          if (p.grainDirection === 'libre' && p.height <= remainingW && p.width <= stripH) {
+            colLeaderIdx = i; colLeaderRotated = true; break;
           }
         }
 
-        if (bestColIdx === -1) break;
+        if (colLeaderIdx === -1) break;
 
-        const colLeader = workingPool[bestColIdx];
-        const colW = colRotated ? colLeader.height : colLeader.width;
-        let colUsedY = 0;
+        const colLeader = workingPool[colLeaderIdx];
+        const colW = colLeaderRotated ? colLeader.height : colLeader.width;
+        const colParts: OptimizedPart[] = [];
+        let colRemainingH = stripH;
 
-        // Llenar la columna dentro de la tira (Nesting de nivel 3)
-        while (colUsedY < stripH) {
-          let pIdx = -1;
-          let pRot = false;
+        // 3. Llenar la columna (Etapa 3 Guillotina - Nesting Recursivo)
+        // Buscamos piezas que tengan el MISMO ANCHO para apilarlas verticalmente
+        for (let i = 0; i < workingPool.length; i++) {
+          const p = workingPool[i];
+          if (p.placed) continue;
 
-          for (let i = 0; i < workingPool.length; i++) {
-            const p = workingPool[i];
-            if (p.placed) continue;
+          let fit = false;
+          let rot = false;
 
-            const remH = stripH - colUsedY;
-            if (p.width === colW && p.height <= remH) {
-              pIdx = i;
-              pRot = false;
-              break;
-            }
-            if (p.grainDirection === 'libre' && p.height === colW && p.width <= remH) {
-              pIdx = i;
-              pRot = true;
-              break;
-            }
+          if (p.width === colW && p.height <= colRemainingH) {
+            fit = true; rot = false;
+          } else if (p.grainDirection === 'libre' && p.height === colW && p.width <= colRemainingH) {
+            fit = true; rot = true;
           }
 
-          if (pIdx === -1) break;
-
-          const part = workingPool[pIdx];
-          const finalH = pRot ? part.width : part.height;
-
-          stripParts.push({
-            name: part.name,
-            x: currentX,
-            y: colUsedY,
-            width: colW,
-            height: finalH,
-            rotated: pRot,
-            color: colors[part.name]
-          });
-
-          part.placed = true;
-          colUsedY += finalH + kerf;
+          if (fit) {
+            const h = rot ? p.width : p.height;
+            colParts.push({
+              name: p.name,
+              x: 0, // Posición relativa a la columna
+              y: stripH - colRemainingH,
+              width: colW,
+              height: h,
+              rotated: rot,
+              color: colors[p.name]
+            });
+            p.placed = true;
+            colRemainingH -= (h + kerf);
+          }
         }
-        currentX += colW + kerf;
+
+        columns.push({ width: colW, parts: colParts });
+        remainingW -= (colW + kerf);
       }
 
-      if (stripParts.length > 0) {
-        const stripUsedWidth = currentX - kerf;
-        panelStrips.push({
-          height: stripH,
-          width: stripUsedWidth,
-          parts: stripParts,
-          efficiency: stripUsedWidth / algoW
-        });
-        currentPanelHeight += stripH + kerf;
+      if (columns.length > 0) {
+        const usedW = algoW - remainingW - kerf;
+        strips.push({ height: stripH, columns, efficiency: usedW / algoW });
+        remainingH -= (stripH + kerf);
       } else {
         break;
       }
     }
 
-    if (panelStrips.length === 0) break;
+    if (strips.length === 0) break;
 
-    // Consolidar tiras: Ordenar por eficiencia para apretar el layout
-    panelStrips.sort((a, b) => b.efficiency - a.efficiency);
+    // CONSOLIDAR PANEL
+    const placedParts: OptimizedPart[] = [];
+    let currentY = 0;
 
-    const placedInPanel: OptimizedPart[] = [];
-    let yOffset = 0;
+    for (const strip of strips) {
+      let currentX = 0;
+      for (const col of strip.columns) {
+        for (const p of col.parts) {
+          const absX = currentX + p.x;
+          const absY = currentY + p.y;
 
-    for (const strip of panelStrips) {
-      for (const p of strip.parts) {
-        const finalX = p.x;
-        const finalY = yOffset + p.y;
+          // Transponer si es Master Vertical
+          const finalX = isVertical ? absY : absX;
+          const finalY = isVertical ? absX : absY;
+          const finalW = isVertical ? p.height : p.width;
+          const finalH = isVertical ? p.width : p.height;
 
-        // Si el cálculo fue vertical, transponemos las coordenadas para el dibujo real
-        const drawX = isVertical ? finalY : finalX;
-        const drawY = isVertical ? finalX : finalY;
-        const drawW = isVertical ? p.height : p.width;
-        const drawH = isVertical ? p.width : p.height;
-
-        placedInPanel.push({
-          ...p,
-          x: drawX,
-          y: drawY,
-          width: drawW,
-          height: drawH,
-          rotated: isVertical ? !p.rotated : p.rotated
-        });
+          placedParts.push({
+            ...p,
+            x: finalX,
+            y: finalY,
+            width: finalW,
+            height: finalH,
+            rotated: isVertical ? !p.rotated : p.rotated
+          });
+        }
+        currentX += col.width + kerf;
       }
-      yOffset += strip.height + kerf;
+      currentY += strip.height + kerf;
     }
 
-    const usedArea = placedInPanel.reduce((acc, p) => acc + (p.width * p.height), 0);
+    const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
+    const totalArea = panelWidth * panelHeight;
+
     panels.push({
       panelNumber: panels.length + 1,
-      parts: placedInPanel,
-      efficiency: (usedArea / (panelWidth * panelHeight)) * 100,
+      parts: placedParts,
+      efficiency: (usedArea / totalArea) * 100,
       usedArea,
-      totalArea: panelWidth * panelHeight
+      totalArea
     });
 
-    if (panels.length > 20) break; // Límite de seguridad
+    if (panels.length > 15) break; 
   }
 
-  const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
+  const totalUsed = panels.reduce((acc, p) => acc + p.usedArea, 0);
   const totalAvail = panels.length * panelWidth * panelHeight;
 
   return {
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v12.6: Guillotina vertical activa. Eficiencia global: ${(totalUsed / totalAvail * 100).toFixed(1)}%.`,
+    summary: `JADSI v13.0 Compact: Consolidación perimetral activa. Eficiencia: ${(totalUsed / totalAvail * 100).toFixed(1)}%.`,
     kerf, trim, selectedThickness
   };
 }
@@ -283,7 +264,7 @@ function generateColors(parts: any[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 75%, 60%, 0.3)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 55%, 0.25)`;
   });
   return colors;
 }
