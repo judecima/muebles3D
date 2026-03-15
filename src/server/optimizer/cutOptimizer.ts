@@ -11,11 +11,11 @@ interface InternalPart {
 }
 
 /**
- * JADSI Industrial Engine v17.0 - Waste Reutilization v2
+ * JADSI Industrial Engine v17.5 - Waste Reutilization v3
  * 
  * OBJETIVO 1: Minimizar cantidad de paneles.
- * OBJETIVO 2: Maximizar bloques de desperdicio reutilizables (>150mm).
- * ESTRATEGIA: Búsqueda estocástica multi-heurística con scoring de entropía de desperdicio.
+ * OBJETIVO 2: Maximizar bloques de desperdicio reutilizables (>60mm).
+ * ESTRATEGIA: Búsqueda estocástica multi-heurística con scoring de entropía de desperdicio ajustado a piezas mínimas de 60mm.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -38,8 +38,8 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // AUMENTO DE INTENSIDAD JADSI v17.0
-  const iterationsPerStrategy = 120; // Duplicado para asegurar encontrar el layout óptimo
+  // INTENSIDAD JADSI v17.5
+  const iterationsPerStrategy = 120; 
   const masterOrientations = [false, true]; // Horizontal vs Vertical
 
   for (const isVerticalMaster of masterOrientations) {
@@ -72,16 +72,13 @@ export function runOptimization(
 
       const currentResult = executeNesting(pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalMaster);
       
-      // EVALUACIÓN JERÁRQUICA JADSI v17.0
+      // EVALUACIÓN JERÁRQUICA JADSI v17.5
       const wasteScore = calculateWasteQuality(currentResult, algoW, algoH);
       
       /**
        * SCORE = Prioridad Paneles (Factor 1e15) 
        *         + Eficiencia (Factor 1e10)
        *         + Calidad Desperdicio (Factor 1)
-       * 
-       * Esto asegura que 1 panel siempre le gane a 2, sin importar el desperdicio.
-       * Pero ante 1 panel vs 1 panel, ganará el que tenga mejor wasteScore.
        */
       const score = (1000 / currentResult.totalPanels) * 1e15 + 
                     (currentResult.totalEfficiency * 1e10) + 
@@ -94,7 +91,7 @@ export function runOptimization(
     }
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor v17.0", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor v17.5", kerf, trim, selectedThickness };
 }
 
 function executeNesting(
@@ -116,12 +113,10 @@ function executeNesting(
     const placedParts: OptimizedPart[] = [];
     let currentY = 0;
 
-    // Crear tiras de guillotina
     while (currentY < algoH) {
       let leaderIdx = -1;
       let leaderRotated = false;
 
-      // Buscar líder de tira (la pieza más alta que quepa)
       for (let i = 0; i < workingPool.length; i++) {
         const p = workingPool[i];
         if (p.placed) continue;
@@ -140,12 +135,10 @@ function executeNesting(
       const stripH = leaderRotated ? leader.width : leader.height;
       let currentX = 0;
 
-      // Rellenar la tira con columnas
       while (currentX < algoW) {
         let bestPartIdx = -1;
         let bestPartRotated = false;
 
-        // Buscar pieza que determine el ancho de la columna
         for (let i = 0; i < workingPool.length; i++) {
           const p = workingPool[i];
           if (p.placed) continue;
@@ -164,7 +157,6 @@ function executeNesting(
         const pW = bestPartRotated ? p.height : p.width;
         const pH = bestPartRotated ? p.width : p.height;
 
-        // Apilamiento vertical dentro de la columna (Sub-stacking)
         let subY = 0;
         while (subY < stripH) {
           let stackPartIdx = -1;
@@ -174,7 +166,6 @@ function executeNesting(
             const sp = workingPool[j];
             if (sp.placed) continue;
 
-            // Piezas que encajen exactamente en el ancho de columna pW
             if (sp.width === pW && sp.height <= (stripH - subY)) {
               stackPartIdx = j; stackRotated = false; break;
             }
@@ -191,7 +182,6 @@ function executeNesting(
           const absX = currentX;
           const absY = currentY + subY;
 
-          // Traducción según orientación maestra
           const finalX = isVertical ? absY : absX;
           const finalY = isVertical ? absX : absY;
           const finalW = isVertical ? spH : pW;
@@ -230,7 +220,6 @@ function executeNesting(
       totalArea
     });
 
-    // Seguridad para evitar bucles infinitos
     if (panels.length > 50) break;
   }
 
@@ -241,7 +230,7 @@ function executeNesting(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v17.0: Nesting industrial iterativo con scoring de reutilización v2.`,
+    summary: `JADSI v17.5: Nesting industrial iterativo optimizado para piezas mínimas de 60mm.`,
     kerf,
     trim,
     selectedThickness
@@ -249,35 +238,31 @@ function executeNesting(
 }
 
 /**
- * Puntuador de Calidad de Desperdicio JADSI v17.0
- * Penaliza tiras < 150mm.
+ * Puntuador de Calidad de Desperdicio JADSI v17.5
+ * Penaliza tiras < 60mm (basado en el tamaño mínimo de pieza de amarre).
  * Premia bloques grandes y cuadrados.
  */
 function calculateWasteQuality(result: OptimizationResult, algoW: number, algoH: number): number {
   let score = 0;
   result.optimizedLayout.forEach(panel => {
-    // Calculamos el rectángulo de uso máximo
     const maxX = panel.parts.reduce((max, p) => Math.max(max, p.x + p.width), 0);
     const maxY = panel.parts.reduce((max, p) => Math.max(max, p.y + p.height), 0);
     
-    // Dimensiones del espacio vacío principal
     const remainingW = Math.max(0, algoW - maxX);
     const remainingH = Math.max(0, algoH - maxY);
 
-    // Estrategia Lepton: El desperdicio es mejor si es un solo bloque grande
     const areaRestanteLongitudinal = remainingW * algoH;
     const areaRestanteTransversal = remainingH * algoW;
 
     const mejorAreaSobrante = Math.max(areaRestanteLongitudinal, areaRestanteTransversal);
     const dimensionMinima = mejorAreaSobrante === areaRestanteLongitudinal ? remainingW : remainingH;
 
-    // SCORING v2:
-    if (dimensionMinima < 150) {
-      // PENALIZACIÓN: El sobrante es una tira inútil
+    // SCORING v3:
+    if (dimensionMinima < 60) {
+      // PENALIZACIÓN: El sobrante es una tira inútil (menor que el amarre de 60mm)
       score -= 5000000;
     } else {
       // PREMIO: El sobrante es una pieza reutilizable
-      // Cuanto más grande sea la dimensión mínima, mejor es el bloque
       score += (mejorAreaSobrante * dimensionMinima);
     }
   });
