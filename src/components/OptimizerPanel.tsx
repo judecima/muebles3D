@@ -71,9 +71,9 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
       setLocalCutlist(Object.values(aggregated));
     } else if (localCutlist.length === 0) {
       setLocalCutlist([
-        { name: "Lateral Izquierdo", width: 720, height: 560, quantity: 4, grainDirection: 'vertical', thickness: 18 },
-        { name: "Piso/Techo", width: 1164, height: 560, quantity: 2, grainDirection: 'horizontal', thickness: 18 },
-        { name: "Estante", width: 1162, height: 500, quantity: 1, grainDirection: 'horizontal', thickness: 18 }
+        { name: "Lateral", width: 720, height: 560, quantity: 4, grainDirection: 'libre', thickness: 18 },
+        { name: "Piso Techo", width: 1164, height: 560, quantity: 2, grainDirection: 'libre', thickness: 18 },
+        { name: "Estante", width: 1164, height: 500, quantity: 1, grainDirection: 'libre', thickness: 18 }
       ]);
     }
   }, [initialParts]);
@@ -161,7 +161,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI NESTING ENGINE v12.1
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v18.5
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -171,7 +171,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
             <CardContent className="p-6 space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Material Industrial Seleccionado</Label>
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Material Industrial</Label>
                   <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" className="w-full justify-between h-14 bg-slate-50 border-slate-200 group hover:border-primary transition-all">
@@ -183,7 +183,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                                 alt="Material"
                                 fill
                                 className="object-cover"
-                                data-ai-hint="wood texture"
                               />
                             )}
                           </div>
@@ -198,19 +197,18 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                     <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden">
                       <DialogHeader className="p-6 bg-slate-900 text-white shrink-0">
                         <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black">
-                          <LayoutGrid className="w-5 h-5 text-primary" /> Catálogo de Materiales JADSI
+                          <LayoutGrid className="w-5 h-5 text-primary" /> Catálogo de Materiales
                         </DialogTitle>
                         <div className="relative mt-4">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                           <Input 
-                            placeholder="Buscar por nombre, línea o espesor..." 
+                            placeholder="Buscar material..." 
                             className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/40"
                             value={searchTerm}
                             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                           />
                         </div>
                       </DialogHeader>
-                      
                       <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {paginatedPanels.map((panel) => (
@@ -225,8 +223,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                                     src={`https://optionline-prod-files.s3.amazonaws.com/${panel.idEmpresa}-${panel.idTextura}-thumbnail.jpg`}
                                     alt={panel.name}
                                     fill
-                                    className="object-cover group-hover:scale-110 transition-transform"
-                                    data-ai-hint="wood board"
+                                    className="object-cover"
                                   />
                                 ) : (
                                   <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-300">
@@ -245,7 +242,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                           ))}
                         </div>
                       </div>
-
                       <div className="p-4 bg-white border-t flex items-center justify-between shrink-0">
                         <span className="text-[10px] font-black text-slate-400 uppercase">Página {currentPage} de {totalPages}</span>
                         <div className="flex gap-2">
@@ -269,30 +265,23 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                 {result && <Button variant="outline" className="border-primary text-primary h-11 px-4" onClick={exportPDF}><FileDown className="w-4 h-4" /></Button>}
               </div>
 
-              <Collapsible open={isPartsListOpen} onOpenChange={setIsPartsListOpen} className="border rounded-xl overflow-hidden shadow-inner">
+              <Collapsible open={isPartsListOpen} onOpenChange={setIsPartsListOpen} className="border rounded-xl overflow-hidden">
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full flex justify-between px-4 py-3 bg-slate-50 text-slate-600 hover:bg-slate-100">
-                    <span className="text-xs font-black flex items-center gap-2 uppercase tracking-tighter"><Ruler className="w-3.5 h-3.5" /> Listado de Piezas ({localCutlist.length})</span>
+                  <Button variant="ghost" className="w-full flex justify-between px-4 py-3 bg-slate-50 text-slate-600">
+                    <span className="text-xs font-black flex items-center gap-2 uppercase"><Ruler className="w-3.5 h-3.5" /> Piezas a Cortar ({localCutlist.length})</span>
                     {isPartsListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="p-4 bg-white border-t">
                   <div className="space-y-3">
-                    <div className="grid grid-cols-12 gap-2 text-[9px] font-black uppercase text-slate-400 px-2">
-                      <div className="col-span-4">Nombre</div>
-                      <div className="col-span-2 text-center">Largo</div>
-                      <div className="col-span-2 text-center">Ancho</div>
-                      <div className="col-span-2 text-center">Cant</div>
-                      <div className="col-span-2 text-center">Veta</div>
-                    </div>
                     {localCutlist.map((part, idx) => (
                       <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border">
-                        <div className="col-span-4"><input className="w-full bg-transparent font-bold text-[10px] focus:outline-none" value={part.name} onChange={(e) => updatePart(idx, 'name', e.target.value)} /></div>
-                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded px-1 text-center font-mono text-[10px]" value={part.width} onChange={(e) => updatePart(idx, 'width', parseInt(e.target.value))} /></div>
-                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded px-1 text-center font-mono text-[10px]" value={part.height} onChange={(e) => updatePart(idx, 'height', parseInt(e.target.value))} /></div>
-                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded px-1 text-center font-bold text-[10px] text-primary" value={part.quantity} onChange={(e) => updatePart(idx, 'quantity', parseInt(e.target.value))} /></div>
+                        <div className="col-span-4"><input className="w-full bg-transparent font-bold text-[10px]" value={part.name} onChange={(e) => updatePart(idx, 'name', e.target.value)} /></div>
+                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded text-center text-[10px]" value={part.width} onChange={(e) => updatePart(idx, 'width', parseInt(e.target.value))} /></div>
+                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded text-center text-[10px]" value={part.height} onChange={(e) => updatePart(idx, 'height', parseInt(e.target.value))} /></div>
+                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded text-center text-[10px] font-bold text-primary" value={part.quantity} onChange={(e) => updatePart(idx, 'quantity', parseInt(e.target.value))} /></div>
                         <div className="col-span-2">
-                          <select className="w-full bg-white border rounded text-[9px] font-bold" value={part.grainDirection} onChange={(e) => updatePart(idx, 'grainDirection', e.target.value)}>
+                          <select className="w-full bg-white border rounded text-[9px]" value={part.grainDirection} onChange={(e) => updatePart(idx, 'grainDirection', e.target.value)}>
                             <option value="libre">Libre</option>
                             <option value="vertical">Veta L</option>
                             <option value="horizontal">Veta A</option>
@@ -300,8 +289,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         </div>
                       </div>
                     ))}
-                    <Button variant="outline" size="sm" className="w-full mt-2 border-dashed border-2 font-bold uppercase text-[9px]" onClick={addManualPart}>
-                      <Plus className="w-3 h-3 mr-2" /> Agregar Pieza Manualmente
+                    <Button variant="outline" size="sm" className="w-full border-dashed font-bold uppercase text-[9px]" onClick={addManualPart}>
+                      <Plus className="w-3 h-3 mr-2" /> Agregar Pieza
                     </Button>
                   </div>
                 </CollapsibleContent>
@@ -312,13 +301,12 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <div className="space-y-6">
             <Card className={`shadow-sm border-slate-200 bg-white flex flex-col ${result ? 'opacity-100' : 'opacity-50'}`}>
               <CardHeader className="py-4 px-6 border-b">
-                <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Eficiencia Global JADSI</CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Aprovechamiento Global</CardTitle>
               </CardHeader>
               <CardContent className="p-6 flex-1 flex flex-col justify-center gap-4">
                 <div className="space-y-2 text-center">
                   <div className="text-4xl font-black text-primary tracking-tighter">{result ? result.totalEfficiency.toFixed(1) : '0.0'}%</div>
                   <Progress value={result ? result.totalEfficiency : 0} className="h-2" />
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Aprovechamiento del Tablero</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4">
                   <div className="p-3 bg-slate-50 rounded-lg border text-center">
@@ -326,8 +314,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                     <p className="text-lg font-black text-slate-700">{result ? result.totalPanels : '-'}</p>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-lg border text-center">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">Hoja Kerf</p>
-                    <p className="text-lg font-black text-slate-700">4.5mm</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">Sobrantes</p>
+                    <p className="text-lg font-black text-slate-700">{result?.optimizedLayout.reduce((acc, p) => acc + (p.leftovers?.length || 0), 0) || '-'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -337,8 +325,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
               <Card className="shadow-sm border-slate-200 bg-white">
                 <Collapsible open={isDetailedListOpen} onOpenChange={setIsDetailedListOpen}>
                   <CollapsibleTrigger asChild>
-                    <Button variant="ghost" className="w-full flex justify-between px-4 py-4 text-slate-600 hover:bg-slate-50">
-                      <div className="flex items-center gap-2"><List className="w-4 h-4 text-primary" /><span className="text-[10px] font-black uppercase">Coordenadas de Montaje</span></div>
+                    <Button variant="ghost" className="w-full flex justify-between px-4 py-4 text-slate-600">
+                      <div className="flex items-center gap-2"><List className="w-4 h-4 text-primary" /><span className="text-[10px] font-black uppercase">Detalle de Posiciones</span></div>
                       {isDetailedListOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </Button>
                   </CollapsibleTrigger>
@@ -348,22 +336,30 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         <TableHeader className="bg-slate-50 sticky top-0">
                           <TableRow className="h-7">
                             <TableHead className="text-[9px] py-1 px-2 font-black">Pieza</TableHead>
-                            <TableHead className="text-[9px] py-1 px-2 text-right font-black">Pos X</TableHead>
-                            <TableHead className="text-[9px] py-1 px-2 text-right font-black">Pos Y</TableHead>
-                            <TableHead className="text-[9px] py-1 px-2 text-center font-black">Rot</TableHead>
+                            <TableHead className="text-[9px] py-1 px-2 text-right font-black">Ancho</TableHead>
+                            <TableHead className="text-[9px] py-1 px-2 text-right font-black">Alto</TableHead>
+                            <TableHead className="text-[9px] py-1 px-2 text-center font-black">Tipo</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {result.optimizedLayout.flatMap(panel => 
-                            panel.parts.map((p, i) => (
-                              <TableRow key={`${panel.panelNumber}-${i}`} className="h-7 hover:bg-blue-50 transition-colors">
+                          {result.optimizedLayout.flatMap(panel => [
+                            ...panel.parts.map((p, i) => (
+                              <TableRow key={`${panel.panelNumber}-p-${i}`} className="h-7">
                                 <TableCell className="text-[9px] py-1 px-2 font-medium truncate max-w-[100px]">{p.name}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-right font-mono">{Math.round(p.x)}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-right font-mono">{Math.round(p.y)}</TableCell>
-                                <TableCell className="text-[9px] py-1 px-2 text-center">{p.rotated ? <Badge className="text-[7px] h-3 px-1 bg-primary">SÍ</Badge> : '-'}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-right">{Math.round(p.width)}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-right">{Math.round(p.height)}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-center">PIEZA</TableCell>
                               </TableRow>
-                            ))
-                          )}
+                            )),
+                            ...(panel.leftovers?.map((l, i) => (
+                              <TableRow key={`${panel.panelNumber}-l-${i}`} className="h-7 bg-slate-50/50">
+                                <TableCell className="text-[9px] py-1 px-2 font-black text-slate-400">{l.name}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-right text-slate-400">{Math.round(l.width)}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-right text-slate-400">{Math.round(l.height)}</TableCell>
+                                <TableCell className="text-[9px] py-1 px-2 text-center text-slate-400 font-bold">SOBRANTE</TableCell>
+                              </TableRow>
+                            )) || [])
+                          ])}
                         </TableBody>
                       </Table>
                     </div>
@@ -376,28 +372,28 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
 
         <div className="w-full">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 flex items-center gap-3 animate-pulse">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 flex items-center gap-3">
               <AlertTriangle className="w-5 h-5" />
-              <p className="text-sm font-bold uppercase tracking-tighter">{error}</p>
+              <p className="text-sm font-bold uppercase">{error}</p>
             </div>
           )}
 
           {loading ? (
-            <div className="py-32 flex flex-col items-center gap-6 text-slate-400 bg-white rounded-2xl border-2 border-dashed mx-4">
+            <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Calculando Algoritmo JADSI Nesting...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v18.5...</p>
             </div>
           ) : !result ? (
-            <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed mx-4">
+            <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
               <LayoutGrid className="w-24 h-24 opacity-10" />
-              <Button variant="secondary" onClick={handleOptimize} className="font-black uppercase tracking-widest text-xs h-12 px-8">Iniciar Cálculo de Optimización</Button>
+              <Button variant="secondary" onClick={handleOptimize} className="font-black uppercase tracking-widest text-xs h-12 px-8">Iniciar Optimización</Button>
             </div>
           ) : (
             <div className="space-y-12 py-8 px-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
               {result.optimizedLayout.map((panel, idx) => (
                 <div key={idx} className="space-y-4">
                   <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
-                    <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — Espesor: {result.selectedThickness}mm — {selectedPanel.width}x{selectedPanel.height}mm</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — {selectedPanel.width}x{selectedPanel.height}mm</h3>
                     <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
                   </div>
                   
@@ -412,27 +408,41 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                       backgroundImage: 'linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px)',
                       backgroundSize: '50px 50px'
                     }}>
+                      {/* Renderizado de Piezas */}
                       {panel.parts.map((p, pIdx) => (
-                        <div key={pIdx} title={`${p.name}: ${p.width}x${p.height}mm`}
-                             className="absolute border border-slate-900/60 transition-all hover:brightness-90 cursor-help" 
+                        <div key={`p-${pIdx}`} title={`${p.name}: ${p.width}x${p.height}mm`}
+                             className="absolute border border-slate-900/60 transition-all hover:brightness-90 flex flex-col justify-center items-center overflow-hidden" 
                              style={{ 
-                               left: `${(p.x / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
-                               top: `${(p.y / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
+                               left: `${((p.x - result.trim) / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                               top: `${((p.y - result.trim) / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
                                width: `${(p.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
                                height: `${(p.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
                                backgroundColor: p.color || 'rgba(13, 110, 253, 0.15)'
                              }}>
-                          <div className="relative w-full h-full overflow-hidden pointer-events-none p-1 flex flex-col justify-center items-center">
-                            <span className="text-[min(1.8vw,10px)] font-black text-slate-900 leading-none whitespace-nowrap">{Math.round(p.width)} x {Math.round(p.height)}</span>
-                            <div className="mt-1 text-center"><span className="text-[min(1.4vw,8px)] text-slate-600 uppercase font-black truncate block w-full px-1">{p.name}</span></div>
-                          </div>
+                          <span className="text-[min(1.8vw,10px)] font-black text-slate-900 leading-none">{Math.round(p.width)} x {Math.round(p.height)}</span>
+                          <span className="text-[min(1.4vw,8px)] text-slate-600 uppercase font-bold truncate block w-full px-1 text-center mt-1">{p.name}</span>
+                        </div>
+                      ))}
+
+                      {/* Renderizado de Sobrantes (S1, S2...) */}
+                      {panel.leftovers?.map((l, lIdx) => (
+                        <div key={`l-${lIdx}`} title={`Sobrante ${l.name}: ${l.width}x${l.height}mm`}
+                             className="absolute border border-dashed border-slate-400 bg-white/80 flex flex-col justify-center items-center overflow-hidden" 
+                             style={{ 
+                               left: `${((l.x - result.trim) / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                               top: `${((l.y - result.trim) / (selectedPanel.height - 2 * result.trim)) * 100}%`, 
+                               width: `${(l.width / (selectedPanel.width - 2 * result.trim)) * 100}%`, 
+                               height: `${(l.height / (selectedPanel.height - 2 * result.trim)) * 100}%`,
+                             }}>
+                          <span className="text-[min(1.8vw,10px)] font-black text-slate-400 leading-none">({l.name})</span>
+                          <span className="text-[min(1.2vw,7px)] text-slate-400 font-bold uppercase mt-1">{Math.round(l.width)}x{Math.round(l.height)}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                   <div className="flex gap-4 items-center px-2">
                     <Info className="w-3 h-3 text-slate-400" />
-                    <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">Algoritmo JADSI v12.1: Nesting de 3 etapas con compactación perimetral activa.</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">Motor JADSI v18.5: Nesting recursivo con extracción de bloques sobrantes útiles.</p>
                   </div>
                 </div>
               ))}

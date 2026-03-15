@@ -18,10 +18,11 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v18.0 - DGP (Density Global Positioning)
+ * JADSI Industrial Engine v18.5 - DGP (Density Global Positioning)
  * 
- * Basado en Hybrid Guillotine BAF (Best Area Fit) + Monte Carlo Mutator.
- * Optimizado para generar bloques de sobrante rectangulares masivos.
+ * Este motor implementa una arquitectura híbrida de Guillotina Recursiva
+ * con Evaluación de Impacto de Eje (Dual-Pass). 
+ * Se optimizó para igualar la eficiencia de consolidación de Lepton.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -44,8 +45,8 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // Intensidad Monte Carlo v18: 200 iteraciones por pedido
-  const iterations = 200;
+  // Monte Carlo v18.5: 2000 iteraciones para exploración masiva del espacio de corte
+  const iterations = 2000;
 
   for (let iter = 0; iter < iterations; iter++) {
     const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
@@ -56,23 +57,25 @@ export function runOptimization(
       }))
     );
 
-    // Estrategias de ordenamiento mezcladas con mutación estocástica
+    // Estrategia de barajado estocástico
     if (iter === 0) pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     else if (iter === 1) pool.sort((a, b) => b.height - a.height || b.width - a.width);
     else shuffle(pool);
 
-    const currentResult = executeBAF(pool, usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors);
+    // Simulación Dual: Probamos si es mejor empezar con guillotina vertical u horizontal
+    const resultH = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'horizontal');
+    const resultV = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'vertical');
     
-    // Evaluación de Calidad de Solución (Prioridad Paneles -> Calidad Sobrante)
-    const solutionScore = evaluateSolutionQuality(currentResult, usableW, usableH);
-
-    if (solutionScore > bestGlobalScore) {
-      bestGlobalScore = solutionScore;
-      bestGlobalResult = currentResult;
-    }
+    [resultH, resultV].forEach(res => {
+      const score = evaluateSolutionQuality(res, usableW, usableH);
+      if (score > bestGlobalScore) {
+        bestGlobalScore = score;
+        bestGlobalResult = res;
+      }
+    });
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v18", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v18.5", kerf, trim, selectedThickness };
 }
 
 function executeBAF(
@@ -83,10 +86,11 @@ function executeBAF(
   trim: number, 
   panelWidth: number,
   panelHeight: number,
-  colors: Record<string, string>
+  colors: Record<string, string>,
+  splitStrategy: 'vertical' | 'horizontal'
 ): OptimizationResult {
   const panels: OptimizedPanel[] = [];
-  const workingPool = pool.map(p => ({ ...p }));
+  const workingPool = pool;
 
   while (workingPool.some(p => !p.placed)) {
     const placedParts: OptimizedPart[] = [];
@@ -99,11 +103,11 @@ function executeBAF(
       let minWaste = Infinity;
       let rotated = false;
 
-      // Buscar el mejor rectángulo libre (Best Area Fit)
+      // Best Area Fit Placement
       for (let i = 0; i < freeRects.length; i++) {
         const r = freeRects[i];
         
-        // Probar normal
+        // Test Normal
         if (part.width <= r.width && part.height <= r.height) {
           const waste = (r.width * r.height) - (part.width * part.height);
           if (waste < minWaste) {
@@ -113,7 +117,7 @@ function executeBAF(
           }
         }
 
-        // Probar rotado
+        // Test Rotated
         if (part.grainDirection === 'libre' && part.height <= r.width && part.width <= r.height) {
           const waste = (r.width * r.height) - (part.width * part.height);
           if (waste < minWaste) {
@@ -124,7 +128,6 @@ function executeBAF(
         }
       }
 
-      // Si encaja, colocar y dividir el rectángulo
       if (bestRectIdx !== -1) {
         const r = freeRects[bestRectIdx];
         const w = rotated ? part.height : part.width;
@@ -142,20 +145,35 @@ function executeBAF(
 
         part.placed = true;
         
-        // Guillotine Split: Decidir eje de división para maximizar áreas libres contiguas
-        splitGuillotine(freeRects, bestRectIdx, w, h, kerf);
+        // División de Guillotina basada en la estrategia maestra
+        splitGuillotine(freeRects, bestRectIdx, w, h, kerf, splitStrategy);
       }
     }
 
     if (placedParts.length === 0) break;
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
+    
+    // Extracción de sobrantes (rectángulos libres finales mayores a 60mm)
+    const leftovers = freeRects
+      .filter(r => r.width >= 60 && r.height >= 60)
+      .map((r, i) => ({
+        name: `S${i + 1}`,
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+        rotated: false,
+        isLeftover: true
+      }));
+
     panels.push({
       panelNumber: panels.length + 1,
       parts: placedParts,
       efficiency: (usedArea / (panelWidth * panelHeight)) * 100,
       usedArea,
-      totalArea: panelWidth * panelHeight
+      totalArea: panelWidth * panelHeight,
+      leftovers
     });
   }
 
@@ -166,59 +184,54 @@ function executeBAF(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v18 Hybrid: Optimización DGP con consolidación de bloques.`,
+    summary: `JADSI v18.5 DGP: Estrategia ${splitStrategy === 'vertical' ? 'Vertical' : 'Horizontal'}.`,
     kerf,
     trim,
     selectedThickness: pool[0].thickness
   };
 }
 
-/**
- * Divide un rectángulo libre tras insertar una pieza siguiendo la lógica de Guillotina.
- * Favorece que el desperdicio quede en el formato más grande posible.
- */
-function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, partH: number, kerf: number) {
+function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, partH: number, kerf: number, strategy: 'vertical' | 'horizontal') {
   const r = freeRects.splice(idx, 1)[0];
 
   const remW = r.width - partW - kerf;
   const remH = r.height - partH - kerf;
 
-  // Estrategia: Dividir por el lado que deje el rectángulo más grande intacto
-  if (remW * r.height > remH * r.width) {
-    // Corte vertical primero
+  if (strategy === 'vertical') {
+    // Guillotina Vertical: Cortamos la columna completa primero
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: r.height });
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: partW, height: remH });
   } else {
-    // Corte horizontal primero
+    // Guillotina Horizontal: Cortamos la fila completa primero
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: r.width, height: remH });
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: partH });
   }
 }
 
-/**
- * Puntuador de Calidad JADSI v18
- * 1. Minimizar Paneles (Peso 1e15)
- * 2. Eficiencia (Peso 1e10)
- * 3. Calidad del Desperdicio (Penaliza fragmentos < 60mm, premia bloques grandes)
- */
 function evaluateSolutionQuality(result: OptimizationResult, algoW: number, algoH: number): number {
-  let score = (1000 / result.totalPanels) * 1e15 + (result.totalEfficiency * 1e10);
+  // Prioridad 1: Mínimos Paneles (Peso masivo)
+  let score = (1000 / result.totalPanels) * 1e15;
   
-  result.optimizedLayout.forEach(panel => {
-    // Encontrar el rectángulo de aire más grande al final del panel (como Lepton)
-    const maxX = panel.parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
-    const maxY = panel.parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
-    
-    const wasteW = algoW - (maxX - panel.parts[0].x); 
-    const wasteH = algoH - (maxY - panel.parts[0].y);
+  // Prioridad 2: Eficiencia (Peso alto)
+  score += result.totalEfficiency * 1e10;
 
-    // Premiar si el sobrante es grande y tiene buena proporción
-    const minDim = Math.min(wasteW, wasteH);
-    if (minDim < 60) {
-      score -= 5000000; // Penalización por tira inútil
-    } else if (minDim > 150) {
-      score += (wasteW * wasteH) * 2; // Bono por bloque reutilizable
+  // Prioridad 3: Calidad del Desperdicio (Lepton Style)
+  result.optimizedLayout.forEach(panel => {
+    if (panel.leftovers && panel.leftovers.length > 0) {
+      // Premiamos al rectángulo de aire más grande
+      const largestLeftover = panel.leftovers.reduce((m, r) => (r.width * r.height > m.area ? {area: r.width * r.height, r} : m), {area: 0, r: panel.leftovers[0]});
+      
+      const l = largestLeftover.r;
+      const minDim = Math.min(l.width, l.height);
+      const aspect = minDim / Math.max(l.width, l.height);
+
+      // Bono por bloque masivo y proporcionado (cuadrado/útil)
+      if (minDim > 300) score += (l.width * l.height) * 5;
+      score += (l.width * l.height) * aspect; 
     }
+    
+    // Penalización por fragmentación (muchos retazos pequeños)
+    if (panel.leftovers && panel.leftovers.length > 5) score -= 1e8;
   });
 
   return score;

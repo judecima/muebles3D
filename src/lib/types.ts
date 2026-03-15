@@ -152,82 +152,6 @@ export const AVAILABLE_PANELS: PanelSize[] = [
   { id: '259594', idEmpresa: 110, idTextura: 21246, name: 'MDF FAPLAC HILADO YUTE 18MM', width: 2750, height: 1830, thickness: 18, hasGrain: false },
 ];
 
-export const MATERIAL_TEXTURES = [
-  { id: 12450, name: "aglo faplac blend amaranto 18mm" },
-  { id: 12451, name: "aglo faplac clasico haya 15mm" },
-  { id: 12452, name: "aglo faplac clasico roble dakar 15mm" },
-  { id: 12453, name: "aglo faplac liso negro profundo 15mm" },
-  { id: 21270, name: "blend amaranto" },
-  { id: 21271, name: "blend camellia" },
-  { id: 21272, name: "blend merlot" },
-  { id: 21275, name: "blend pinot gris" },
-  { id: 21273, name: "blend sauco" },
-  { id: 21274, name: "blend scotch" },
-  { id: 21248, name: "clasica cedro nature" },
-  { id: 21247, name: "clasica cedro woodtext" },
-  { id: 21251, name: "clasica ebano negro" },
-  { id: 21252, name: "clasica roble americano nature" },
-  { id: 21250, name: "clasica roble americano supermate" },
-  { id: 21253, name: "clasica roble dakar nature" },
-  { id: 21249, name: "clasica roble dakar woodtext" },
-  { id: 21279, name: "etnica everest" },
-  { id: 21280, name: "etnica himalaya" },
-  { id: 21276, name: "etnica safari" },
-  { id: 21281, name: "etnica sahara" },
-  { id: 21278, name: "etnica tribal" },
-  { id: 21277, name: "etnica tuareg" },
-  { id: 21295, name: "hilado lino blanco" },
-  { id: 21297, name: "hilado lino chiaro" },
-  { id: 21299, name: "hilado lino negro" },
-  { id: 21301, name: "hilado lino terra" },
-  { id: 21296, name: "hilado seda azzurra" },
-  { id: 21300, name: "hilado seda giorno" },
-  { id: 21298, name: "hilado seda notte" },
-  { id: 21314, name: "liso azul lago" },
-  { id: 21292, name: "lisos almendra" },
-  { id: 21294, name: "lisos aluminio" },
-  { id: 21288, name: "lisos blanco tundra" },
-  { id: 21293, name: "lisos ceniza" },
-  { id: 21291, name: "lisos grafito" },
-  { id: 21289, name: "lisos gris humo" },
-  { id: 21287, name: "lisos litio" },
-  { id: 21290, name: "lisos negro profundo" },
-  { id: 21311, name: "lisos rojo" },
-  { id: 21243, name: "mesopotamia kiri" },
-  { id: 21241, name: "mosopotamia amatista" },
-  { id: 21239, name: "mosopotamia gris basalto" },
-  { id: 21238, name: "mosopotamia gris caliza" },
-  { id: 21242, name: "mosopotamia gris tapir" },
-  { id: 21237, name: "mosopotamia jade" },
-  { id: 21244, name: "mosopotamia paraiso" },
-  { id: 21245, name: "mosopotamia petiribi" },
-  { id: 21240, name: "mosopotamia terracota" },
-  { id: 21246, name: "mosopotamia yute" },
-  { id: 21257, name: "nature blanco nature" },
-  { id: 21262, name: "nature caju" },
-  { id: 21259, name: "nature carvalho mezzo" },
-  { id: 21261, name: "nature gaudi" },
-  { id: 21312, name: "nature linosa cinza" },
-  { id: 21260, name: "nature mont blanc" },
-  { id: 21258, name: "nature nocce milano" },
-  { id: 21254, name: "nature nogal terracota" },
-  { id: 21255, name: "nature teka artico" },
-  { id: 21313, name: "nature terrarum" },
-  { id: 21256, name: "nature venezia" },
-  { id: 21286, name: "nordica baktico" },
-  { id: 21285, name: "nordica helsinki" },
-  { id: 21283, name: "nordica olmo finlandes" },
-  { id: 21284, name: "nordica roble escandinavo" },
-  { id: 21282, name: "nordica teka oslo" },
-  { id: 21264, name: "urban amberes" },
-  { id: 21263, name: "urban coliseo" },
-  { id: 21265, name: "urban home" },
-  { id: 21266, name: "urban moscu" },
-  { id: 21269, name: "urban praga" },
-  { id: 21267, name: "urban street" },
-  { id: 21268, name: "urban viena" }
-];
-
 export interface OptimizedPart {
   name: string;
   x: number;
@@ -236,6 +160,7 @@ export interface OptimizedPart {
   height: number;
   rotated: boolean;
   color?: string;
+  isLeftover?: boolean;
 }
 
 export interface OptimizedPanel {
@@ -244,6 +169,7 @@ export interface OptimizedPanel {
   efficiency: number;
   usedArea: number;
   totalArea: number;
+  leftovers?: OptimizedPart[];
 }
 
 export interface OptimizationResult {
