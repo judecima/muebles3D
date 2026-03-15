@@ -53,37 +53,70 @@ const FURNITURE_PRESETS = [
     id: 'test-dataset',
     name: "Valores de Prueba (73 Piezas)",
     parts: [
-      { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'vertical' },
-      { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'vertical' },
-      { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'vertical' },
-      { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'vertical' },
-      { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'vertical' },
-      { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'vertical' },
-      { name: "(8) Amarre(8)", width: 562, height: 150, quantity: 2, grainDirection: 'vertical' },
-      { name: "(15) Divisor V-Caj Cent2", width: 578, height: 470, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'vertical' },
-      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "(22) Contrafrente v1 v2 caj", width: 382, height: 117, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "(24) Taco Pieza 2", width: 177, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'vertical' }
+      { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
+      { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+      { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'libre' },
+      { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
+      { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+      { name: "(8) Amarre(8)", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+      { name: "(15) Divisor V-Caj Cent2", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'libre' },
+      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "(22) Contrafrente v1 v2 caj", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "(24) Taco Pieza 2", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'bajo-mesada-std',
+    name: "Bajo Mesada 1.20m (Estándar)",
+    parts: [
+      { name: "Lateral Izq/Der", width: 720, height: 580, quantity: 2, grainDirection: 'libre' },
+      { name: "Piso", width: 1164, height: 580, quantity: 1, grainDirection: 'libre' },
+      { name: "Estante", width: 1162, height: 550, quantity: 1, grainDirection: 'libre' },
+      { name: "Amarre Frontal", width: 1164, height: 60, quantity: 1, grainDirection: 'libre' },
+      { name: "Amarre Trasero", width: 1164, height: 60, quantity: 1, grainDirection: 'libre' },
+      { name: "Puerta", width: 717, height: 597, quantity: 2, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'alacena-std',
+    name: "Alacena 80cm (Estándar)",
+    parts: [
+      { name: "Lateral Izq/Der", width: 600, height: 300, quantity: 2, grainDirection: 'libre' },
+      { name: "Techo/Piso", width: 764, height: 300, quantity: 2, grainDirection: 'libre' },
+      { name: "Estante", width: 762, height: 280, quantity: 1, grainDirection: 'libre' },
+      { name: "Puerta", width: 597, height: 397, quantity: 2, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'placard-std',
+    name: "Placard Vestidor 1.80m",
+    parts: [
+      { name: "Lateral Largo", width: 2100, height: 600, quantity: 2, grainDirection: 'libre' },
+      { name: "Piso/Techo", width: 1764, height: 600, quantity: 2, grainDirection: 'libre' },
+      { name: "Divisor Central", width: 2064, height: 600, quantity: 1, grainDirection: 'libre' },
+      { name: "Estante Grande", width: 873, height: 580, quantity: 4, grainDirection: 'libre' },
+      { name: "Frente Cajon", width: 868, height: 200, quantity: 4, grainDirection: 'libre' }
     ]
   }
 ];
@@ -130,13 +163,22 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     setResult(null);
   };
 
+  const toggleAllGrain = (respect: boolean) => {
+    const updated = localCutlist.map(p => ({
+      ...p,
+      grainDirection: respect ? 'vertical' : 'libre'
+    }));
+    setLocalCutlist(updated);
+    setResult(null);
+  };
+
   const removePart = (index: number) => {
     setLocalCutlist(localCutlist.filter((_, i) => i !== index));
     setResult(null);
   };
 
   const addManualPart = () => {
-    setLocalCutlist([...localCutlist, { name: "Nueva Pieza", width: 500, height: 300, quantity: 1, grainDirection: 'vertical', thickness: targetThickness }]);
+    setLocalCutlist([...localCutlist, { name: "Nueva Pieza", width: 500, height: 300, quantity: 1, grainDirection: 'libre', thickness: targetThickness }]);
   };
 
   const loadPreset = (presetId: string) => {
@@ -222,6 +264,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     setResult(null);
     setIsModalOpen(false);
   };
+
+  const allRespectGrain = localCutlist.length > 0 && localCutlist.every(p => p.grainDirection !== 'libre');
 
   return (
     <div className="flex-1 w-full bg-slate-50 overflow-y-auto">
@@ -379,7 +423,15 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Largo</span>
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Ancho</span>
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Cant.</span>
-                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Resp. Veta</span>
+                      <div className="col-span-2 flex flex-col items-center justify-center gap-1">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase text-center">Resp. Veta</span>
+                        <Checkbox 
+                          checked={allRespectGrain} 
+                          onCheckedChange={(checked) => toggleAllGrain(!!checked)}
+                          disabled={!selectedPanel.hasGrain}
+                          className={!selectedPanel.hasGrain ? "opacity-20" : ""}
+                        />
+                      </div>
                       <span className="col-span-1"></span>
                     </div>
                     {localCutlist.map((part, idx) => (
