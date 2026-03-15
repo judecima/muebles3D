@@ -50,7 +50,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [zoom, setZoom] = useState(1);
   const [targetThickness, setTargetThickness] = useState<number>(18);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchTerm, setSearch) = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
 
@@ -206,7 +206,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                             placeholder="Buscar por nombre, línea o espesor..." 
                             className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/40"
                             value={searchTerm}
-                            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                           />
                         </div>
                       </DialogHeader>
