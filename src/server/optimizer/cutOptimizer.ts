@@ -18,11 +18,10 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v24.0 - Sequential Panel Architect
+ * JADSI Industrial Engine v25.0 - High Performance Architect
  * 
- * Este motor optimiza cada panel de forma independiente y secuencial.
- * Prioriza llenar el primer panel con la máxima eficiencia (>94%) usando las mejores piezas disponibles.
- * Cada panel puede elegir su propio eje de guillotina (Vertical vs Horizontal).
+ * Este motor implementa búsqueda intensiva de 10,000 iteraciones por panel
+ * con salida anticipada al alcanzar el 95% de eficiencia.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -59,26 +58,22 @@ export function runOptimization(
   while (pool.some(p => !p.placed)) {
     let bestPanelForThisStep: OptimizedPanel | null = null;
     let bestPanelScore = -Infinity;
-    let bestStrategyUsed: 'vertical' | 'horizontal' = 'horizontal';
 
-    // Para cada panel, realizamos una búsqueda exhaustiva (Monte Carlo localizado)
-    const iterationsPerPanel = 1000; 
+    // Búsqueda de alta intensidad: 10,000 iteraciones por panel
+    const maxIterations = 10000; 
     
-    for (let iter = 0; iter < iterationsPerPanel; iter++) {
-      // Clonamos solo las piezas no colocadas para este intento de panel
+    for (let iter = 0; iter < maxIterations; iter++) {
       const currentTryPool = pool.filter(p => !p.placed).map(p => ({ ...p }));
       
-      // Aplicamos diferentes heurísticas de ordenamiento por iteración
       if (iter > 0) {
         if (iter % 5 === 0) clusterShuffle(currentTryPool);
         else shuffle(currentTryPool);
       } else {
-        // Primera iteración: Ordenamiento técnico ideal (Área Descendente)
         currentTryPool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
       }
 
-      // Probamos ambas estrategias de guillotina para este panel
-      const strategies: ('vertical' | 'horizontal')[] = ['vertical', 'horizontal'];
+      // Evaluamos ambas estrategias, pero el scoring favorecerá la que pidas (Horizontal por defecto en tie-break)
+      const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
       
       for (const strategy of strategies) {
         const attempt = fillSinglePanel(
@@ -95,22 +90,21 @@ export function runOptimization(
           panelCounter
         );
 
-        const score = evaluatePanelQuality(attempt);
+        const score = evaluatePanelQuality(attempt, strategy);
         
         if (score > bestPanelScore) {
           bestPanelScore = score;
           bestPanelForThisStep = attempt;
-          bestStrategyUsed = strategy;
         }
+      }
+
+      // SHORT-CIRCUIT: Si alcanzamos > 95% de eficiencia, consideramos el panel óptimo y saltamos el resto de iteraciones
+      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= 95) {
+        break;
       }
     }
 
     if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
-      // Marcamos como colocadas las piezas que ganaron en el mejor layout de este panel
-      const placedNames = bestPanelForThisStep.parts.filter(p => !p.isLeftover).map(p => p.name);
-      
-      // IMPORTANTE: Debemos marcar piezas específicas del pool, no solo por nombre
-      // Para simplificar, recorremos las piezas colocadas del layout y buscamos su equivalente en el pool
       bestPanelForThisStep.parts.forEach(placedPart => {
         if (placedPart.isLeftover) return;
         const indexInPool = pool.findIndex(p => 
@@ -127,7 +121,6 @@ export function runOptimization(
       finalPanels.push(bestPanelForThisStep);
       panelCounter++;
     } else {
-      // Evitar bucle infinito si ninguna pieza cabe
       break;
     }
   }
@@ -139,16 +132,13 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: (totalUsedArea / totalAvailArea) * 100,
-    summary: `Optimización JADSI v24.0: ${finalPanels.length} paneles procesados independientemente.`,
+    summary: `JADSI v25.0: Optimización completada con ${finalPanels.length} paneles.`,
     kerf,
     trim,
     selectedThickness
   };
 }
 
-/**
- * Intenta llenar UN solo panel con la mejor combinación posible de piezas restantes.
- */
 function fillSinglePanel(
   pool: InternalPart[], 
   algoW: number, 
@@ -177,7 +167,7 @@ function fillSinglePanel(
     for (let j = 0; j < freeRects.length; j++) {
       const r = freeRects[j];
       
-      // Evaluar Normal
+      // EVALUAR NORMAL: Respeta veta estrictamente
       if (part.width <= r.width && part.height <= r.height) {
         const cp = calculateContactScore(r.x, r.y, part.width, part.height, panelWidth, panelHeight, trim, r);
         const residue = (r.width * r.height) - (part.width * part.height);
@@ -186,7 +176,7 @@ function fillSinglePanel(
         }
       }
 
-      // Evaluar Rotado
+      // EVALUAR ROTADO: Solo si el material es liso o el usuario activó "Rotar"
       const canRotate = !hasGrain || part.grainDirection === 'libre';
       if (canRotate && part.height <= r.width && part.width <= r.height) {
         const cp = calculateContactScore(r.x, r.y, part.height, part.width, panelWidth, panelHeight, trim, r);
@@ -211,8 +201,6 @@ function fillSinglePanel(
 
       part.placed = true;
       splitGuillotine(freeRects, bestRectIdx, w, h, kerf, strategy);
-      
-      // Afinidad de clúster: Intentar meter hermanos inmediatamente en los nuevos huecos
       fillRemainingWithBrothers(pool, freeRects, kerf, strategy, hasGrain, colors, placedParts, panelWidth, panelHeight, trim);
     }
   }
@@ -239,14 +227,13 @@ function fillSinglePanel(
 
 function calculateContactScore(x: number, y: number, w: number, h: number, pW: number, pH: number, trim: number, r: FreeRect): number {
   let score = 0;
-  if (Math.abs(x - trim) < 0.5) score += h;
-  if (Math.abs(y - trim) < 0.5) score += w;
+  if (Math.abs(x - trim) < 0.5) score += h * 2;
+  if (Math.abs(y - trim) < 0.5) score += w * 2;
   if (Math.abs(x + w - (pW - trim)) < 0.5) score += h;
   if (Math.abs(y + h - (pH - trim)) < 0.5) score += w;
   
-  // Bonus por alineación perfecta con el rectángulo libre (mantiene guillotina limpia)
-  if (Math.abs(w - r.width) < 0.5) score += h * 3;
-  if (Math.abs(h - r.height) < 0.5) score += w * 3;
+  if (Math.abs(w - r.width) < 0.5) score += h * 5; // Premio masivo por alineación perfecta de ancho
+  if (Math.abs(h - r.height) < 0.5) score += w * 5; // Premio masivo por alineación perfecta de alto
   
   return score;
 }
@@ -271,14 +258,12 @@ function fillRemainingWithBrothers(
     let bestRectIdx = -1;
     let currentRotated = false;
 
-    // Prioridad absoluta: Hermano idéntico en el mismo eje
     for (let j = 0; j < freeRects.length; j++) {
       const r = freeRects[j];
       const wN = part.width; const hN = part.height;
       const isSameSize = (wN === (last.rotated ? last.height : last.width) && hN === (last.rotated ? last.width : last.height));
       
       if (isSameSize && wN <= r.width && hN <= r.height) {
-        // Si encaja perfectamente en una de las dimensiones del remanente, lo metemos
         if (Math.abs(wN - r.width) < 0.5 || Math.abs(hN - r.height) < 0.5) {
           bestRectIdx = j;
           currentRotated = last.rotated;
@@ -311,27 +296,27 @@ function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, part
   const remH = r.height - partH - kerf;
 
   if (strategy === 'vertical') {
-    // Corte vertical primero (X-Rip): genera una columna
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: r.height });
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: partW, height: remH });
   } else {
-    // Corte horizontal primero (Y-Rip): genera una tira
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: r.width, height: remH });
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: partH });
   }
 }
 
-function evaluatePanelQuality(panel: OptimizedPanel): number {
-  // Puntuación masiva para eficiencia de área
-  let score = panel.efficiency * 1e15;
+function evaluatePanelQuality(panel: OptimizedPanel, strategy: 'vertical' | 'horizontal'): number {
+  let score = panel.efficiency * 1e18;
   
-  // Bono por consolidación de sobrante (área del sobrante más grande)
-  const largestLeftover = Math.max(0, ...(panel.leftovers?.map(l => l.width * l.height) || [0]));
-  score += largestLeftover * 1e5;
+  // Bono por estrategia horizontal (transversal) si empatan en eficiencia
+  if (strategy === 'horizontal') score += 1e12;
 
-  // Penalización por fragmentación (muchos sobrantes pequeños)
+  // Bono por consolidación de sobrante masivo
+  const largestLeftover = Math.max(0, ...(panel.leftovers?.map(l => l.width * l.height) || [0]));
+  score += largestLeftover * 1e8;
+
+  // Penalización por fragmentación excesiva
   const uselessLeftovers = panel.leftovers?.filter(l => Math.min(l.width, l.height) < 100).length || 0;
-  score -= uselessLeftovers * 1e12;
+  score -= uselessLeftovers * 1e14;
 
   return score;
 }
