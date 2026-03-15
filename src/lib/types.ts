@@ -163,6 +163,16 @@ export interface OptimizedPart {
   isLeftover?: boolean;
 }
 
+export interface PanelStats {
+  totalAreaM2: number;
+  usedAreaM2: number;
+  leftoverAreaM2: number;
+  wasteAreaM2: number;
+  wastePercentage: number;
+  displacements: number;
+  linearMeters: number;
+}
+
 export interface OptimizedPanel {
   panelNumber: number;
   parts: OptimizedPart[];
@@ -171,6 +181,7 @@ export interface OptimizedPanel {
   totalArea: number;
   leftovers?: OptimizedPart[];
   strategy?: 'horizontal' | 'vertical';
+  stats: PanelStats;
 }
 
 export interface OptimizationResult {

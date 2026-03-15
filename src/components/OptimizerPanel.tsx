@@ -31,7 +31,8 @@ import {
   RotateCcw,
   ArrowDownToLine,
   ArrowRightToLine,
-  PackageCheck
+  PackageCheck,
+  Scissors
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -269,7 +270,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v28.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v30.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -616,7 +617,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v28.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v30.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -627,20 +628,60 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
             <div className="space-y-12 py-8 px-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
               {result.optimizedLayout.map((panel, idx) => {
                 const isVertical = panel.strategy === 'vertical';
+                const s = panel.stats;
                 return (
                   <div key={idx} className="space-y-4">
-                    <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
-                      <div className="flex flex-col gap-0.5">
-                        <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — {selectedPanel.width}x{selectedPanel.height}mm</h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={`border-primary text-primary text-[8px] font-black uppercase px-1.5 h-4 flex items-center gap-1 bg-primary/10`}>
-                            {isVertical ? <ArrowDownToLine className="w-2.5 h-2.5" /> : <ArrowRightToLine className="w-2.5 h-2.5" />}
-                            Primer Corte: {isVertical ? 'Vertical (Columna)' : 'Horizontal (Tira)'}
-                          </Badge>
-                          {selectedPanel.hasGrain && <Badge variant="outline" className="text-[8px] border-amber-500 text-amber-500 bg-amber-500/5">RESPETANDO VETA</Badge>}
+                    <div className="bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary overflow-hidden">
+                      <div className="flex items-center justify-between px-6 py-3 border-b border-white/10">
+                        <div className="flex flex-col gap-0.5">
+                          <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — {selectedPanel.width}x{selectedPanel.height}mm</h3>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={`border-primary text-primary text-[8px] font-black uppercase px-1.5 h-4 flex items-center gap-1 bg-primary/10`}>
+                              {isVertical ? <ArrowDownToLine className="w-2.5 h-2.5" /> : <ArrowRightToLine className="w-2.5 h-2.5" />}
+                              Primer Corte: {isVertical ? 'Vertical (Columna)' : 'Horizontal (Tira)'}
+                            </Badge>
+                            {selectedPanel.hasGrain && <Badge variant="outline" className="text-[8px] border-amber-500 text-amber-500 bg-amber-500/5">RESPETANDO VETA</Badge>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-[8px] font-bold text-slate-400 uppercase">Eficiencia Real</div>
+                            <div className="text-lg font-black text-primary">{panel.efficiency.toFixed(1)}%</div>
+                          </div>
                         </div>
                       </div>
-                      <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
+                      
+                      {/* Industrial Diagnostics Panel */}
+                      <div className="bg-slate-800/50 px-6 py-2 grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4 border-b border-white/5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-amber-500 uppercase">Desperdicio =</span>
+                          <span className="text-[10px] font-mono font-bold">{s.wastePercentage.toFixed(3)} %</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-slate-400 uppercase">m2 totales =</span>
+                          <span className="text-[10px] font-mono font-bold">{s.totalAreaM2.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-red-400 uppercase">m2 Desp =</span>
+                          <span className="text-[10px] font-mono font-bold">{s.wasteAreaM2.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-emerald-400 uppercase">m2 Stes =</span>
+                          <span className="text-[10px] font-mono font-bold">{s.leftoverAreaM2.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-blue-400 uppercase">m2 cortados =</span>
+                          <span className="text-[10px] font-mono font-bold">{s.usedAreaM2.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 col-span-2">
+                          <div className="flex items-center gap-1.5 bg-slate-900/50 px-2 py-0.5 rounded">
+                            <Scissors className="w-2.5 h-2.5 text-primary" />
+                            <span className="text-[9px] font-black text-slate-300 uppercase">Desplazamientos =</span>
+                            <span className="text-[10px] font-mono font-bold text-white">{s.displacements} por cada placa</span>
+                            <span className="text-[10px] font-mono font-bold text-primary ml-2">{s.linearMeters.toFixed(2)} mts</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     
                     <div className="relative bg-white shadow-2xl rounded-sm mx-auto overflow-hidden border border-slate-300" 
