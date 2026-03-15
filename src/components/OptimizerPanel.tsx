@@ -1,9 +1,10 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult, OptimizedPanel } from '@/lib/types';
+import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult, OptimizedPanel, OptimizedPart } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -240,9 +241,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     result.optimizedLayout.forEach((panel, pIdx) => {
       const isVertical = panel.strategy === 'vertical';
       
-      // LOGICA LEPTON VALIDADA:
-      // Si es Vertical: l=Width(2750), w=Height(1830)
-      // Si es Horizontal: l=Height(1830), w=Width(2750)
       const rootL = isVertical ? selectedPanel.width : selectedPanel.height;
       const rootW = isVertical ? selectedPanel.height : selectedPanel.width;
 
@@ -295,20 +293,161 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     if (!result) return;
     const doc = new jsPDF('p', 'mm', 'a4');
     const BRAND_COLOR = [13, 110, 253];
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(24);
-    doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
-    doc.text("JADSI", 105, 20, { align: 'center' });
-    doc.setFontSize(14);
-    doc.setTextColor(80, 80, 80);
-    doc.text("Hoja de Optimización Industrial", 105, 28, { align: 'center' });
-    (doc as any).autoTable({
-      head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
-      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Libre' : 'Fija']),
-      startY: 40,
-      headStyles: { fillColor: BRAND_COLOR, fontStyle: 'bold' }
+    const MARGIN = 15;
+    const PAGE_WIDTH = 210;
+    const DRAW_WIDTH = PAGE_WIDTH - (MARGIN * 2);
+
+    result.optimizedLayout.forEach((panel, idx) => {
+      if (idx > 0) doc.addPage();
+
+      // Logo/Brand
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+      doc.text("JADSI INDUSTRIAL", PAGE_WIDTH / 2, 20, { align: 'center' });
+      
+      // Divider
+      doc.setDrawColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+      doc.setLineWidth(0.5);
+      doc.line(MARGIN, 25, PAGE_WIDTH - MARGIN, 25);
+
+      // Panel Title
+      doc.setFontSize(14);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`HOJA DE OPTIMIZACIÓN - PANEL #${panel.panelNumber}`, MARGIN, 35);
+      
+      // Material Info
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Material: ${selectedPanel.name}`, MARGIN, 42);
+      doc.text(`Dimensiones: ${selectedPanel.width} x ${selectedPanel.height} mm | Espesor: ${selectedPanel.thickness}mm | Sierra: ${result.kerf}mm`, MARGIN, 47);
+
+      // Telemetry Block
+      const s = panel.stats;
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(MARGIN, 52, DRAW_WIDTH, 15, 'FD');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 41, 59);
+      const tel1 = `DESPERDICIO: ${s.wastePercentage.toFixed(3)}%   |   m2 TOTALES: ${s.totalAreaM2.toFixed(2)}   |   m2 PIEZAS: ${s.usedAreaM2.toFixed(2)}   |   m2 SOBRANTES: ${s.leftoverAreaM2.toFixed(2)}`;
+      const tel2 = `DESPLAZAMIENTOS: ${s.displacements}   |   METROS LINEALES: ${s.linearMeters.toFixed(2)} mts   |   ESTRATEGIA: ${panel.strategy?.toUpperCase()}`;
+      doc.text(tel1, MARGIN + 5, 58);
+      doc.text(tel2, MARGIN + 5, 63);
+
+      // Drawing Calculations
+      const scale = DRAW_WIDTH / selectedPanel.width;
+      const drawHeight = selectedPanel.height * scale;
+      const startY = 75;
+
+      // Panel Base Rectangle
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.2);
+      doc.rect(MARGIN, startY, DRAW_WIDTH, drawHeight);
+
+      // Parts Drawing
+      panel.parts.forEach((p) => {
+        const px = MARGIN + (p.x * scale);
+        const py = startY + (p.y * scale);
+        const pw = p.width * scale;
+        const ph = p.height * scale;
+
+        // Part Fill (consistent with UI)
+        doc.setFillColor(230, 240, 255);
+        doc.setDrawColor(30, 41, 59);
+        doc.rect(px, py, pw, ph, 'FD');
+
+        // Part dimensions/labels
+        if (pw > 12 && ph > 8) {
+          doc.setFontSize(pw > 25 ? 6 : 4);
+          doc.setTextColor(51, 65, 85);
+          const name = p.name.length > 15 ? p.name.substring(0, 12) + "..." : p.name;
+          doc.text(`${name}`, px + pw/2, py + ph/2 - (ph > 10 ? 1 : 0), { align: 'center', baseline: 'middle' });
+          if (ph > 10) {
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${Math.round(p.width)}x${Math.round(p.height)}`, px + pw/2, py + ph/2 + 3, { align: 'center', baseline: 'middle' });
+            doc.setFont('helvetica', 'normal');
+          }
+        }
+      });
+
+      // Leftovers Drawing
+      panel.leftovers?.forEach(l => {
+        const lx = MARGIN + (l.x * scale);
+        const ly = startY + (l.y * scale);
+        const lw = l.width * scale;
+        const lh = l.height * scale;
+        
+        doc.setLineDashPattern([1, 1], 0);
+        doc.setDrawColor(148, 163, 184);
+        doc.rect(lx, ly, lw, lh, 'S');
+        doc.setLineDashPattern([], 0);
+        
+        if (lw > 15 && lh > 10) {
+          doc.setFontSize(5);
+          doc.setTextColor(148, 163, 184);
+          doc.text(`Sobrante`, lx + lw/2, ly + lh/2, { align: 'center', baseline: 'middle' });
+        }
+      });
+
+      // Parts Table per Panel
+      const tableStartY = startY + drawHeight + 15;
+      
+      const panelParts = panel.parts.filter(p => !p.isLeftover);
+      const aggregated = panelParts.reduce((acc, p) => {
+        const key = `${p.name}-${Math.round(p.width)}-${Math.round(p.height)}`;
+        if (!acc[key]) {
+          acc[key] = { 
+            name: p.name, 
+            w: Math.round(p.width), 
+            h: Math.round(p.height), 
+            qty: 0,
+            area: (p.width * p.height) / 1000000 
+          };
+        }
+        acc[key].qty++;
+        return acc;
+      }, {} as Record<string, any>);
+
+      (doc as any).autoTable({
+        startY: tableStartY,
+        margin: { left: MARGIN, right: MARGIN },
+        head: [['Ítem', 'Pieza', 'Ancho (mm)', 'Alto (mm)', 'Cant.', 'm2 Total']],
+        body: Object.values(aggregated).map((p: any, i) => [
+          i + 1, 
+          p.name, 
+          p.w, 
+          p.h, 
+          p.qty, 
+          (p.area * p.qty).toFixed(3)
+        ]),
+        headStyles: { 
+          fillColor: BRAND_COLOR, 
+          textColor: [255, 255, 255],
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'center' },
+          5: { halign: 'right' }
+        },
+        styles: { fontSize: 7, cellPadding: 2 },
+        theme: 'striped'
+      });
+
+      // Footer line
+      doc.setFontSize(7);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`JADSI INDUSTRIAL TECHNOLOGY v37.0 - Documento generado el ${new Date().toLocaleString()}`, MARGIN, 285);
     });
-    doc.save(`jadsi-optimizacion-${Date.now()}.pdf`);
+
+    doc.save(`JADSI-Reporte-Optimización-${Date.now()}.pdf`);
   };
 
   const filteredPanels = AVAILABLE_PANELS.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
