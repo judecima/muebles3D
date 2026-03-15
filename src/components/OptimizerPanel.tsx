@@ -53,37 +53,37 @@ const FURNITURE_PRESETS = [
     id: 'test-dataset',
     name: "Valores de Prueba (73 Piezas)",
     parts: [
-      { name: "Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'vertical' },
-      { name: "Lateral V2", width: 610, height: 570, quantity: 4, grainDirection: 'vertical' },
-      { name: "Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'vertical' },
-      { name: "Piso/Techo 582", width: 500, height: 582, quantity: 2, grainDirection: 'vertical' },
-      { name: "Piso/Techo 562", width: 500, height: 562, quantity: 1, grainDirection: 'vertical' },
-      { name: "Amarre 582", width: 582, height: 150, quantity: 4, grainDirection: 'vertical' },
-      { name: "Amarre 463", width: 463, height: 150, quantity: 3, grainDirection: 'vertical' },
-      { name: "Amarre 562", width: 562, height: 150, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'vertical' },
-      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 382x117", width: 382, height: 117, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 177x117", width: 177, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'vertical' },
-      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'vertical' },
-      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'vertical' }
+      { name: "Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
+      { name: "Lateral V2", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
+      { name: "Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'libre' },
+      { name: "Piso/Techo 582", width: 500, height: 582, quantity: 2, grainDirection: 'libre' },
+      { name: "Piso/Techo 562", width: 500, height: 562, quantity: 1, grainDirection: 'libre' },
+      { name: "Amarre 582", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
+      { name: "Amarre 463", width: 463, height: 150, quantity: 3, grainDirection: 'libre' },
+      { name: "Amarre 562", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'libre' },
+      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 382x117", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 177x117", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'libre' }
     ]
   },
   {
@@ -242,8 +242,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     doc.setTextColor(80, 80, 80);
     doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
     (doc as any).autoTable({
-      head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Rotación']],
-      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Permitida' : 'Fija']),
+      head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
+      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Ignorar' : 'Respetar']),
       startY: 40,
       headStyles: { fillColor: BRAND_COLOR, fontStyle: 'bold' }
     });
@@ -268,7 +268,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v20.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v25.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -417,7 +417,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Largo</span>
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Ancho</span>
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Cant.</span>
-                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Rotar</span>
+                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Resp. Veta</span>
                       <span className="col-span-1"></span>
                     </div>
                     {localCutlist.map((part, idx) => (
@@ -448,15 +448,15 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         <div className="col-span-2">
                           <Input 
                             type="number" 
-                            className="h-8 bg-white border rounded text-center text-[10px] font-bold text-primary" 
+                            className="h-8 bg-white border rounded text-center text-[10px]" 
                             value={part.quantity} 
                             onChange={(e) => updatePart(idx, 'quantity', parseInt(e.target.value) || 0)} 
                           />
                         </div>
                         <div className="col-span-2 flex justify-center">
                           <Checkbox 
-                            checked={part.grainDirection === 'libre'} 
-                            onCheckedChange={(checked) => updatePart(idx, 'grainDirection', checked ? 'libre' : 'vertical')}
+                            checked={part.grainDirection !== 'libre'} 
+                            onCheckedChange={(checked) => updatePart(idx, 'grainDirection', checked ? 'vertical' : 'libre')}
                             disabled={!selectedPanel.hasGrain}
                             className={!selectedPanel.hasGrain ? "opacity-20" : ""}
                           />
@@ -474,7 +474,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                       </div>
                     ))}
                     {!selectedPanel.hasGrain && (
-                      <p className="text-[8px] text-blue-500 font-bold uppercase text-center mt-2 italic">* Material liso: rotación automática activada para todas las piezas.</p>
+                      <p className="text-[8px] text-blue-500 font-bold uppercase text-center mt-2 italic">* Material liso: rotación libre activada automáticamente (veta no aplica).</p>
                     )}
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" size="sm" className="flex-1 border-dashed font-bold uppercase text-[9px]" onClick={addManualPart}>
@@ -607,7 +607,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v20.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v25.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
