@@ -1,7 +1,4 @@
-
-'use client';
-
-import { GrainDirection, OptimizationResult, OptimizedPanel, OptimizedPart } from '@/lib/types';
+import { GrainDirection, OptimizationResult, OptimizedPanel, OptimizedPart } from '../../lib/types';
 
 interface InternalPart {
   name: string;
@@ -50,7 +47,7 @@ export function runOptimization(
   ];
 
   let bestResult: OptimizationResult | null = null;
-  let bestScore = Infinity; // Menor es mejor (Paneles * 1000000 - Eficiencia Panel 1)
+  let bestScore = Infinity; 
   const partColors = generateColors(filteredParts);
 
   for (const strategy of sortStrategies) {
@@ -69,7 +66,6 @@ export function runOptimization(
 
       pool.sort(strategy);
 
-      // Si rotamos el panel, intercambiamos los límites del algoritmo
       const algoW = isVerticalPanel ? usableH : usableW;
       const algoH = isVerticalPanel ? usableW : usableH;
 
@@ -78,7 +74,6 @@ export function runOptimization(
       );
       
       if (currentResult.optimizedLayout.length > 0) {
-        // Puntuación: Priorizar menos paneles. Si empatan, priorizar el que llene más el primer panel.
         const firstPanelEfficiency = currentResult.optimizedLayout[0]?.efficiency || 0;
         const score = (currentResult.totalPanels * 1000000) - firstPanelEfficiency;
 
@@ -112,9 +107,7 @@ function buildStripLayout(
     const panelStrips: Strip[] = [];
     let currentPanelHeight = 0;
 
-    // CAPA 2: FAJAS (STRIPS)
     while (currentPanelHeight < algoH) {
-      // Buscar líder de faja: la pieza más alta disponible que quepa en el alto restante
       let leaderIdx = -1;
       let leaderIsRotated = false;
 
@@ -122,13 +115,11 @@ function buildStripLayout(
         const p = workingPool[i];
         if (p.placed) continue;
 
-        // Probar normal
         if (p.width <= algoW && p.height <= (algoH - currentPanelHeight)) {
           leaderIdx = i;
           leaderIsRotated = false;
           break;
         }
-        // Probar rotado (solo si es libre)
         if (p.grainDirection === 'libre' && p.height <= algoW && p.width <= (algoH - currentPanelHeight)) {
           leaderIdx = i;
           leaderIsRotated = true;
@@ -143,23 +134,19 @@ function buildStripLayout(
       const stripParts: OptimizedPart[] = [];
       let currentX = 0;
 
-      // CAPA 3: COLUMNAS (CONTENEDORES)
       while (currentX < algoW) {
         let bestColIdx = -1;
         let colRotated = false;
 
-        // Buscamos la mejor pieza para iniciar una columna (debe ser <= stripH)
         for (let i = 0; i < workingPool.length; i++) {
           const p = workingPool[i];
           if (p.placed) continue;
 
-          // Normal
           if (p.width <= (algoW - currentX) && p.height <= stripH) {
             bestColIdx = i;
             colRotated = false;
             break;
           }
-          // Rotada
           if (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= stripH) {
             bestColIdx = i;
             colRotated = true;
@@ -173,7 +160,6 @@ function buildStripLayout(
         const colW = colRotated ? colLeader.height : colLeader.width;
         let colUsedY = 0;
 
-        // CAPA 4: APILADO (STACKING) - Todas las piezas en la columna deben tener el mismo ancho (colW)
         while (colUsedY < stripH) {
           let pIdx = -1;
           let pRot = false;
@@ -183,7 +169,6 @@ function buildStripLayout(
             if (p.placed) continue;
 
             const remH = stripH - colUsedY;
-            // Solo piezas que coincidan exactamente con el ancho de la columna para respetar guillotina
             if (p.width === colW && p.height <= remH) {
               pIdx = i;
               pRot = false;
@@ -233,7 +218,6 @@ function buildStripLayout(
 
     if (panelStrips.length === 0) break;
 
-    // REORDENAR FAJAS POR DENSIDAD (Más llenas arriba para maximizar el bloque sobrante abajo)
     panelStrips.sort((a, b) => b.efficiency - a.efficiency);
 
     const placedInPanel: OptimizedPart[] = [];
@@ -244,7 +228,6 @@ function buildStripLayout(
         const finalX = p.x;
         const finalY = yOffset + p.y;
 
-        // Transformación final de coordenadas si el panel está en modo vertical
         const drawX = isVertical ? finalY : finalX;
         const drawY = isVertical ? finalX : finalY;
         const drawW = isVertical ? p.height : p.width;
@@ -271,7 +254,7 @@ function buildStripLayout(
       totalArea: panelWidth * panelHeight
     });
 
-    if (panels.length > 20) break; // Seguridad
+    if (panels.length > 20) break; 
   }
 
   const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
@@ -281,7 +264,7 @@ function buildStripLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `ArquiMax v12.6: Guillotina vertical activa. Eficiencia global: ${(totalUsed / totalAvail * 100).toFixed(1)}%.`,
+    summary: `JADSI v12.6: Guillotina vertical activa. Eficiencia global: ${(totalUsed / totalAvail * 100).toFixed(1)}%.`,
     kerf, trim, selectedThickness
   };
 }

@@ -1,4 +1,4 @@
-import { Part, GrainDirection } from '@/lib/types';
+import { Part, GrainDirection } from '../../lib/types';
 
 export interface CutlistPart {
   name: string;
@@ -17,7 +17,6 @@ export function generateCutListFromModel(parts: Part[]): CutlistPart[] {
   const woodParts = parts.filter(p => !p.isHardware);
   
   const aggregated = woodParts.reduce((acc, part) => {
-    // Forzar redondeo a enteros en la generación de la lista de corte
     const l = Math.round(part.cutLargo);
     const a = Math.round(part.cutAncho);
     const e = Math.round(part.cutEspesor);
