@@ -53,7 +53,7 @@ interface OptimizerPanelProps {
 const FURNITURE_PRESETS = [
   {
     id: 'test-dataset',
-    name: "Valores de Prueba (73 Piezas)",
+    name: "Dataset Mesopotamia (73 Piezas)",
     parts: [
       { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
       { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
@@ -147,7 +147,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
         const e = Math.round(part.cutEspesor);
         const key = `${part.name}-${l}-${a}-${e}-${part.grainDirection}`;
         if (!acc[key]) {
-          acc[key] = { name: part.name, width: l, height: a, quantity: 0, grainDirection: part.grainDirection, thickness: e };
+          acc[key] = { name: part.name, width: l, height: a, quantity: 0, grainDirection: 'libre', thickness: e };
         }
         acc[key].quantity += 1;
         return acc;
@@ -237,24 +237,24 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<project>\n`;
     
     result.optimizedLayout.forEach((panel, pIdx) => {
-      const strategy = panel.strategy === 'vertical' ? 'X-Rip' : 'Y-Rip';
-      xml += `  <panel${pIdx + 1} l="${selectedPanel.width}" w="${selectedPanel.height}" material="${selectedPanel.name}" thickness="${selectedPanel.thickness}" saw="${result.kerf}" num="${panel.panelNumber}" strategy="${strategy}">\n`;
+      xml += `  <panel${pIdx + 1} l="${selectedPanel.width}" w="${selectedPanel.height}" material="${selectedPanel.name}" thickness="${selectedPanel.thickness}" saw="${result.kerf}" num="${panel.panelNumber}" strategy="${panel.strategy}">\n`;
       
-      // Nodo Jerárquico Principal (Área de Corte)
+      // Nodo Jerárquico Principal
       xml += `    <no.1 l="${selectedPanel.height}" w="${selectedPanel.width}" trim="${result.trim}" x="0" y="0" layer="1" id="0">\n`;
       
-      // Agrupamos piezas por "columnas" o "tiras" para el XML jerárquico
-      const uniqueCoords = Array.from(new Set(panel.parts.map(p => panel.strategy === 'vertical' ? p.x : p.y))).sort((a,b) => a-b);
+      // Agrupamos piezas por capas jerárquicas según la estrategia ganadora
+      const isVertical = panel.strategy === 'vertical';
+      const uniqueStrips = Array.from(new Set(panel.parts.map(p => isVertical ? p.x : p.y))).sort((a,b) => a-b);
       
-      uniqueCoords.forEach((coord, coordIdx) => {
-        const partsInLayer = panel.parts.filter(p => (panel.strategy === 'vertical' ? p.x : p.y) === coord);
-        const layerWidth = panel.strategy === 'vertical' ? partsInLayer[0].width : selectedPanel.width;
-        const layerHeight = panel.strategy === 'vertical' ? selectedPanel.height : partsInLayer[0].height;
+      uniqueStrips.forEach((coord, coordIdx) => {
+        const partsInStrip = panel.parts.filter(p => (isVertical ? p.x : p.y) === coord);
+        const stripW = isVertical ? partsInStrip[0].width : selectedPanel.width;
+        const stripH = isVertical ? selectedPanel.height : partsInStrip[0].height;
         
-        xml += `      <no.${coordIdx + 2} l="${layerHeight}" w="${layerWidth}" trim="0" x="${panel.strategy === 'vertical' ? coord : 0}" y="${panel.strategy === 'vertical' ? 0 : coord}" layer="2" id="${coordIdx + 1}">\n`;
+        xml += `      <no.${coordIdx + 2} l="${stripH}" w="${stripW}" trim="0" x="${isVertical ? coord : 0}" y="${isVertical ? 0 : coord}" layer="2" id="${coordIdx + 1}">\n`;
         
-        partsInLayer.forEach((part, partIdx) => {
-          xml += `        <part cut="${panel.strategy === 'vertical' ? part.height : part.width}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
+        partsInStrip.forEach((part, partIdx) => {
+          xml += `        <part cut="${isVertical ? part.height : part.width}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
         });
         
         xml += `      </no.${coordIdx + 2}>\n`;
@@ -270,7 +270,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `jadsi-lepton-industrial-${Date.now()}.xml`;
+    a.download = `jadsi-industrial-export-${Date.now()}.xml`;
     a.click();
   };
 
@@ -284,14 +284,14 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     doc.text("JADSI", 105, 20, { align: 'center' });
     doc.setFontSize(14);
     doc.setTextColor(80, 80, 80);
-    doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
+    doc.text("Hoja de Optimización Industrial", 105, 28, { align: 'center' });
     (doc as any).autoTable({
       head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
-      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Rotación Libre' : 'Respetar Veta']),
+      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Libre' : 'Fija']),
       startY: 40,
       headStyles: { fillColor: BRAND_COLOR, fontStyle: 'bold' }
     });
-    doc.save(`jadsi-optimizacion-${targetThickness}mm.pdf`);
+    doc.save(`jadsi-optimizacion-${Date.now()}.pdf`);
   };
 
   const filteredPanels = AVAILABLE_PANELS.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -314,7 +314,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v32.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v33.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -666,7 +666,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v32.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v33.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -700,7 +700,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         </div>
                       </div>
                       
-                      {/* Telemetría Industrial v32.0 - Analytics Pro */}
+                      {/* Telemetría Industrial v33.0 - Analytics Pro */}
                       <div className="bg-slate-800/50 px-6 py-2 grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4 border-b border-white/5">
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] font-black text-amber-500 uppercase">Desperdicio =</span>
@@ -780,7 +780,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
                       <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">
-                        Flujo JADSI Industrial: Las líneas de guillotina {isVertical ? 'verticales' : 'horizontales'} definen los cortes primarios de seccionadora para este panel.
+                        Estrategia JADSI v33.0: Optimización mediante {isVertical ? 'columnas verticales' : 'filas horizontales'} para maximizar bloques remantes reutilizables.
                       </p>
                     </div>
                   </div>

@@ -18,8 +18,8 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v32.0 - Lepton Standard Alignment
- * Optimización voraz por paneles con evaluación de eje dual y scoring de stock.
+ * JADSI Industrial Engine v33.0 - Lepton Logic Alignment
+ * Optimización secuencial independiente con enfoque en consolidación de stock reutilizable.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -40,6 +40,7 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(filteredParts);
 
+  // Pool de piezas restantes
   let globalPool: InternalPart[] = filteredParts.flatMap((p, idx) => 
     Array.from({ length: p.quantity }, () => ({
       ...p,
@@ -58,19 +59,20 @@ export function runOptimization(
     const maxIterations = 10000;
     const targetEfficiency = 95.3;
 
+    // Evaluamos el panel actual de forma totalmente independiente
     for (let iter = 0; iter < maxIterations; iter++) {
       const currentAvailablePieces = globalPool.filter(p => !p.placed).map(p => ({ ...p }));
       
-      // Heurísticas de ordenamiento para diversidad de búsqueda
+      // Heurísticas de ordenamiento para explorar el espacio de soluciones
       if (iter === 0) {
         currentAvailablePieces.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-      } else if (iter < 1000) {
+      } else if (iter < 2000) {
         currentAvailablePieces.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
       } else {
         smartShuffle(currentAvailablePieces);
       }
 
-      // Evaluar ambos sentidos de guillotina
+      // IMPORTANTE: Cada panel evalúa ambas estrategias en cada iteración
       const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
       
       for (const strategy of strategies) {
@@ -96,11 +98,12 @@ export function runOptimization(
         }
       }
 
+      // Si alcanzamos la meta de eficiencia industrial, cerramos el panel
       if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= targetEfficiency) break;
     }
 
     if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
-      // Marcar piezas como colocadas definitivamente
+      // Marcar piezas como colocadas y eliminarlas del pool para el siguiente panel
       bestPanelForThisStep.parts.forEach(placedPart => {
         if (placedPart.isLeftover) return;
         
@@ -116,7 +119,7 @@ export function runOptimization(
       finalPanels.push(bestPanelForThisStep);
       panelCounter++;
     } else {
-      break;
+      break; 
     }
   }
 
@@ -127,7 +130,7 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: finalPanels.length > 0 ? (totalUsedArea / totalAvailArea) * 100 : 0,
-    summary: `JADSI v32.0 Industrial: ${finalPanels.length} paneles procesados con análisis de eje dual.`,
+    summary: `JADSI v33.0 Industrial: Optimización por panel con consolidación de stock masivo.`,
     kerf,
     trim,
     selectedThickness
@@ -151,10 +154,12 @@ function fillSinglePanel(
   const freeRects: FreeRect[] = [{ x: trim, y: trim, width: usableW, height: usableH }];
   const leftovers: OptimizedPart[] = [];
   
+  // Logística inicial (perímetro de la placa + 4 cortes de limpieza)
   let linearMeters = (panelWidth * 2 + panelHeight * 2) / 1000;
   let displacements = 4;
 
   while (freeRects.length > 0) {
+    // Ordenamiento de guillotina según estrategia elegida
     freeRects.sort((a, b) => {
       if (strategy === 'horizontal') return (a.y - b.y) || (a.x - b.x);
       return (a.x - b.x) || (a.y - b.y);
@@ -167,11 +172,12 @@ function fillSinglePanel(
     let bestScore = -1;
     let rotated = false;
 
+    // Gap-First Intelligence: Para este hueco, buscamos la mejor pieza
     for (let i = 0; i < pieces.length; i++) {
       const part = pieces[i];
       if (part.placed) continue;
 
-      // Sin rotación
+      // Evaluar sin rotar
       if (part.width <= r.width && part.height <= r.height) {
         const score = calculateIndustrialScore(part.width, part.height, r, strategy);
         if (score > bestScore) {
@@ -179,7 +185,7 @@ function fillSinglePanel(
         }
       }
 
-      // Con rotación
+      // Evaluar con rotación (si es permitida)
       const canRotate = !hasGrain || part.grainDirection === 'libre';
       if (canRotate && part.height <= r.width && part.width <= r.height) {
         const score = calculateIndustrialScore(part.height, part.width, r, strategy);
@@ -202,11 +208,12 @@ function fillSinglePanel(
       });
 
       part.placed = true;
-      displacements += 1.5; 
+      displacements += 1.5; // Estimación de reposicionamiento
       linearMeters += (strategy === 'vertical' ? h : w) / 1000;
 
       splitGuillotine(freeRects, r, w, h, kerf, strategy);
     } else {
+      // Si el hueco es útil (>100mm), lo guardamos como sobrante (Stes)
       if (r.width >= 100 && r.height >= 100) {
         leftovers.push({
           name: `S${leftovers.length + 1}`,
@@ -218,6 +225,7 @@ function fillSinglePanel(
     }
   }
 
+  // Reseteamos el estado para no afectar otras simulaciones del mismo panel
   pieces.forEach(p => p.placed = false);
 
   const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
@@ -249,14 +257,15 @@ function fillSinglePanel(
 
 function calculateIndustrialScore(w: number, h: number, r: FreeRect, strategy: 'vertical' | 'horizontal'): number {
   let score = 0;
-  // Bono por ajuste perfecto al eje de la sierra (Master Axis Alignment)
+  // Ajuste Maestro al Eje: Bono masivo por llenar el alto (vertical) o ancho (horizontal) de la tira
   if (strategy === 'horizontal') {
-    if (Math.abs(h - r.height) < 0.5) score += 10000000;
+    if (Math.abs(h - r.height) < 0.5) score += 50000000;
   } else {
-    if (Math.abs(w - r.width) < 0.5) score += 10000000;
+    if (Math.abs(w - r.width) < 0.5) score += 50000000;
   }
-  score += (w * h) * 2; 
-  if (r.x === 10 || r.y === 10) score += 500000;
+  
+  score += (w * h) * 5; // Preferimos piezas grandes primero
+  if (r.x === 10 || r.y === 10) score += 1000000; // Preferimos pegar al origen
   return score;
 }
 
@@ -274,25 +283,27 @@ function splitGuillotine(freeRects: FreeRect[], r: FreeRect, pW: number, pH: num
 }
 
 function evaluatePanelQuality(panel: OptimizedPanel): number {
-  let score = Math.pow(panel.efficiency, 4) * 2000;
+  // Función de Aptitud Industrial: premia eficiencia y penaliza fragmentación
+  let score = Math.pow(panel.efficiency, 5) * 5000;
   
   const leftoverCount = panel.leftovers?.length || 0;
-  score -= (leftoverCount * 50000);
+  score -= (leftoverCount * 100000); // Fuerte penalización a la fragmentación
   
   const maxLeftoverArea = Math.max(0, ...(panel.leftovers?.map(l => l.width * l.height) || [0]));
-  score += (maxLeftoverArea / panel.totalArea) * 5000000;
+  score += (maxLeftoverArea / panel.totalArea) * 20000000; // Bono masivo por el remante más grande
 
-  // Bono por forma de sobrante (aspect ratio)
+  // Bono por forma útil del remante (que no sea una tira delgada)
   panel.leftovers?.forEach(l => {
     const ratio = Math.max(l.width, l.height) / Math.min(l.width, l.height);
-    if (ratio < 4) score += 1000000; // Preferimos bloques compactos, no cintas
+    if (ratio < 3) score += 2000000; 
   });
   
   return score;
 }
 
 function smartShuffle(pieces: InternalPart[]) {
-  for (let i = Math.min(15, pieces.length - 1); i < pieces.length; i++) {
+  // Barajado aleatorio para evitar óptimos locales
+  for (let i = Math.min(20, pieces.length - 1); i < pieces.length; i++) {
     const j = Math.floor(Math.random() * (i + 1));
     [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
   }
