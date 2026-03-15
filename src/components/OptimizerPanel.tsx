@@ -240,9 +240,9 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     result.optimizedLayout.forEach((panel, pIdx) => {
       const isVertical = panel.strategy === 'vertical';
       
-      // Lógica Lepton Industrial Validada:
-      // Si es Vertical: no.1 l=Width, w=Height
-      // Si es Horizontal: no.1 l=Height, w=Width
+      // LOGICA LEPTON VALIDADA:
+      // Si es Vertical: l=Width(2750), w=Height(1830)
+      // Si es Horizontal: l=Height(1830), w=Width(2750)
       const rootL = isVertical ? selectedPanel.width : selectedPanel.height;
       const rootW = isVertical ? selectedPanel.height : selectedPanel.width;
 
@@ -251,7 +251,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
       const rootNodeId = nodeCounter++;
       xml += `    <no.${rootNodeId} l="${rootL}" w="${rootW}" trim="${result.trim}" x="0" y="0" layer="1" id="0">\n`;
       
-      // Agrupar piezas por franjas (X para vertical, Y para horizontal)
       const uniqueStrips = Array.from(new Set(panel.parts.map(p => isVertical ? p.x : p.y))).sort((a,b) => a-b);
       
       uniqueStrips.forEach((stripCoord, coordIdx) => {
@@ -261,7 +260,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
         
         if (partsInStrip.length === 0) return;
 
-        // Strip Node (Layer 2): l es la longitud del corte, w es el ancho de la franja
         const stripL = isVertical ? selectedPanel.height : selectedPanel.width;
         const stripW = isVertical ? partsInStrip[0].width : partsInStrip[0].height;
         
@@ -272,7 +270,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
         xml += `      <no.${stripNodeId} l="${stripL}" w="${stripW}" trim="0" x="${stripX}" y="${stripY}" layer="2" id="${coordIdx + 1}">\n`;
         
         partsInStrip.forEach((part, partIdx) => {
-          // 'cut' es el avance de la sierra en la franja
           const cutDim = isVertical ? part.height : part.width;
           xml += `        <part cut="${cutDim}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
         });
@@ -290,7 +287,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `jadsi-industrial-export-${Date.now()}.xml`;
+    a.download = `jadsi-industrial-v37-${Date.now()}.xml`;
     a.click();
   };
 
@@ -334,7 +331,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v36.1
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v37.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -553,7 +550,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                       </div>
                     ))}
                     {!selectedPanel.hasGrain && (
-                      <p className="text-[8px] text-blue-500 font-bold uppercase text-center mt-2 italic">* Material liso: rotación libre activada automáticamente (veta no aplica).</p>
+                      <p className="text-[8px] text-blue-500 font-bold uppercase text-center mt-2 italic">* Material liso: rotación libre activada automáticamente.</p>
                     )}
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" size="sm" className="flex-1 border-dashed font-bold uppercase text-[9px]" onClick={addManualPart}>
@@ -662,7 +659,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                               ))
                             )}
                             {result.optimizedLayout.every(p => !p.leftovers || p.leftovers.length === 0) && (
-                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables ({" > "}100mm)</TableCell></TableRow>
+                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables.</TableCell></TableRow>
                             )}
                           </TableBody>
                         </Table>
@@ -686,7 +683,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v36.1...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación Industrial v37.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -797,7 +794,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
                       <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">
-                        Estrategia JADSI v36.1: Optimización mediante {isVertical ? 'columnas verticales' : 'filas horizontales'} para maximizar bloques remantes reutilizables.
+                        Estrategia JADSI v37.0: Optimización mediante {isVertical ? 'columnas verticales' : 'filas horizontales'} para maximizar stock recuperable.
                       </p>
                     </div>
                   </div>
