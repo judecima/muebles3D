@@ -56,11 +56,11 @@ const FURNITURE_PRESETS = [
       { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
       { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
       { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'libre' },
-      { name: "(4) Piso/Techo", width: 582, height: 500, quantity: 2, grainDirection: 'libre' },
-      { name: "(5) Piso/Techo", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "(4) Piso/Techo", width: 500, height: 582, quantity: 2, grainDirection: 'libre' },
+      { name: "(5) Piso/Techo", width: 500, height: 562, quantity: 1, grainDirection: 'libre' },
       { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-      { name: "(8) Amarre(8)", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-      { name: "(15) Divisor V-Caj Cent2", width: 578, height: 470, quantity: 1, grainDirection: 'libre' },
+      { name: "(7) Amarre", width: 463, height: 150, quantity: 3, grainDirection: 'libre' },
+      { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
       { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'libre' },
       { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'libre' },
       { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'libre' },
@@ -184,12 +184,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const loadPreset = (presetId: string) => {
     const preset = FURNITURE_PRESETS.find(p => p.id === presetId);
     if (!preset) return;
-    
-    const newParts = preset.parts.map(p => ({
-      ...p,
-      thickness: targetThickness
-    }));
-    
+    const newParts = preset.parts.map(p => ({ ...p, thickness: targetThickness }));
     setLocalCutlist(newParts);
     setResult(null);
   };
@@ -274,7 +269,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v27.1
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v28.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -597,7 +592,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                               ))
                             )}
                             {result.optimizedLayout.every(p => !p.leftovers || p.leftovers.length === 0) && (
-                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables ({">"}60mm)</TableCell></TableRow>
+                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables ({" > "}60mm)</TableCell></TableRow>
                             )}
                           </TableBody>
                         </Table>
@@ -621,7 +616,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v27.1...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v28.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
