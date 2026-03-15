@@ -18,10 +18,10 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v19.0 - DGP (Density Global Positioning)
+ * JADSI Industrial Engine v20.0 - Perfect Stacking & Cluster Nesting
  * 
- * Este motor implementa una arquitectura híbrida de Guillotina Recursiva
- * con Evaluación de Impacto de Eje (Dual-Pass) y consciencia de veta.
+ * Basado en algoritmos de impacto global con afinidad geométrica.
+ * Maximiza la densidad agrupando piezas de dimensiones idénticas en el mismo eje de guillotina.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -45,8 +45,8 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // Monte Carlo v19.0: 2000 iteraciones para exploración masiva
-  const iterations = 2000;
+  // Monte Carlo v20.0: 3000 iteraciones para búsqueda exhaustiva
+  const iterations = 3000;
 
   for (let iter = 0; iter < iterations; iter++) {
     const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
@@ -57,17 +57,24 @@ export function runOptimization(
       }))
     );
 
-    // Estrategia de barajado estocástico
-    if (iter === 0) pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-    else if (iter === 1) pool.sort((a, b) => b.height - a.height || b.width - a.width);
-    else shuffle(pool);
+    // Estrategia de ordenamiento jerárquico v20.0
+    if (iter === 0) {
+      // Orden por Area Descendente (Estrategia Clásica)
+      pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    } else if (iter === 1) {
+      // Orden por Lado Largo (Estrategia de Tira)
+      pool.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
+    } else {
+      // Barajado por Clústeres: Agrupamos piezas iguales y barajamos los grupos
+      clusterShuffle(pool);
+    }
 
-    // Simulación Dual: Probamos si es mejor empezar con guillotina vertical u horizontal
-    const resultH = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'horizontal', hasGrain);
-    const resultV = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'vertical', hasGrain);
+    // Probamos ambas orientaciones maestras
+    const resultH = executeLayout(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'horizontal', hasGrain);
+    const resultV = executeLayout(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'vertical', hasGrain);
     
     [resultH, resultV].forEach(res => {
-      const score = evaluateSolutionQuality(res, usableW, usableH);
+      const score = evaluateSolution(res);
       if (score > bestGlobalScore) {
         bestGlobalScore = score;
         bestGlobalResult = res;
@@ -75,10 +82,10 @@ export function runOptimization(
     });
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v19.0", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v20.0", kerf, trim, selectedThickness };
 }
 
-function executeBAF(
+function executeLayout(
   pool: InternalPart[], 
   algoW: number, 
   algoH: number, 
@@ -87,7 +94,7 @@ function executeBAF(
   panelWidth: number,
   panelHeight: number,
   colors: Record<string, string>,
-  splitStrategy: 'vertical' | 'horizontal',
+  strategy: 'vertical' | 'horizontal',
   hasGrain: boolean
 ): OptimizationResult {
   const panels: OptimizedPanel[] = [];
@@ -101,7 +108,7 @@ function executeBAF(
       if (part.placed) continue;
 
       let bestRectIdx = -1;
-      let minWaste = Infinity;
+      let minWasteScore = Infinity;
       let rotated = false;
 
       for (let i = 0; i < freeRects.length; i++) {
@@ -109,20 +116,27 @@ function executeBAF(
         
         // Test Normal
         if (part.width <= r.width && part.height <= r.height) {
-          const waste = (r.width * r.height) - (part.width * part.height);
-          if (waste < minWaste) {
-            minWaste = waste;
+          // Score v20.0: Area residual + Bono por coincidencia perfecta de dimensión
+          let score = (r.width * r.height) - (part.width * part.height);
+          if (Math.abs(part.width - r.width) < 1) score -= 1000000; // Coincidencia de Ancho
+          if (Math.abs(part.height - r.height) < 1) score -= 1000000; // Coincidencia de Alto
+          
+          if (score < minWasteScore) {
+            minWasteScore = score;
             bestRectIdx = i;
             rotated = false;
           }
         }
 
-        // Test Rotated: Solo si el material es liso O si la pieza tiene veta libre permitida por usuario
+        // Test Rotated
         const rotationAllowed = !hasGrain || part.grainDirection === 'libre';
         if (rotationAllowed && part.height <= r.width && part.width <= r.height) {
-          const waste = (r.width * r.height) - (part.width * part.height);
-          if (waste < minWaste) {
-            minWaste = waste;
+          let score = (r.width * r.height) - (part.width * part.height);
+          if (Math.abs(part.height - r.width) < 1) score -= 1000000;
+          if (Math.abs(part.width - r.height) < 1) score -= 1000000;
+
+          if (score < minWasteScore) {
+            minWasteScore = score;
             bestRectIdx = i;
             rotated = true;
           }
@@ -145,7 +159,7 @@ function executeBAF(
         });
 
         part.placed = true;
-        splitGuillotine(freeRects, bestRectIdx, w, h, kerf, splitStrategy);
+        splitGuillotine(freeRects, bestRectIdx, w, h, kerf, strategy);
       }
     }
 
@@ -181,7 +195,7 @@ function executeBAF(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v19.0 DGP: Estrategia ${splitStrategy === 'vertical' ? 'Vertical' : 'Horizontal'}.`,
+    summary: `JADSI v20.0 Industrial Stacking: Estrategia ${strategy === 'vertical' ? 'Vertical (X-Rip)' : 'Horizontal (Y-Rip)'}.`,
     kerf,
     trim,
     selectedThickness: pool[0].thickness
@@ -194,45 +208,75 @@ function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, part
   const remH = r.height - partH - kerf;
 
   if (strategy === 'vertical') {
+    // Primer corte Vertical (X-Axis)
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: r.height });
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: partW, height: remH });
   } else {
+    // Primer corte Horizontal (Y-Axis)
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: r.width, height: remH });
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: partH });
   }
 }
 
-function evaluateSolutionQuality(result: OptimizationResult, algoW: number, algoH: number): number {
-  let score = (1000 / result.totalPanels) * 1e15;
-  score += result.totalEfficiency * 1e10;
+function evaluateSolution(result: OptimizationResult): number {
+  // Prioridad 1: Menos Paneles (Penalización masiva por panel extra)
+  let score = (1000 / result.totalPanels) * 1e18;
+  
+  // Prioridad 2: Eficiencia Global
+  score += result.totalEfficiency * 1e12;
 
+  // Prioridad 3: Consolidación de Sobrantes (Preferir bloques únicos grandes)
   result.optimizedLayout.forEach(panel => {
     if (panel.leftovers && panel.leftovers.length > 0) {
-      const largestLeftover = panel.leftovers.reduce((m, r) => (r.width * r.height > m.area ? {area: r.width * r.height, r} : m), {area: 0, r: panel.leftovers[0]});
-      const l = largestLeftover.r;
+      const largest = panel.leftovers.reduce((m, r) => (r.width * r.height > m.area ? {area: r.width * r.height, r} : m), {area: 0, r: panel.leftovers[0]});
+      const l = largest.r;
       const minDim = Math.min(l.width, l.height);
-      const aspect = minDim / Math.max(l.width, l.height);
-      if (minDim > 300) score += (l.width * l.height) * 5;
-      score += (l.width * l.height) * aspect; 
+      const aspectRatio = minDim / Math.max(l.width, l.height);
+      
+      // Bonus por área útil consolidada
+      score += (l.width * l.height) * 10;
+      // Bonus por forma cuadrada (reutilizable)
+      score += (l.width * l.height) * aspectRatio * 5;
     }
-    if (panel.leftovers && panel.leftovers.length > 5) score -= 1e8;
+    // Penalización por fragmentación (muchos sobrantes pequeños)
+    if (panel.leftovers && panel.leftovers.length > 4) {
+      score -= panel.leftovers.length * 1e9;
+    }
   });
 
   return score;
 }
 
-function shuffle(arr: any[]) {
-  for (let i = arr.length - 1; i > 0; i--) {
+function clusterShuffle(pool: InternalPart[]) {
+  // Agrupamos piezas por dimensiones idénticas
+  const groups: Map<string, InternalPart[]> = new Map();
+  pool.forEach(p => {
+    const key = `${p.width}x${p.height}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
+  });
+
+  const groupArray = Array.from(groups.values());
+  // Barajamos los grupos
+  for (let i = groupArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [groupArray[i], groupArray[j]] = [groupArray[j], groupArray[i]];
   }
+
+  // Reconstruimos el pool manteniendo los grupos unidos
+  let idx = 0;
+  groupArray.forEach(group => {
+    group.forEach(p => {
+      pool[idx++] = p;
+    });
+  });
 }
 
 function generateColors(parts: any[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 65%, 60%, 0.3)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 55%, 0.35)`;
   });
   return colors;
 }
