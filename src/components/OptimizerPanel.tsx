@@ -230,7 +230,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v26.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v27.1
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -569,7 +569,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v26.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v27.1...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -579,7 +579,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           ) : (
             <div className="space-y-12 py-8 px-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
               {result.optimizedLayout.map((panel, idx) => {
-                const isVertical = result.summary.toLowerCase().includes('vertical');
+                const isVertical = panel.strategy === 'vertical';
                 return (
                   <div key={idx} className="space-y-4">
                     <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
@@ -643,7 +643,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
                       <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">
-                        Flujo JADSI Industrial: Las líneas de guillotina {isVertical ? 'verticales' : 'horizontales'} definen los cortes primarios de seccionadora.
+                        Flujo JADSI Industrial: Las líneas de guillotina {isVertical ? 'verticales' : 'horizontales'} definen los cortes primarios de seccionadora para este panel.
                       </p>
                     </div>
                   </div>

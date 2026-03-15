@@ -170,6 +170,7 @@ export interface OptimizedPanel {
   usedArea: number;
   totalArea: number;
   leftovers?: OptimizedPart[];
+  strategy?: 'horizontal' | 'vertical';
 }
 
 export interface OptimizationResult {
