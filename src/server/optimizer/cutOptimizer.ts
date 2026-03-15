@@ -18,7 +18,7 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v30.0 - Analytics Pro
+ * JADSI Industrial Engine v31.0 - Analytics Pro & Beam Saw Logic
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -60,14 +60,17 @@ export function runOptimization(
     for (let iter = 0; iter < maxIterations; iter++) {
       const currentAvailablePieces = globalPool.filter(p => !p.placed).map(p => ({ ...p }));
       
+      // Heurística de ordenamiento inicial: Área descendente
       if (iter === 0) {
         currentAvailablePieces.sort((a, b) => (b.width * b.height) - (a.width * a.height));
       } else if (iter < 1000) {
+        // Variante por lado largo
         currentAvailablePieces.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
       } else {
         smartShuffle(currentAvailablePieces);
       }
 
+      // Alternar estrategias de primer corte (X-Rip o Y-Rip)
       const strategy: 'horizontal' | 'vertical' = iter % 2 === 0 ? 'horizontal' : 'vertical';
       
       const attempt = fillSinglePanel(
@@ -91,10 +94,12 @@ export function runOptimization(
         bestPanelForThisStep = attempt;
       }
 
+      // Salida anticipada si alcanzamos la meta de eficiencia industrial
       if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= targetEfficiency) break;
     }
 
     if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
+      // Marcar piezas como colocadas definitivamente en este panel
       bestPanelForThisStep.parts.forEach(placedPart => {
         if (placedPart.isLeftover) return;
         
@@ -121,7 +126,7 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: finalPanels.length > 0 ? (totalUsedArea / totalAvailArea) * 100 : 0,
-    summary: `JADSI v30.0 Analytics: ${finalPanels.length} paneles. Panel 1 Efficiency: ${finalPanels[0]?.efficiency.toFixed(1)}%.`,
+    summary: `JADSI v31.0 Analytics: ${finalPanels.length} paneles procesados secuencialmente.`,
     kerf,
     trim,
     selectedThickness
@@ -145,10 +150,12 @@ function fillSinglePanel(
   const freeRects: FreeRect[] = [{ x: trim, y: trim, width: usableW, height: usableH }];
   const leftovers: OptimizedPart[] = [];
   
+  // Inicialización de logística de corte
   let linearMeters = (panelWidth * 2 + panelHeight * 2) / 1000; // Perímetro inicial (trim)
   let displacements = 4; // 4 cortes perimetrales iniciales
 
   while (freeRects.length > 0) {
+    // Ordenar huecos para favorecer la esquina cercana al origen
     freeRects.sort((a, b) => {
       if (strategy === 'horizontal') return (a.y - b.y) || (a.x - b.x);
       return (a.x - b.x) || (a.y - b.y);
@@ -165,6 +172,7 @@ function fillSinglePanel(
       const part = pieces[i];
       if (part.placed) continue;
 
+      // Evaluar sin rotación
       if (part.width <= r.width && part.height <= r.height) {
         const score = calculateIndustrialScore(part.width, part.height, r, strategy);
         if (score > bestScore) {
@@ -172,6 +180,7 @@ function fillSinglePanel(
         }
       }
 
+      // Evaluar con rotación (si la veta lo permite)
       const canRotate = !hasGrain || part.grainDirection === 'libre';
       if (canRotate && part.height <= r.width && part.width <= r.height) {
         const score = calculateIndustrialScore(part.height, part.width, r, strategy);
@@ -195,8 +204,8 @@ function fillSinglePanel(
 
       part.placed = true;
       
-      // Cálculo de logística de corte
-      displacements += 2; // Cada división guillotina genera 2 nuevos segmentos de corte
+      // Cálculo de logística de corte (Simulación de Seccionadora)
+      displacements += 2; 
       if (strategy === 'vertical') {
         linearMeters += (r.height + h) / 1000;
       } else {
@@ -205,6 +214,7 @@ function fillSinglePanel(
 
       splitGuillotine(freeRects, r, w, h, kerf, strategy);
     } else {
+      // Si el hueco es lo suficientemente grande, registrarlo como sobrante útil
       if (r.width >= 100 && r.height >= 100) {
         leftovers.push({
           name: `S${leftovers.length + 1}`,
@@ -216,6 +226,7 @@ function fillSinglePanel(
     }
   }
 
+  // Limpiar estados de piezas para el pool del siguiente panel
   pieces.forEach(p => p.placed = false);
 
   const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
@@ -229,7 +240,7 @@ function fillSinglePanel(
     leftoverAreaM2: Number((leftoverArea / 1000000).toFixed(2)),
     wasteAreaM2: Number((wasteArea / 1000000).toFixed(2)),
     wastePercentage: Number(((wasteArea / totalArea) * 100).toFixed(3)),
-    displacements: Math.round(displacements * 1.4), // Factor de ajuste por manejo de placa
+    displacements: Math.round(displacements * 1.2), // Factor de ajuste industrial
     linearMeters: Number(linearMeters.toFixed(2))
   };
 
@@ -247,12 +258,14 @@ function fillSinglePanel(
 
 function calculateIndustrialScore(w: number, h: number, r: FreeRect, strategy: 'vertical' | 'horizontal'): number {
   let score = 0;
+  // Bono masivo por ajuste perfecto en el eje de guillotina (evita escalones)
   if (strategy === 'horizontal') {
     if (Math.abs(h - r.height) < 0.5) score += 5000000;
   } else {
     if (Math.abs(w - r.width) < 0.5) score += 5000000;
   }
-  score += (w * h);
+  score += (w * h); // Priorizar piezas grandes
+  // Bono por proximidad al origen
   if (r.x === 10 || r.y === 10) score += 100000;
   return score;
 }
@@ -262,24 +275,33 @@ function splitGuillotine(freeRects: FreeRect[], r: FreeRect, pW: number, pH: num
   const remH = r.height - pH - kerf;
 
   if (strategy === 'vertical') {
+    // Primero dividir horizontalmente para crear la columna, luego verticalmente dentro de la columna
     if (remW > 0) freeRects.push({ x: r.x + pW + kerf, y: r.y, width: remW, height: r.height });
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + pH + kerf, width: pW, height: remH });
   } else {
+    // Estrategia Horizontal (Tira): Dividir verticalmente primero para cerrar la tira
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + pH + kerf, width: r.width, height: remH });
     if (remW > 0) freeRects.push({ x: r.x + pW + kerf, y: r.y, width: remW, height: pH });
   }
 }
 
 function evaluatePanelQuality(panel: OptimizedPanel): number {
+  // Puntuación cúbica de eficiencia para penalizar fuertemente los huecos
   let score = Math.pow(panel.efficiency, 3) * 1000;
+  
+  // Penalización por número de sobrantes (queremos pocos y grandes)
   const leftoverCount = panel.leftovers?.length || 0;
   score -= (leftoverCount * 10000);
+  
+  // Bono por el tamaño del sobrante más grande
   const maxLeftoverArea = Math.max(0, ...(panel.leftovers?.map(l => l.width * l.height) || [0]));
   score += (maxLeftoverArea / panel.totalArea) * 2000000;
+  
   return score;
 }
 
 function smartShuffle(pieces: InternalPart[]) {
+  // Solo mezclar después de las piezas críticas
   for (let i = Math.min(10, pieces.length - 1); i < pieces.length; i++) {
     const j = Math.floor(Math.random() * (i + 1));
     [pieces[i], pieces[j]] = [pieces[j], pieces[i]];

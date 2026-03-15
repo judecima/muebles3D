@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult } from '@/lib/types';
+import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult, OptimizedPanel } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +32,8 @@ import {
   ArrowDownToLine,
   ArrowRightToLine,
   PackageCheck,
-  Scissors
+  Scissors,
+  FileCode
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -185,7 +186,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const loadPreset = (presetId: string) => {
     const preset = FURNITURE_PRESETS.find(p => p.id === presetId);
     if (!preset) return;
-    const newParts = preset.parts.map(p => ({ ...p, thickness: targetThickness }));
+    const newParts = preset.parts.map(p => ({ ...p, thickness: targetThickness, grainDirection: 'libre' }));
     setLocalCutlist(newParts);
     setResult(null);
   };
@@ -230,6 +231,35 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     }
   };
 
+  const exportXML = () => {
+    if (!result) return;
+    
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<project>\n`;
+    
+    result.optimizedLayout.forEach((panel, pIdx) => {
+      xml += `  <panel${pIdx + 1} l="${selectedPanel.width}" w="${selectedPanel.height}" material="${selectedPanel.name}" thickness="${selectedPanel.thickness}" saw="${result.kerf}" num="${panel.panelNumber}">\n`;
+      
+      // Nodo Maestro (Área Útil)
+      xml += `    <no.1 l="${selectedPanel.height}" w="${selectedPanel.width}" trim="${result.trim}" x="0" y="0" layer="1" id="0">\n`;
+      
+      panel.parts.forEach((part, partIdx) => {
+        xml += `      <part cut="${part.width}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
+      });
+      
+      xml += `    </no.1>\n`;
+      xml += `  </panel${pIdx + 1}>\n`;
+    });
+    
+    xml += `</project>`;
+    
+    const blob = new Blob([xml], { type: 'text/xml' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jadsi-lepton-export-${Date.now()}.xml`;
+    a.click();
+  };
+
   const exportPDF = async () => {
     if (!result) return;
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -270,7 +300,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v30.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v31.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -402,7 +432,12 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                 <Button className="flex-1 font-black uppercase text-xs bg-primary hover:bg-primary/90 text-white h-11" onClick={handleOptimize} disabled={loading}>
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Ejecutar Optimización Industrial'}
                 </Button>
-                {result && <Button variant="outline" className="border-primary text-primary h-11 px-4" onClick={exportPDF}><FileDown className="w-4 h-4" /></Button>}
+                {result && (
+                  <>
+                    <Button variant="outline" className="border-primary text-primary h-11 px-4" onClick={exportPDF} title="Exportar PDF Técnico"><FileDown className="w-4 h-4" /></Button>
+                    <Button variant="outline" className="border-emerald-600 text-emerald-600 h-11 px-4" onClick={exportXML} title="Exportar XML Seccionadora"><FileCode className="w-4 h-4" /></Button>
+                  </>
+                )}
               </div>
 
               <Collapsible open={isPartsListOpen} onOpenChange={setIsPartsListOpen} className="border rounded-xl overflow-hidden">
@@ -577,7 +612,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                             <TableRow className="h-7">
                               <TableHead className="text-[9px] py-1 px-2 font-black">ID</TableHead>
                               <TableHead className="text-[9px] py-1 px-2 text-right font-black">Base</TableHead>
-                              <TableHead className="text-[9px] py-1 px-2 text-right font-black">Altura</TableHead>
+                              <TableHead className="text-[9px] py-1 px-2 text-right font-black">Alto</TableHead>
                               <TableHead className="text-[9px] py-1 px-2 text-center font-black">Panel</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -593,7 +628,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                               ))
                             )}
                             {result.optimizedLayout.every(p => !p.leftovers || p.leftovers.length === 0) && (
-                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables ({" > "}60mm)</TableCell></TableRow>
+                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables ({" > "}100mm)</TableCell></TableRow>
                             )}
                           </TableBody>
                         </Table>
@@ -617,7 +652,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v30.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v31.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -651,7 +686,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         </div>
                       </div>
                       
-                      {/* Industrial Diagnostics Panel */}
+                      {/* Telemetría Industrial v31.0 - Analytics Pro */}
                       <div className="bg-slate-800/50 px-6 py-2 grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4 border-b border-white/5">
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] font-black text-amber-500 uppercase">Desperdicio =</span>
