@@ -240,7 +240,9 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     result.optimizedLayout.forEach((panel, pIdx) => {
       const isVertical = panel.strategy === 'vertical';
       
-      // Según Lepton: En vertical se intercambian l y w del nodo raíz
+      // Lógica Lepton Industrial Validada:
+      // Si es Vertical: no.1 l=Width, w=Height
+      // Si es Horizontal: no.1 l=Height, w=Width
       const rootL = isVertical ? selectedPanel.width : selectedPanel.height;
       const rootW = isVertical ? selectedPanel.height : selectedPanel.width;
 
@@ -249,17 +251,22 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
       const rootNodeId = nodeCounter++;
       xml += `    <no.${rootNodeId} l="${rootL}" w="${rootW}" trim="${result.trim}" x="0" y="0" layer="1" id="0">\n`;
       
+      // Agrupar piezas por franjas (X para vertical, Y para horizontal)
       const uniqueStrips = Array.from(new Set(panel.parts.map(p => isVertical ? p.x : p.y))).sort((a,b) => a-b);
       
-      uniqueStrips.forEach((coord, coordIdx) => {
-        const partsInStrip = panel.parts.filter(p => (isVertical ? p.x : p.y) === coord);
+      uniqueStrips.forEach((stripCoord, coordIdx) => {
+        const partsInStrip = panel.parts
+          .filter(p => (isVertical ? p.x : p.y) === stripCoord)
+          .sort((a, b) => (isVertical ? a.y - b.y : a.x - b.x));
         
-        // Strip Node: l es la dimensión de corte (fija), w es el ancho de la franja (variable)
+        if (partsInStrip.length === 0) return;
+
+        // Strip Node (Layer 2): l es la longitud del corte, w es el ancho de la franja
         const stripL = isVertical ? selectedPanel.height : selectedPanel.width;
         const stripW = isVertical ? partsInStrip[0].width : partsInStrip[0].height;
         
-        const stripX = isVertical ? coord : 0;
-        const stripY = isVertical ? 0 : coord;
+        const stripX = isVertical ? stripCoord : 0;
+        const stripY = isVertical ? 0 : stripCoord;
         
         const stripNodeId = nodeCounter++;
         xml += `      <no.${stripNodeId} l="${stripL}" w="${stripW}" trim="0" x="${stripX}" y="${stripY}" layer="2" id="${coordIdx + 1}">\n`;
@@ -327,7 +334,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v36.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v36.1
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -679,7 +686,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v36.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v36.1...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -790,7 +797,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                     <div className="flex gap-4 items-center px-2">
                       <Info className="w-3 h-3 text-slate-400" />
                       <p className="text-[9px] text-slate-400 font-bold uppercase italic tracking-wider">
-                        Estrategia JADSI v36.0: Optimización mediante {isVertical ? 'columnas verticales' : 'filas horizontales'} para maximizar bloques remantes reutilizables.
+                        Estrategia JADSI v36.1: Optimización mediante {isVertical ? 'columnas verticales' : 'filas horizontales'} para maximizar bloques remantes reutilizables.
                       </p>
                     </div>
                   </div>
