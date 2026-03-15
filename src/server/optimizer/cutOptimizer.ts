@@ -18,10 +18,10 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v22.0 - Hyper-Density Pack
+ * JADSI Industrial Engine v23.0 - Precision Contact & Cluster Affinity
  * 
- * Basado en algoritmos de afinidad de clúster y empaquetado por franjas maestras.
- * Optimizado para maximizar la eficiencia del primer panel (>94%) y consolidar sobrantes.
+ * Basado en la regla de Contact Point (CP) combinada con Best Area Fit (BAF).
+ * Diseñado para maximizar la densidad global y consolidar sobrantes monolíticos.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -45,7 +45,7 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // Búsqueda Ultra-Intensiva v22.0: 5000 iteraciones
+  // Búsqueda Ultra-Intensiva v23.0: 5000 iteraciones para encontrar el óptimo global
   const iterations = 5000;
 
   for (let iter = 0; iter < iterations; iter++) {
@@ -57,20 +57,18 @@ export function runOptimization(
       }))
     );
 
-    // Estrategias de ordenamiento híbridas
+    // Estrategias de ordenamiento jerárquico + Mutación Monte Carlo
     if (iter === 0) {
       pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     } else if (iter === 1) {
       pool.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
     } else if (iter === 2) {
       pool.sort((a, b) => b.width - a.width || b.height - a.height);
-    } else if (iter === 3) {
-      pool.sort((a, b) => b.height - a.height || b.width - a.width);
     } else {
       clusterShuffle(pool);
     }
 
-    // Evaluación Dual-Axis (Vertical vs Horizontal)
+    // Evaluación Dual-Axis con Contact Point Heuristic
     const resultH = executeLayout(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'horizontal', hasGrain);
     const resultV = executeLayout(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'vertical', hasGrain);
     
@@ -83,7 +81,7 @@ export function runOptimization(
     });
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v22.0", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v23.0", kerf, trim, selectedThickness };
 }
 
 function executeLayout(
@@ -110,35 +108,35 @@ function executeLayout(
       if (part.placed) continue;
 
       let bestRectIdx = -1;
-      let minWasteScore = Infinity;
+      let maxContactScore = -1;
+      let minResidueArea = Infinity;
       let rotated = false;
 
       for (let j = 0; j < freeRects.length; j++) {
         const r = freeRects[j];
         
-        // Test Normal
+        // 1. Evaluar Orientación Normal
         if (part.width <= r.width && part.height <= r.height) {
-          let score = (r.width * r.height) - (part.width * part.height);
-          // Bono masivo por Stacking (Coincidencia de eje)
-          if (Math.abs(part.width - r.width) < 1) score -= 5000000;
-          if (Math.abs(part.height - r.height) < 1) score -= 5000000;
+          const cpScore = calculateContactScore(r.x, r.y, part.width, part.height, panelWidth, panelHeight, trim, r);
+          const residue = (r.width * r.height) - (part.width * part.height);
           
-          if (score < minWasteScore) {
-            minWasteScore = score;
+          if (cpScore > maxContactScore || (cpScore === maxContactScore && residue < minResidueArea)) {
+            maxContactScore = cpScore;
+            minResidueArea = residue;
             bestRectIdx = j;
             rotated = false;
           }
         }
 
-        // Test Rotated
+        // 2. Evaluar Orientación Rotada (si está permitido)
         const rotationAllowed = !hasGrain || part.grainDirection === 'libre';
         if (rotationAllowed && part.height <= r.width && part.width <= r.height) {
-          let score = (r.width * r.height) - (part.width * part.height);
-          if (Math.abs(part.height - r.width) < 1) score -= 5000000;
-          if (Math.abs(part.width - r.height) < 1) score -= 5000000;
+          const cpScore = calculateContactScore(r.x, r.y, part.height, part.width, panelWidth, panelHeight, trim, r);
+          const residue = (r.width * r.height) - (part.height * part.width);
 
-          if (score < minWasteScore) {
-            minWasteScore = score;
+          if (cpScore > maxContactScore || (cpScore === maxContactScore && residue < minResidueArea)) {
+            maxContactScore = cpScore;
+            minResidueArea = residue;
             bestRectIdx = j;
             rotated = true;
           }
@@ -163,8 +161,9 @@ function executeLayout(
         part.placed = true;
         splitGuillotine(freeRects, bestRectIdx, w, h, kerf, strategy);
         
-        // Lógica de Llenado de Franja: Intentar agotar piezas idénticas o que encajen perfecto
-        fillStripAggressively(workingPool, freeRects, kerf, strategy, hasGrain, colors, placedParts);
+        // Lógica de Agrupamiento Proactiva (Cluster Affinity)
+        // Intentar llenar la franja creada con piezas del mismo tipo/tamaño inmediatamente
+        fillStripWithCluster(workingPool, freeRects, kerf, strategy, hasGrain, colors, placedParts, panelWidth, panelHeight, trim);
       }
     }
 
@@ -200,7 +199,7 @@ function executeLayout(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v22.0 Hyper-Density: ${strategy === 'vertical' ? 'Vertical' : 'Horizontal'}.`,
+    summary: `JADSI v23.0 Precision Contact: ${strategy === 'vertical' ? 'Vertical' : 'Horizontal'}.`,
     kerf,
     trim,
     selectedThickness: pool[0].thickness
@@ -208,16 +207,37 @@ function executeLayout(
 }
 
 /**
- * Busca piezas que encajen perfectamente en la franja actual para evitar fragmentación.
+ * Heurística de Contact Point (CP)
+ * Premiar piezas que toquen bordes del panel o límites del rectángulo libre.
+ * Esto obliga a las piezas a consolidarse en las esquinas y contra otras piezas.
  */
-function fillStripAggressively(
+function calculateContactScore(x: number, y: number, w: number, h: number, pW: number, pH: number, trim: number, r: FreeRect): number {
+  let score = 0;
+  // Contacto con bordes externos (incluyendo refilado)
+  if (Math.abs(x - trim) < 0.5) score += h;
+  if (Math.abs(y - trim) < 0.5) score += w;
+  if (Math.abs(x + w - (pW - trim)) < 0.5) score += h;
+  if (Math.abs(y + h - (pH - trim)) < 0.5) score += w;
+
+  // Contacto con límites de guillotina del rectángulo libre (bordes de otras piezas)
+  if (Math.abs(w - r.width) < 0.5) score += h * 2; // Alineación perfecta de columna/tira
+  if (Math.abs(h - r.height) < 0.5) score += w * 2;
+
+  return score;
+}
+
+/**
+ * Busca agresivamente piezas del mismo clúster para llenar la franja actual.
+ */
+function fillStripWithCluster(
   pool: InternalPart[], 
   freeRects: FreeRect[], 
   kerf: number, 
   strategy: 'vertical' | 'horizontal',
   hasGrain: boolean,
   colors: Record<string, string>,
-  placedParts: OptimizedPart[]
+  placedParts: OptimizedPart[],
+  pW: number, pH: number, trim: number
 ) {
   if (placedParts.length === 0) return;
   const last = placedParts[placedParts.length - 1];
@@ -228,31 +248,30 @@ function fillStripAggressively(
 
     let bestRectIdx = -1;
     let currentRotated = false;
+    let maxCP = -1;
 
     for (let j = 0; j < freeRects.length; j++) {
       const r = freeRects[j];
       const canRotate = !hasGrain || part.grainDirection === 'libre';
 
-      // Prioridad 1: Pieza idéntica en misma orientación
+      // 1. Prioridad Absoluta: Pieza idéntica en el mismo eje
       const wN = part.width; const hN = part.height;
       if (part.name === last.name && wN === (last.rotated ? last.height : last.width) && hN === (last.rotated ? last.width : last.height)) {
         if (wN <= r.width && hN <= r.height) {
-          if (Math.abs(wN - r.width) < 1 || Math.abs(hN - r.height) < 1) {
+          if (Math.abs(wN - r.width) < 0.5 || Math.abs(hN - r.height) < 0.5) {
             bestRectIdx = j; currentRotated = last.rotated; break;
           }
         }
       }
 
-      // Prioridad 2: Cualquier pieza que encaje perfecto en el ancho/alto de la franja
+      // 2. Prioridad Secundaria: Cualquier pieza que maximice contacto (CP)
       if (part.width <= r.width && part.height <= r.height) {
-        if (Math.abs(part.width - r.width) < 0.5 || Math.abs(part.height - r.height) < 0.5) {
-          bestRectIdx = j; currentRotated = false; break;
-        }
+        const cp = calculateContactScore(r.x, r.y, part.width, part.height, pW, pH, trim, r);
+        if (cp > maxCP) { maxCP = cp; bestRectIdx = j; currentRotated = false; }
       }
       if (canRotate && part.height <= r.width && part.width <= r.height) {
-        if (Math.abs(part.height - r.width) < 0.5 || Math.abs(part.width - r.height) < 0.5) {
-          bestRectIdx = j; currentRotated = true; break;
-        }
+        const cp = calculateContactScore(r.x, r.y, part.height, part.width, pW, pH, trim, r);
+        if (cp > maxCP) { maxCP = cp; bestRectIdx = j; currentRotated = true; }
       }
     }
 
@@ -292,28 +311,23 @@ function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, part
 }
 
 function evaluateSolution(result: OptimizationResult): number {
-  // Factor Panel 1: El más importante
   const p1 = result.optimizedLayout[0];
   const p1Efficiency = p1 ? p1.efficiency : 0;
 
-  let score = (1000 / result.totalPanels) * 1e25; // Prioridad absoluta: menos paneles
-  score += p1Efficiency * 1e20; // Prioridad 2: llenar el primer panel al máximo
+  // Prioridad 1: Menor cantidad de paneles (Peso exponencial)
+  let score = (1000 / result.totalPanels) * 1e25; 
+  
+  // Prioridad 2: Eficiencia extrema del Panel 1 (>94%)
+  score += p1Efficiency * 1e20; 
 
-  // Bono por contigüidad de piezas hermanas
+  // Prioridad 3: Calidad del sobrante (Premiar bloques grandes y penalizar fragmentos)
   result.optimizedLayout.forEach(panel => {
-    for (let i = 0; i < panel.parts.length; i++) {
-      for (let j = i + 1; j < panel.parts.length; j++) {
-        const p1 = panel.parts[i];
-        const p2 = panel.parts[j];
-        if (p1.name === p2.name) {
-          const isContiguous = Math.abs(p1.x - (p2.x + p2.width)) < 10 || 
-                               Math.abs(p2.x - (p1.x + p1.width)) < 10 ||
-                               Math.abs(p1.y - (p2.y + p2.height)) < 10 ||
-                               Math.abs(p2.y - (p1.y + p1.height)) < 10;
-          if (isContiguous) score += 1e15; 
-        }
-      }
-    }
+    panel.leftovers?.forEach(l => {
+      const area = l.width * l.height;
+      const minSide = Math.min(l.width, l.height);
+      if (minSide > 300) score += area * 1e5; // Bono por bloque reutilizable grande
+      if (minSide < 60) score -= 1e15; // Penalización por residuo inservible
+    });
   });
 
   return score;
