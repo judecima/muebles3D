@@ -10,12 +10,18 @@ interface InternalPart {
   placed: boolean;
 }
 
+interface FreeRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /**
- * JADSI Industrial Engine v17.5 - Waste Reutilization v3
+ * JADSI Industrial Engine v18.0 - DGP (Density Global Positioning)
  * 
- * OBJETIVO 1: Minimizar cantidad de paneles.
- * OBJETIVO 2: Maximizar bloques de desperdicio reutilizables (>60mm).
- * ESTRATEGIA: Búsqueda estocástica multi-heurística con scoring de entropía de desperdicio ajustado a piezas mínimas de 60mm.
+ * Basado en Hybrid Guillotine BAF (Best Area Fit) + Monte Carlo Mutator.
+ * Optimizado para generar bloques de sobrante rectangulares masivos.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -28,7 +34,7 @@ export function runOptimization(
   const filteredParts = parts.filter(p => p.thickness === selectedThickness);
   
   if (filteredParts.length === 0) {
-    return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas del espesor seleccionado", kerf, trim, selectedThickness };
+    return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas", kerf, trim, selectedThickness };
   }
 
   const usableW = Math.max(0, panelWidth - (trim * 2));
@@ -38,189 +44,119 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // INTENSIDAD JADSI v17.5
-  const iterationsPerStrategy = 120; 
-  const masterOrientations = [false, true]; // Horizontal vs Vertical
+  // Intensidad Monte Carlo v18: 200 iteraciones por pedido
+  const iterations = 200;
 
-  for (const isVerticalMaster of masterOrientations) {
-    const algoW = isVerticalMaster ? usableH : usableW;
-    const algoH = isVerticalMaster ? usableW : usableH;
+  for (let iter = 0; iter < iterations; iter++) {
+    const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
+      Array.from({ length: p.quantity }, () => ({
+        ...p,
+        originalIndex: idx,
+        placed: false
+      }))
+    );
 
-    for (let iter = 0; iter < iterationsPerStrategy; iter++) {
-      const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
-        Array.from({ length: p.quantity }, () => ({
-          ...p,
-          originalIndex: idx,
-          placed: false
-        }))
-      );
+    // Estrategias de ordenamiento mezcladas con mutación estocástica
+    if (iter === 0) pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    else if (iter === 1) pool.sort((a, b) => b.height - a.height || b.width - a.width);
+    else shuffle(pool);
 
-      // MIX DE ESTRATEGIAS DE ORDENAMIENTO
-      if (iter === 0) {
-        pool.sort((a, b) => b.height - a.height || b.width - a.width);
-      } else if (iter === 1) {
-        pool.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-      } else if (iter === 2) {
-        pool.sort((a, b) => b.width - a.width || b.height - a.height);
-      } else {
-        // Monte Carlo Shuffling
-        for (let i = pool.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [pool[i], pool[j]] = [pool[j], pool[i]];
-        }
-      }
+    const currentResult = executeBAF(pool, usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors);
+    
+    // Evaluación de Calidad de Solución (Prioridad Paneles -> Calidad Sobrante)
+    const solutionScore = evaluateSolutionQuality(currentResult, usableW, usableH);
 
-      const currentResult = executeNesting(pool, algoW, algoH, kerf, trim, selectedThickness, partColors, panelWidth, panelHeight, isVerticalMaster);
-      
-      // EVALUACIÓN JERÁRQUICA JADSI v17.5
-      const wasteScore = calculateWasteQuality(currentResult, algoW, algoH);
-      
-      /**
-       * SCORE = Prioridad Paneles (Factor 1e15) 
-       *         + Eficiencia (Factor 1e10)
-       *         + Calidad Desperdicio (Factor 1)
-       */
-      const score = (1000 / currentResult.totalPanels) * 1e15 + 
-                    (currentResult.totalEfficiency * 1e10) + 
-                    wasteScore;
-
-      if (!bestGlobalResult || score > bestGlobalScore) {
-        bestGlobalResult = currentResult;
-        bestGlobalScore = score;
-      }
+    if (solutionScore > bestGlobalScore) {
+      bestGlobalScore = solutionScore;
+      bestGlobalResult = currentResult;
     }
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error en el motor v17.5", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v18", kerf, trim, selectedThickness };
 }
 
-function executeNesting(
+function executeBAF(
   pool: InternalPart[], 
   algoW: number, 
   algoH: number, 
   kerf: number, 
   trim: number, 
-  selectedThickness: number,
-  colors: Record<string, string>,
   panelWidth: number,
   panelHeight: number,
-  isVertical: boolean
+  colors: Record<string, string>
 ): OptimizationResult {
   const panels: OptimizedPanel[] = [];
-  let workingPool = pool.map(p => ({ ...p }));
+  const workingPool = pool.map(p => ({ ...p }));
 
   while (workingPool.some(p => !p.placed)) {
     const placedParts: OptimizedPart[] = [];
-    let currentY = 0;
+    const freeRects: FreeRect[] = [{ x: trim, y: trim, width: algoW, height: algoH }];
 
-    while (currentY < algoH) {
-      let leaderIdx = -1;
-      let leaderRotated = false;
+    for (const part of workingPool) {
+      if (part.placed) continue;
 
-      for (let i = 0; i < workingPool.length; i++) {
-        const p = workingPool[i];
-        if (p.placed) continue;
+      let bestRectIdx = -1;
+      let minWaste = Infinity;
+      let rotated = false;
+
+      // Buscar el mejor rectángulo libre (Best Area Fit)
+      for (let i = 0; i < freeRects.length; i++) {
+        const r = freeRects[i];
         
-        if (p.height <= (algoH - currentY) && p.width <= algoW) {
-          leaderIdx = i; leaderRotated = false; break;
+        // Probar normal
+        if (part.width <= r.width && part.height <= r.height) {
+          const waste = (r.width * r.height) - (part.width * part.height);
+          if (waste < minWaste) {
+            minWaste = waste;
+            bestRectIdx = i;
+            rotated = false;
+          }
         }
-        if (p.grainDirection === 'libre' && p.width <= (algoH - currentY) && p.height <= algoW) {
-          leaderIdx = i; leaderRotated = true; break;
+
+        // Probar rotado
+        if (part.grainDirection === 'libre' && part.height <= r.width && part.width <= r.height) {
+          const waste = (r.width * r.height) - (part.width * part.height);
+          if (waste < minWaste) {
+            minWaste = waste;
+            bestRectIdx = i;
+            rotated = true;
+          }
         }
       }
 
-      if (leaderIdx === -1) break;
+      // Si encaja, colocar y dividir el rectángulo
+      if (bestRectIdx !== -1) {
+        const r = freeRects[bestRectIdx];
+        const w = rotated ? part.height : part.width;
+        const h = rotated ? part.width : part.height;
 
-      const leader = workingPool[leaderIdx];
-      const stripH = leaderRotated ? leader.width : leader.height;
-      let currentX = 0;
+        placedParts.push({
+          name: part.name,
+          x: r.x,
+          y: r.y,
+          width: w,
+          height: h,
+          rotated,
+          color: colors[part.name]
+        });
 
-      while (currentX < algoW) {
-        let bestPartIdx = -1;
-        let bestPartRotated = false;
-
-        for (let i = 0; i < workingPool.length; i++) {
-          const p = workingPool[i];
-          if (p.placed) continue;
-
-          if (p.width <= (algoW - currentX) && p.height <= stripH) {
-            bestPartIdx = i; bestPartRotated = false; break;
-          }
-          if (p.grainDirection === 'libre' && p.height <= (algoW - currentX) && p.width <= stripH) {
-            bestPartIdx = i; bestPartRotated = true; break;
-          }
-        }
-
-        if (bestPartIdx === -1) break;
-
-        const p = workingPool[bestPartIdx];
-        const pW = bestPartRotated ? p.height : p.width;
-        const pH = bestPartRotated ? p.width : p.height;
-
-        let subY = 0;
-        while (subY < stripH) {
-          let stackPartIdx = -1;
-          let stackRotated = false;
-
-          for (let j = 0; j < workingPool.length; j++) {
-            const sp = workingPool[j];
-            if (sp.placed) continue;
-
-            if (sp.width === pW && sp.height <= (stripH - subY)) {
-              stackPartIdx = j; stackRotated = false; break;
-            }
-            if (sp.grainDirection === 'libre' && sp.height === pW && sp.width <= (stripH - subY)) {
-              stackPartIdx = j; stackRotated = true; break;
-            }
-          }
-
-          if (stackPartIdx === -1) break;
-
-          const sp = workingPool[stackPartIdx];
-          const spH = stackRotated ? sp.width : sp.height;
-
-          const absX = currentX;
-          const absY = currentY + subY;
-
-          const finalX = isVertical ? absY : absX;
-          const finalY = isVertical ? absX : absY;
-          const finalW = isVertical ? spH : pW;
-          const finalH = isVertical ? pW : spH;
-
-          placedParts.push({
-            name: sp.name,
-            x: finalX,
-            y: finalY,
-            width: finalW,
-            height: finalH,
-            rotated: isVertical ? !stackRotated : stackRotated,
-            color: colors[sp.name]
-          });
-
-          sp.placed = true;
-          subY += spH + kerf;
-        }
-
-        currentX += pW + kerf;
+        part.placed = true;
+        
+        // Guillotine Split: Decidir eje de división para maximizar áreas libres contiguas
+        splitGuillotine(freeRects, bestRectIdx, w, h, kerf);
       }
-
-      currentY += stripH + kerf;
     }
 
     if (placedParts.length === 0) break;
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
-    const totalArea = panelWidth * panelHeight;
-    
     panels.push({
       panelNumber: panels.length + 1,
       parts: placedParts,
-      efficiency: (usedArea / totalArea) * 100,
+      efficiency: (usedArea / (panelWidth * panelHeight)) * 100,
       usedArea,
-      totalArea
+      totalArea: panelWidth * panelHeight
     });
-
-    if (panels.length > 50) break;
   }
 
   const totalUsed = panels.reduce((acc, p) => acc + p.usedArea, 0);
@@ -230,43 +166,69 @@ function executeNesting(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v17.5: Nesting industrial iterativo optimizado para piezas mínimas de 60mm.`,
+    summary: `JADSI v18 Hybrid: Optimización DGP con consolidación de bloques.`,
     kerf,
     trim,
-    selectedThickness
+    selectedThickness: pool[0].thickness
   };
 }
 
 /**
- * Puntuador de Calidad de Desperdicio JADSI v17.5
- * Penaliza tiras < 60mm (basado en el tamaño mínimo de pieza de amarre).
- * Premia bloques grandes y cuadrados.
+ * Divide un rectángulo libre tras insertar una pieza siguiendo la lógica de Guillotina.
+ * Favorece que el desperdicio quede en el formato más grande posible.
  */
-function calculateWasteQuality(result: OptimizationResult, algoW: number, algoH: number): number {
-  let score = 0;
+function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, partH: number, kerf: number) {
+  const r = freeRects.splice(idx, 1)[0];
+
+  const remW = r.width - partW - kerf;
+  const remH = r.height - partH - kerf;
+
+  // Estrategia: Dividir por el lado que deje el rectángulo más grande intacto
+  if (remW * r.height > remH * r.width) {
+    // Corte vertical primero
+    if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: r.height });
+    if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: partW, height: remH });
+  } else {
+    // Corte horizontal primero
+    if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: r.width, height: remH });
+    if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: partH });
+  }
+}
+
+/**
+ * Puntuador de Calidad JADSI v18
+ * 1. Minimizar Paneles (Peso 1e15)
+ * 2. Eficiencia (Peso 1e10)
+ * 3. Calidad del Desperdicio (Penaliza fragmentos < 60mm, premia bloques grandes)
+ */
+function evaluateSolutionQuality(result: OptimizationResult, algoW: number, algoH: number): number {
+  let score = (1000 / result.totalPanels) * 1e15 + (result.totalEfficiency * 1e10);
+  
   result.optimizedLayout.forEach(panel => {
-    const maxX = panel.parts.reduce((max, p) => Math.max(max, p.x + p.width), 0);
-    const maxY = panel.parts.reduce((max, p) => Math.max(max, p.y + p.height), 0);
+    // Encontrar el rectángulo de aire más grande al final del panel (como Lepton)
+    const maxX = panel.parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
+    const maxY = panel.parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
     
-    const remainingW = Math.max(0, algoW - maxX);
-    const remainingH = Math.max(0, algoH - maxY);
+    const wasteW = algoW - (maxX - panel.parts[0].x); 
+    const wasteH = algoH - (maxY - panel.parts[0].y);
 
-    const areaRestanteLongitudinal = remainingW * algoH;
-    const areaRestanteTransversal = remainingH * algoW;
-
-    const mejorAreaSobrante = Math.max(areaRestanteLongitudinal, areaRestanteTransversal);
-    const dimensionMinima = mejorAreaSobrante === areaRestanteLongitudinal ? remainingW : remainingH;
-
-    // SCORING v3:
-    if (dimensionMinima < 60) {
-      // PENALIZACIÓN: El sobrante es una tira inútil (menor que el amarre de 60mm)
-      score -= 5000000;
-    } else {
-      // PREMIO: El sobrante es una pieza reutilizable
-      score += (mejorAreaSobrante * dimensionMinima);
+    // Premiar si el sobrante es grande y tiene buena proporción
+    const minDim = Math.min(wasteW, wasteH);
+    if (minDim < 60) {
+      score -= 5000000; // Penalización por tira inútil
+    } else if (minDim > 150) {
+      score += (wasteW * wasteH) * 2; // Bono por bloque reutilizable
     }
   });
+
   return score;
+}
+
+function shuffle(arr: any[]) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
 }
 
 function generateColors(parts: any[]): Record<string, string> {
