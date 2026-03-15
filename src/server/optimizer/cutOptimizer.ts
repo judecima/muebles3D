@@ -40,6 +40,7 @@ export function runOptimization(
   const usableW = Math.max(0, panelWidth - (trim * 2));
   const usableH = Math.max(0, panelHeight - (trim * 2));
 
+  // Estrategias de ordenamiento para probar cuál consolida mejor
   const sortStrategies = [
     (a: InternalPart, b: InternalPart) => b.height - a.height, 
     (a: InternalPart, b: InternalPart) => (b.width * b.height) - (a.width * a.height),
@@ -50,6 +51,7 @@ export function runOptimization(
   let bestScore = Infinity; 
   const partColors = generateColors(filteredParts);
 
+  // PROBAR TODAS LAS COMBINACIONES: Estrategia de Orden vs Orientación de Panel
   for (const strategy of sortStrategies) {
     for (const isVerticalPanel of [false, true]) {
       const pool: InternalPart[] = filteredParts.flatMap((p, idx) => 
@@ -66,6 +68,7 @@ export function runOptimization(
 
       pool.sort(strategy);
 
+      // Si es vertical, invertimos las dimensiones de trabajo
       const algoW = isVerticalPanel ? usableH : usableW;
       const algoH = isVerticalPanel ? usableW : usableH;
 
@@ -74,6 +77,7 @@ export function runOptimization(
       );
       
       if (currentResult.optimizedLayout.length > 0) {
+        // Puntuamos: menos paneles es mejor. A igualdad de paneles, mayor eficiencia en el primer panel es mejor.
         const firstPanelEfficiency = currentResult.optimizedLayout[0]?.efficiency || 0;
         const score = (currentResult.totalPanels * 1000000) - firstPanelEfficiency;
 
@@ -107,10 +111,12 @@ function buildStripLayout(
     const panelStrips: Strip[] = [];
     let currentPanelHeight = 0;
 
+    // Llenar un panel con tiras
     while (currentPanelHeight < algoH) {
       let leaderIdx = -1;
       let leaderIsRotated = false;
 
+      // Buscar el mejor líder de tira (el que mejor encaje en el alto restante)
       for (let i = 0; i < workingPool.length; i++) {
         const p = workingPool[i];
         if (p.placed) continue;
@@ -134,6 +140,7 @@ function buildStripLayout(
       const stripParts: OptimizedPart[] = [];
       let currentX = 0;
 
+      // Llenar la tira horizontalmente
       while (currentX < algoW) {
         let bestColIdx = -1;
         let colRotated = false;
@@ -160,6 +167,7 @@ function buildStripLayout(
         const colW = colRotated ? colLeader.height : colLeader.width;
         let colUsedY = 0;
 
+        // Llenar la columna dentro de la tira (Nesting de nivel 3)
         while (colUsedY < stripH) {
           let pIdx = -1;
           let pRot = false;
@@ -218,6 +226,7 @@ function buildStripLayout(
 
     if (panelStrips.length === 0) break;
 
+    // Consolidar tiras: Ordenar por eficiencia para apretar el layout
     panelStrips.sort((a, b) => b.efficiency - a.efficiency);
 
     const placedInPanel: OptimizedPart[] = [];
@@ -228,6 +237,7 @@ function buildStripLayout(
         const finalX = p.x;
         const finalY = yOffset + p.y;
 
+        // Si el cálculo fue vertical, transponemos las coordenadas para el dibujo real
         const drawX = isVertical ? finalY : finalX;
         const drawY = isVertical ? finalX : finalY;
         const drawW = isVertical ? p.height : p.width;
@@ -254,7 +264,7 @@ function buildStripLayout(
       totalArea: panelWidth * panelHeight
     });
 
-    if (panels.length > 20) break; 
+    if (panels.length > 20) break; // Límite de seguridad
   }
 
   const totalUsed = panels.reduce((acc, l) => acc + l.usedArea, 0);
