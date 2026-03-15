@@ -24,12 +24,16 @@ import {
   Search, 
   ChevronLeft, 
   ChevronRight,
-  Maximize
+  Maximize,
+  Trash2,
+  Database,
+  RotateCcw
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import Image from 'next/image';
@@ -39,6 +43,47 @@ interface OptimizerPanelProps {
   selectedPanel: PanelSize;
   onPanelChange: (panel: PanelSize) => void;
 }
+
+const FURNITURE_PRESETS = [
+  {
+    id: 'bajo-120',
+    name: "Bajo Mesada 1.20m (Base)",
+    parts: [
+      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'libre' },
+      { name: "Piso", width: 1164, height: 560, quantity: 1, grainDirection: 'libre' },
+      { name: "Estante", width: 1164, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "Amarre Frontal/Trasero", width: 1164, height: 60, quantity: 2, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'ala-80',
+    name: "Alacena 0.80m (Standard)",
+    parts: [
+      { name: "Lateral Izq/Der", width: 600, height: 300, quantity: 2, grainDirection: 'libre' },
+      { name: "Piso/Techo", width: 764, height: 300, quantity: 2, grainDirection: 'libre' },
+      { name: "Estante", width: 764, height: 280, quantity: 1, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'caj-60',
+    name: "Cajonera 0.60m (3 Cajones)",
+    parts: [
+      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'libre' },
+      { name: "Piso", width: 564, height: 560, quantity: 1, grainDirection: 'libre' },
+      { name: "Amarre Trasero", width: 564, height: 60, quantity: 1, grainDirection: 'libre' },
+      { name: "Frente Cajón", width: 596, height: 235, quantity: 3, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'pla-mod',
+    name: "Placard (Módulo Central)",
+    parts: [
+      { name: "Lateral", width: 2100, height: 580, quantity: 2, grainDirection: 'libre' },
+      { name: "Techo/Piso", width: 564, height: 580, quantity: 2, grainDirection: 'libre' },
+      { name: "Divisor Estantes", width: 564, height: 500, quantity: 4, grainDirection: 'libre' }
+    ]
+  }
+];
 
 export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChange }: OptimizerPanelProps) {
   const [loading, setLoading] = useState(false);
@@ -70,11 +115,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
       }, {} as Record<string, any>);
       setLocalCutlist(Object.values(aggregated));
     } else if (localCutlist.length === 0) {
-      setLocalCutlist([
-        { name: "Lateral", width: 720, height: 560, quantity: 4, grainDirection: 'libre', thickness: 18 },
-        { name: "Piso Techo", width: 1164, height: 560, quantity: 2, grainDirection: 'libre', thickness: 18 },
-        { name: "Estante", width: 1164, height: 500, quantity: 1, grainDirection: 'libre', thickness: 18 }
-      ]);
+      // Valor por defecto inicial
+      loadPreset('bajo-120');
     }
   }, [initialParts]);
 
@@ -85,8 +127,31 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     setResult(null);
   };
 
+  const removePart = (index: number) => {
+    setLocalCutlist(localCutlist.filter((_, i) => i !== index));
+    setResult(null);
+  };
+
   const addManualPart = () => {
     setLocalCutlist([...localCutlist, { name: "Nueva Pieza", width: 500, height: 300, quantity: 1, grainDirection: 'libre', thickness: targetThickness }]);
+  };
+
+  const loadPreset = (presetId: string) => {
+    const preset = FURNITURE_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    
+    const newParts = preset.parts.map(p => ({
+      ...p,
+      thickness: targetThickness
+    }));
+    
+    setLocalCutlist(newParts);
+    setResult(null);
+  };
+
+  const clearAllParts = () => {
+    setLocalCutlist([]);
+    setResult(null);
   };
 
   const handleOptimize = async () => {
@@ -169,7 +234,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold text-slate-500 uppercase">Material Industrial</Label>
                   <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -252,9 +317,26 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                             <ChevronRight className="w-4 h-4" />
                           </Button>
                         </div>
-                      </div>
-                    </DialogContent>
+                      </DialogContent>
+                    </Dialog>
                   </Dialog>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Cargar Modelo Predefinido</Label>
+                  <Select onValueChange={loadPreset}>
+                    <SelectTrigger className="h-14 bg-slate-50 border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-4 h-4 text-primary" />
+                        <SelectValue placeholder="Seleccionar mueble..." />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FURNITURE_PRESETS.map(preset => (
+                        <SelectItem key={preset.id} value={preset.id}>{preset.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -274,24 +356,78 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                 </CollapsibleTrigger>
                 <CollapsibleContent className="p-4 bg-white border-t">
                   <div className="space-y-3">
+                    <div className="grid grid-cols-12 gap-2 px-2 mb-1">
+                      <span className="col-span-3 text-[8px] font-bold text-slate-400 uppercase">Nombre</span>
+                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Largo</span>
+                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Ancho</span>
+                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Cant.</span>
+                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Veta</span>
+                      <span className="col-span-1"></span>
+                    </div>
                     {localCutlist.map((part, idx) => (
-                      <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border">
-                        <div className="col-span-4"><input className="w-full bg-transparent font-bold text-[10px]" value={part.name} onChange={(e) => updatePart(idx, 'name', e.target.value)} /></div>
-                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded text-center text-[10px]" value={part.width} onChange={(e) => updatePart(idx, 'width', parseInt(e.target.value))} /></div>
-                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded text-center text-[10px]" value={part.height} onChange={(e) => updatePart(idx, 'height', parseInt(e.target.value))} /></div>
-                        <div className="col-span-2"><input type="number" className="w-full bg-white border rounded text-center text-[10px] font-bold text-primary" value={part.quantity} onChange={(e) => updatePart(idx, 'quantity', parseInt(e.target.value))} /></div>
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border group hover:border-primary transition-colors">
+                        <div className="col-span-3">
+                          <Input 
+                            className="h-8 bg-transparent font-bold text-[10px] border-none shadow-none focus-visible:ring-0 p-0" 
+                            value={part.name} 
+                            onChange={(e) => updatePart(idx, 'name', e.target.value)} 
+                          />
+                        </div>
                         <div className="col-span-2">
-                          <select className="w-full bg-white border rounded text-[9px]" value={part.grainDirection} onChange={(e) => updatePart(idx, 'grainDirection', e.target.value)}>
+                          <Input 
+                            type="number" 
+                            className="h-8 bg-white border rounded text-center text-[10px]" 
+                            value={part.width} 
+                            onChange={(e) => updatePart(idx, 'width', parseInt(e.target.value) || 0)} 
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input 
+                            type="number" 
+                            className="h-8 bg-white border rounded text-center text-[10px]" 
+                            value={part.height} 
+                            onChange={(e) => updatePart(idx, 'height', parseInt(e.target.value) || 0)} 
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input 
+                            type="number" 
+                            className="h-8 bg-white border rounded text-center text-[10px] font-bold text-primary" 
+                            value={part.quantity} 
+                            onChange={(e) => updatePart(idx, 'quantity', parseInt(e.target.value) || 0)} 
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <select 
+                            className="w-full h-8 bg-white border rounded text-[9px] px-1 outline-none focus:border-primary" 
+                            value={part.grainDirection} 
+                            onChange={(e) => updatePart(idx, 'grainDirection', e.target.value)}
+                          >
                             <option value="libre">Libre</option>
                             <option value="vertical">Veta L</option>
                             <option value="horizontal">Veta A</option>
                           </select>
                         </div>
+                        <div className="col-span-1 flex justify-center">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-300 hover:text-red-500 hover:bg-red-50"
+                            onClick={() => removePart(idx)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
-                    <Button variant="outline" size="sm" className="w-full border-dashed font-bold uppercase text-[9px]" onClick={addManualPart}>
-                      <Plus className="w-3 h-3 mr-2" /> Agregar Pieza
-                    </Button>
+                    <div className="flex gap-2 pt-2">
+                      <Button variant="outline" size="sm" className="flex-1 border-dashed font-bold uppercase text-[9px]" onClick={addManualPart}>
+                        <Plus className="w-3 h-3 mr-2" /> Agregar Pieza
+                      </Button>
+                      <Button variant="ghost" size="sm" className="font-bold uppercase text-[9px] text-slate-400 hover:text-red-500" onClick={clearAllParts}>
+                        <RotateCcw className="w-3 h-3 mr-2" /> Limpiar Todo
+                      </Button>
+                    </div>
                   </div>
                 </CollapsibleContent>
               </Collapsible>
