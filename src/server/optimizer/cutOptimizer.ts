@@ -18,17 +18,17 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v18.5 - DGP (Density Global Positioning)
+ * JADSI Industrial Engine v19.0 - DGP (Density Global Positioning)
  * 
  * Este motor implementa una arquitectura híbrida de Guillotina Recursiva
- * con Evaluación de Impacto de Eje (Dual-Pass). 
- * Se optimizó para igualar la eficiencia de consolidación de Lepton.
+ * con Evaluación de Impacto de Eje (Dual-Pass) y consciencia de veta.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
   panelWidth: number,
   panelHeight: number,
   selectedThickness: number,
+  hasGrain: boolean,
   kerf: number = 4.5,
   trim: number = 10
 ): OptimizationResult {
@@ -45,7 +45,7 @@ export function runOptimization(
   let bestGlobalResult: OptimizationResult | null = null;
   let bestGlobalScore = -Infinity;
 
-  // Monte Carlo v18.5: 2000 iteraciones para exploración masiva del espacio de corte
+  // Monte Carlo v19.0: 2000 iteraciones para exploración masiva
   const iterations = 2000;
 
   for (let iter = 0; iter < iterations; iter++) {
@@ -63,8 +63,8 @@ export function runOptimization(
     else shuffle(pool);
 
     // Simulación Dual: Probamos si es mejor empezar con guillotina vertical u horizontal
-    const resultH = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'horizontal');
-    const resultV = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'vertical');
+    const resultH = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'horizontal', hasGrain);
+    const resultV = executeBAF(pool.map(p => ({...p})), usableW, usableH, kerf, trim, panelWidth, panelHeight, partColors, 'vertical', hasGrain);
     
     [resultH, resultV].forEach(res => {
       const score = evaluateSolutionQuality(res, usableW, usableH);
@@ -75,7 +75,7 @@ export function runOptimization(
     });
   }
 
-  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v18.5", kerf, trim, selectedThickness };
+  return bestGlobalResult || { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Error v19.0", kerf, trim, selectedThickness };
 }
 
 function executeBAF(
@@ -87,7 +87,8 @@ function executeBAF(
   panelWidth: number,
   panelHeight: number,
   colors: Record<string, string>,
-  splitStrategy: 'vertical' | 'horizontal'
+  splitStrategy: 'vertical' | 'horizontal',
+  hasGrain: boolean
 ): OptimizationResult {
   const panels: OptimizedPanel[] = [];
   const workingPool = pool;
@@ -103,7 +104,6 @@ function executeBAF(
       let minWaste = Infinity;
       let rotated = false;
 
-      // Best Area Fit Placement
       for (let i = 0; i < freeRects.length; i++) {
         const r = freeRects[i];
         
@@ -117,8 +117,9 @@ function executeBAF(
           }
         }
 
-        // Test Rotated
-        if (part.grainDirection === 'libre' && part.height <= r.width && part.width <= r.height) {
+        // Test Rotated: Solo si el material es liso O si la pieza tiene veta libre permitida por usuario
+        const rotationAllowed = !hasGrain || part.grainDirection === 'libre';
+        if (rotationAllowed && part.height <= r.width && part.width <= r.height) {
           const waste = (r.width * r.height) - (part.width * part.height);
           if (waste < minWaste) {
             minWaste = waste;
@@ -144,8 +145,6 @@ function executeBAF(
         });
 
         part.placed = true;
-        
-        // División de Guillotina basada en la estrategia maestra
         splitGuillotine(freeRects, bestRectIdx, w, h, kerf, splitStrategy);
       }
     }
@@ -153,8 +152,6 @@ function executeBAF(
     if (placedParts.length === 0) break;
 
     const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
-    
-    // Extracción de sobrantes (rectángulos libres finales mayores a 60mm)
     const leftovers = freeRects
       .filter(r => r.width >= 60 && r.height >= 60)
       .map((r, i) => ({
@@ -184,7 +181,7 @@ function executeBAF(
     optimizedLayout: panels,
     totalPanels: panels.length,
     totalEfficiency: (totalUsed / totalAvail) * 100,
-    summary: `JADSI v18.5 DGP: Estrategia ${splitStrategy === 'vertical' ? 'Vertical' : 'Horizontal'}.`,
+    summary: `JADSI v19.0 DGP: Estrategia ${splitStrategy === 'vertical' ? 'Vertical' : 'Horizontal'}.`,
     kerf,
     trim,
     selectedThickness: pool[0].thickness
@@ -193,44 +190,31 @@ function executeBAF(
 
 function splitGuillotine(freeRects: FreeRect[], idx: number, partW: number, partH: number, kerf: number, strategy: 'vertical' | 'horizontal') {
   const r = freeRects.splice(idx, 1)[0];
-
   const remW = r.width - partW - kerf;
   const remH = r.height - partH - kerf;
 
   if (strategy === 'vertical') {
-    // Guillotina Vertical: Cortamos la columna completa primero
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: r.height });
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: partW, height: remH });
   } else {
-    // Guillotina Horizontal: Cortamos la fila completa primero
     if (remH > 0) freeRects.push({ x: r.x, y: r.y + partH + kerf, width: r.width, height: remH });
     if (remW > 0) freeRects.push({ x: r.x + partW + kerf, y: r.y, width: remW, height: partH });
   }
 }
 
 function evaluateSolutionQuality(result: OptimizationResult, algoW: number, algoH: number): number {
-  // Prioridad 1: Mínimos Paneles (Peso masivo)
   let score = (1000 / result.totalPanels) * 1e15;
-  
-  // Prioridad 2: Eficiencia (Peso alto)
   score += result.totalEfficiency * 1e10;
 
-  // Prioridad 3: Calidad del Desperdicio (Lepton Style)
   result.optimizedLayout.forEach(panel => {
     if (panel.leftovers && panel.leftovers.length > 0) {
-      // Premiamos al rectángulo de aire más grande
       const largestLeftover = panel.leftovers.reduce((m, r) => (r.width * r.height > m.area ? {area: r.width * r.height, r} : m), {area: 0, r: panel.leftovers[0]});
-      
       const l = largestLeftover.r;
       const minDim = Math.min(l.width, l.height);
       const aspect = minDim / Math.max(l.width, l.height);
-
-      // Bono por bloque masivo y proporcionado (cuadrado/útil)
       if (minDim > 300) score += (l.width * l.height) * 5;
       score += (l.width * l.height) * aspect; 
     }
-    
-    // Penalización por fragmentación (muchos retazos pequeños)
     if (panel.leftovers && panel.leftovers.length > 5) score -= 1e8;
   });
 

@@ -7,6 +7,7 @@ import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult } from '@/lib/typ
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, 
   LayoutGrid, 
@@ -52,38 +53,38 @@ const FURNITURE_PRESETS = [
     id: 'bajo-120',
     name: "Bajo Mesada 1.20m (Base)",
     parts: [
-      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'libre' },
-      { name: "Piso", width: 1164, height: 560, quantity: 1, grainDirection: 'libre' },
-      { name: "Estante", width: 1164, height: 500, quantity: 1, grainDirection: 'libre' },
-      { name: "Amarre Frontal/Trasero", width: 1164, height: 60, quantity: 2, grainDirection: 'libre' }
+      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'vertical' },
+      { name: "Piso", width: 1164, height: 560, quantity: 1, grainDirection: 'vertical' },
+      { name: "Estante", width: 1164, height: 500, quantity: 1, grainDirection: 'vertical' },
+      { name: "Amarre Frontal/Trasero", width: 1164, height: 60, quantity: 2, grainDirection: 'vertical' }
     ]
   },
   {
     id: 'ala-80',
     name: "Alacena 0.80m (Standard)",
     parts: [
-      { name: "Lateral Izq/Der", width: 600, height: 300, quantity: 2, grainDirection: 'libre' },
-      { name: "Piso/Techo", width: 764, height: 300, quantity: 2, grainDirection: 'libre' },
-      { name: "Estante", width: 764, height: 280, quantity: 1, grainDirection: 'libre' }
+      { name: "Lateral Izq/Der", width: 600, height: 300, quantity: 2, grainDirection: 'vertical' },
+      { name: "Piso/Techo", width: 764, height: 300, quantity: 2, grainDirection: 'vertical' },
+      { name: "Estante", width: 764, height: 280, quantity: 1, grainDirection: 'vertical' }
     ]
   },
   {
     id: 'caj-60',
     name: "Cajonera 0.60m (3 Cajones)",
     parts: [
-      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'libre' },
-      { name: "Piso", width: 564, height: 560, quantity: 1, grainDirection: 'libre' },
-      { name: "Amarre Trasero", width: 564, height: 60, quantity: 1, grainDirection: 'libre' },
-      { name: "Frente Cajón", width: 596, height: 235, quantity: 3, grainDirection: 'libre' }
+      { name: "Lateral Izq/Der", width: 720, height: 560, quantity: 2, grainDirection: 'vertical' },
+      { name: "Piso", width: 564, height: 560, quantity: 1, grainDirection: 'vertical' },
+      { name: "Amarre Trasero", width: 564, height: 60, quantity: 1, grainDirection: 'vertical' },
+      { name: "Frente Cajón", width: 596, height: 235, quantity: 3, grainDirection: 'vertical' }
     ]
   },
   {
     id: 'pla-mod',
     name: "Placard (Módulo Central)",
     parts: [
-      { name: "Lateral", width: 2100, height: 580, quantity: 2, grainDirection: 'libre' },
-      { name: "Techo/Piso", width: 564, height: 580, quantity: 2, grainDirection: 'libre' },
-      { name: "Divisor Estantes", width: 564, height: 500, quantity: 4, grainDirection: 'libre' }
+      { name: "Lateral", width: 2100, height: 580, quantity: 2, grainDirection: 'vertical' },
+      { name: "Techo/Piso", width: 564, height: 580, quantity: 2, grainDirection: 'vertical' },
+      { name: "Divisor Estantes", width: 564, height: 500, quantity: 4, grainDirection: 'vertical' }
     ]
   }
 ];
@@ -136,7 +137,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   };
 
   const addManualPart = () => {
-    setLocalCutlist([...localCutlist, { name: "Nueva Pieza", width: 500, height: 300, quantity: 1, grainDirection: 'libre', thickness: targetThickness }]);
+    setLocalCutlist([...localCutlist, { name: "Nueva Pieza", width: 500, height: 300, quantity: 1, grainDirection: 'vertical', thickness: targetThickness }]);
   };
 
   const loadPreset = (presetId: string) => {
@@ -174,6 +175,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           width: selectedPanel.width,
           height: selectedPanel.height,
           thickness: targetThickness,
+          hasGrain: selectedPanel.hasGrain,
           kerf: 4.5,
           trim: 10
         })
@@ -203,8 +205,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     doc.setTextColor(80, 80, 80);
     doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
     (doc as any).autoTable({
-      head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
-      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection]),
+      head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Rotación']],
+      body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection === 'libre' ? 'Permitida' : 'Fija']),
       startY: 40,
       headStyles: { fillColor: BRAND_COLOR, fontStyle: 'bold' }
     });
@@ -229,7 +231,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v18.5
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v19.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -259,7 +261,14 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                             <div className="text-[9px] text-slate-400 font-bold uppercase">{selectedPanel.width}x{selectedPanel.height}mm — {selectedPanel.thickness}mm</div>
                           </div>
                         </div>
-                        <Maximize className="w-4 h-4 text-slate-300 group-hover:text-primary" />
+                        <div className="flex flex-col items-end gap-1">
+                          {selectedPanel.hasGrain ? (
+                            <Badge variant="outline" className="text-[7px] font-black uppercase text-amber-600 border-amber-200 bg-amber-50">Con Veta</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[7px] font-black uppercase text-blue-600 border-blue-200 bg-blue-50">Liso</Badge>
+                          )}
+                          <Maximize className="w-3.5 h-3.5 text-slate-300 group-hover:text-primary" />
+                        </div>
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden">
@@ -298,8 +307,15 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                                     <Ruler className="w-8 h-8" />
                                   </div>
                                 )}
-                                <div className="absolute top-2 right-2 bg-slate-900/80 text-white px-2 py-1 rounded text-[8px] font-black uppercase">
-                                  {panel.thickness} mm
+                                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                                  <div className="bg-slate-900/80 text-white px-2 py-1 rounded text-[8px] font-black uppercase">
+                                    {panel.thickness} mm
+                                  </div>
+                                  {panel.hasGrain ? (
+                                    <Badge className="text-[7px] bg-amber-500 hover:bg-amber-500 font-black uppercase">Veta</Badge>
+                                  ) : (
+                                    <Badge className="text-[7px] bg-blue-500 hover:bg-blue-500 font-black uppercase">Liso</Badge>
+                                  )}
                                 </div>
                               </div>
                               <CardContent className="p-3">
@@ -364,7 +380,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Largo</span>
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Ancho</span>
                       <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Cant.</span>
-                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Veta</span>
+                      <span className="col-span-2 text-[8px] font-bold text-slate-400 uppercase text-center">Rotar</span>
                       <span className="col-span-1"></span>
                     </div>
                     {localCutlist.map((part, idx) => (
@@ -400,16 +416,13 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                             onChange={(e) => updatePart(idx, 'quantity', parseInt(e.target.value) || 0)} 
                           />
                         </div>
-                        <div className="col-span-2">
-                          <select 
-                            className="w-full h-8 bg-white border rounded text-[9px] px-1 outline-none focus:border-primary" 
-                            value={part.grainDirection} 
-                            onChange={(e) => updatePart(idx, 'grainDirection', e.target.value)}
-                          >
-                            <option value="libre">Libre</option>
-                            <option value="vertical">Veta L</option>
-                            <option value="horizontal">Veta A</option>
-                          </select>
+                        <div className="col-span-2 flex justify-center">
+                          <Checkbox 
+                            checked={part.grainDirection === 'libre'} 
+                            onCheckedChange={(checked) => updatePart(idx, 'grainDirection', checked ? 'libre' : 'vertical')}
+                            disabled={!selectedPanel.hasGrain}
+                            className={!selectedPanel.hasGrain ? "opacity-20" : ""}
+                          />
                         </div>
                         <div className="col-span-1 flex justify-center">
                           <Button 
@@ -423,6 +436,9 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         </div>
                       </div>
                     ))}
+                    {!selectedPanel.hasGrain && (
+                      <p className="text-[8px] text-blue-500 font-bold uppercase text-center mt-2 italic">* Material liso: rotación automática activada para todas las piezas.</p>
+                    )}
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" size="sm" className="flex-1 border-dashed font-bold uppercase text-[9px]" onClick={addManualPart}>
                         <Plus className="w-3 h-3 mr-2" /> Agregar Pieza
@@ -554,7 +570,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v18.5...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI DGP v19.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -575,6 +591,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                             {isVertical ? <ArrowDownToLine className="w-2.5 h-2.5" /> : <ArrowRightToLine className="w-2.5 h-2.5" />}
                             Primer Corte: {isVertical ? 'Vertical (Columna)' : 'Horizontal (Tira)'}
                           </Badge>
+                          {selectedPanel.hasGrain && <Badge variant="outline" className="text-[8px] border-amber-500 text-amber-500 bg-amber-500/5">RESPETANDO VETA</Badge>}
                         </div>
                       </div>
                       <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
