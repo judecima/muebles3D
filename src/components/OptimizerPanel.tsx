@@ -237,13 +237,27 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<project>\n`;
     
     result.optimizedLayout.forEach((panel, pIdx) => {
-      xml += `  <panel${pIdx + 1} l="${selectedPanel.width}" w="${selectedPanel.height}" material="${selectedPanel.name}" thickness="${selectedPanel.thickness}" saw="${result.kerf}" num="${panel.panelNumber}">\n`;
+      const strategy = panel.strategy === 'vertical' ? 'X-Rip' : 'Y-Rip';
+      xml += `  <panel${pIdx + 1} l="${selectedPanel.width}" w="${selectedPanel.height}" material="${selectedPanel.name}" thickness="${selectedPanel.thickness}" saw="${result.kerf}" num="${panel.panelNumber}" strategy="${strategy}">\n`;
       
-      // Nodo Maestro (Área Útil)
+      // Nodo Jerárquico Principal (Área de Corte)
       xml += `    <no.1 l="${selectedPanel.height}" w="${selectedPanel.width}" trim="${result.trim}" x="0" y="0" layer="1" id="0">\n`;
       
-      panel.parts.forEach((part, partIdx) => {
-        xml += `      <part cut="${part.width}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
+      // Agrupamos piezas por "columnas" o "tiras" para el XML jerárquico
+      const uniqueCoords = Array.from(new Set(panel.parts.map(p => panel.strategy === 'vertical' ? p.x : p.y))).sort((a,b) => a-b);
+      
+      uniqueCoords.forEach((coord, coordIdx) => {
+        const partsInLayer = panel.parts.filter(p => (panel.strategy === 'vertical' ? p.x : p.y) === coord);
+        const layerWidth = panel.strategy === 'vertical' ? partsInLayer[0].width : selectedPanel.width;
+        const layerHeight = panel.strategy === 'vertical' ? selectedPanel.height : partsInLayer[0].height;
+        
+        xml += `      <no.${coordIdx + 2} l="${layerHeight}" w="${layerWidth}" trim="0" x="${panel.strategy === 'vertical' ? coord : 0}" y="${panel.strategy === 'vertical' ? 0 : coord}" layer="2" id="${coordIdx + 1}">\n`;
+        
+        partsInLayer.forEach((part, partIdx) => {
+          xml += `        <part cut="${panel.strategy === 'vertical' ? part.height : part.width}" num="1" type="${part.rotated ? 2 : 1}" id="${partIdx + 1}" code="${part.name}"/>\n`;
+        });
+        
+        xml += `      </no.${coordIdx + 2}>\n`;
       });
       
       xml += `    </no.1>\n`;
@@ -256,7 +270,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `jadsi-lepton-export-${Date.now()}.xml`;
+    a.download = `jadsi-lepton-industrial-${Date.now()}.xml`;
     a.click();
   };
 
@@ -300,7 +314,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v31.0
+                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v32.0
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
@@ -652,7 +666,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           {loading ? (
             <div className="py-32 flex flex-col items-center gap-6 bg-white rounded-2xl border-2 border-dashed">
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
-              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v31.0...</p>
+              <p className="font-black text-slate-700 uppercase tracking-widest">Ejecutando Simulación JADSI Industrial v32.0...</p>
             </div>
           ) : !result ? (
             <div className="py-40 flex flex-col items-center gap-6 text-slate-300 bg-white rounded-2xl border-2 border-dashed">
@@ -686,7 +700,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                         </div>
                       </div>
                       
-                      {/* Telemetría Industrial v31.0 - Analytics Pro */}
+                      {/* Telemetría Industrial v32.0 - Analytics Pro */}
                       <div className="bg-slate-800/50 px-6 py-2 grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4 border-b border-white/5">
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] font-black text-amber-500 uppercase">Desperdicio =</span>
