@@ -530,7 +530,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                               ))
                             )}
                             {result.optimizedLayout.every(p => !p.leftovers || p.leftovers.length === 0) && (
-                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables (>60mm)</TableCell></TableRow>
+                              <TableRow><TableCell colSpan={4} className="text-center py-4 text-[9px] text-slate-400 italic">No hay sobrantes reutilizables ({">"}60mm)</TableCell></TableRow>
                             )}
                           </TableBody>
                         </Table>
