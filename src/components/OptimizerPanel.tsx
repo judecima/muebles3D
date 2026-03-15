@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Part, AVAILABLE_PANELS, PanelSize, GrainDirection, OptimizationResult } from '@/lib/types';
+import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -15,19 +14,25 @@ import {
   ChevronDown, 
   ChevronUp, 
   Ruler, 
-  Settings2,
-  FileDown,
-  ZoomIn,
-  ZoomOut,
-  Info,
-  List,
-  Cpu,
-  Plus
+  FileDown, 
+  ZoomIn, 
+  ZoomOut, 
+  Info, 
+  List, 
+  Cpu, 
+  Plus, 
+  Search, 
+  ChevronLeft, 
+  ChevronRight,
+  Maximize
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+import Image from 'next/image';
 
 interface OptimizerPanelProps {
   parts: Part[];
@@ -44,6 +49,10 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [isDetailedListOpen, setIsDetailedListOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [targetThickness, setTargetThickness] = useState<number>(18);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearch) = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
 
   useEffect(() => {
     const woodParts = initialParts.filter(p => !p.isHardware);
@@ -69,8 +78,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     }
   }, [initialParts]);
 
-  const availableThicknesses = Array.from(new Set(localCutlist.map(p => p.thickness))).sort((a, b) => b - a);
-  
   const updatePart = (index: number, field: string, value: any) => {
     const updated = [...localCutlist];
     updated[index] = { ...updated[index], [field]: value };
@@ -79,20 +86,17 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   };
 
   const addManualPart = () => {
-    setLocalCutlist([...localCutlist, { name: "Nueva Pieza", width: 500, height: 300, quantity: 1, grainDirection: 'libre', thickness: 18 }]);
+    setLocalCutlist([...localCutlist, { name: "Nueva Pieza", width: 500, height: 300, quantity: 1, grainDirection: 'libre', thickness: targetThickness }]);
   };
 
   const handleOptimize = async () => {
     const filteredParts = localCutlist.filter(p => p.thickness === targetThickness);
-    
     if (filteredParts.length === 0) {
-      setError(`No hay piezas de ${targetThickness}mm.`);
+      setError(`No hay piezas de ${targetThickness}mm en la lista.`);
       return;
     }
-
     setLoading(true);
     setError(null);
-    
     try {
       const res = await fetch('/api/cutting/optimize', {
         method: 'POST',
@@ -107,17 +111,13 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
         })
       });
       const data = await res.json();
-      
       if (!res.ok || !data || data.error) {
         setError(data?.error || "Error en el cálculo industrial.");
-      } else if (!data.optimizedLayout || data.optimizedLayout.length === 0) {
-        setError("Piezas demasiado grandes para el panel.");
       } else {
         setResult(data);
       }
     } catch (e) {
-      console.error(e);
-      setError("Error de comunicación con el motor de optimización.");
+      setError("Error de comunicación con el motor.");
     } finally {
       setLoading(false);
     }
@@ -127,24 +127,31 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     if (!result) return;
     const doc = new jsPDF('p', 'mm', 'a4');
     const BRAND_COLOR = [13, 110, 253];
-
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(24);
     doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
     doc.text("JADSI", 105, 20, { align: 'center' });
-    
     doc.setFontSize(14);
     doc.setTextColor(80, 80, 80);
     doc.text("Plano de Optimización de Corte", 105, 28, { align: 'center' });
-    
     (doc as any).autoTable({
       head: [['Pieza', 'Base (mm)', 'Altura (mm)', 'Cant.', 'Veta']],
       body: localCutlist.filter(p => p.thickness === targetThickness).map(p => [p.name, p.width, p.height, p.quantity, p.grainDirection]),
       startY: 40,
       headStyles: { fillColor: BRAND_COLOR, fontStyle: 'bold' }
     });
-
     doc.save(`jadsi-optimizacion-${targetThickness}mm.pdf`);
+  };
+
+  const filteredPanels = AVAILABLE_PANELS.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const totalPages = Math.ceil(filteredPanels.length / ITEMS_PER_PAGE);
+  const paginatedPanels = filteredPanels.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const handlePanelSelect = (panel: PanelSize) => {
+    onPanelChange(panel);
+    setTargetThickness(panel.thickness);
+    setResult(null);
+    setIsModalOpen(false);
   };
 
   return (
@@ -162,28 +169,96 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Espesor del Material</Label>
-                  <Select value={targetThickness.toString()} onValueChange={(v) => { setTargetThickness(parseInt(v)); setResult(null); }}>
-                    <SelectTrigger className="bg-slate-50 border-slate-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[3, 12, 15, 18, 25].map(t => <SelectItem key={t} value={t.toString()}>{t} mm</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Dimensiones de Tablero</Label>
-                  <Select value={selectedPanel.id} onValueChange={(id) => onPanelChange(AVAILABLE_PANELS.find(p => p.id === id)!)}>
-                    <SelectTrigger className="bg-slate-50 border-slate-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {AVAILABLE_PANELS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Material Industrial Seleccionado</Label>
+                  <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between h-14 bg-slate-50 border-slate-200 group hover:border-primary transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded border overflow-hidden relative bg-white">
+                            {selectedPanel.idTextura !== -1 && (
+                              <Image 
+                                src={`https://optionline-prod-files.s3.amazonaws.com/${selectedPanel.idEmpresa}-${selectedPanel.idTextura}-thumbnail.jpg`}
+                                alt="Material"
+                                fill
+                                className="object-cover"
+                                data-ai-hint="wood texture"
+                              />
+                            )}
+                          </div>
+                          <div className="text-left">
+                            <div className="text-[10px] font-black text-primary uppercase">{selectedPanel.name}</div>
+                            <div className="text-[9px] text-slate-400 font-bold uppercase">{selectedPanel.width}x{selectedPanel.height}mm — {selectedPanel.thickness}mm</div>
+                          </div>
+                        </div>
+                        <Maximize className="w-4 h-4 text-slate-300 group-hover:text-primary" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden">
+                      <DialogHeader className="p-6 bg-slate-900 text-white shrink-0">
+                        <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter font-black">
+                          <LayoutGrid className="w-5 h-5 text-primary" /> Catálogo de Materiales JADSI
+                        </DialogTitle>
+                        <div className="relative mt-4">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <Input 
+                            placeholder="Buscar por nombre, línea o espesor..." 
+                            className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                            value={searchTerm}
+                            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                          />
+                        </div>
+                      </DialogHeader>
+                      
+                      <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {paginatedPanels.map((panel) => (
+                            <Card 
+                              key={panel.id} 
+                              className={`cursor-pointer transition-all hover:shadow-lg border-2 ${selectedPanel.id === panel.id ? 'border-primary shadow-primary/10' : 'border-transparent'}`}
+                              onClick={() => handlePanelSelect(panel)}
+                            >
+                              <div className="aspect-[4/3] relative bg-white border-b overflow-hidden">
+                                {panel.idTextura !== -1 ? (
+                                  <Image 
+                                    src={`https://optionline-prod-files.s3.amazonaws.com/${panel.idEmpresa}-${panel.idTextura}-thumbnail.jpg`}
+                                    alt={panel.name}
+                                    fill
+                                    className="object-cover group-hover:scale-110 transition-transform"
+                                    data-ai-hint="wood board"
+                                  />
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-300">
+                                    <Ruler className="w-8 h-8" />
+                                  </div>
+                                )}
+                                <div className="absolute top-2 right-2 bg-slate-900/80 text-white px-2 py-1 rounded text-[8px] font-black uppercase">
+                                  {panel.thickness} mm
+                                </div>
+                              </div>
+                              <CardContent className="p-3">
+                                <h4 className="text-[9px] font-black text-slate-800 uppercase leading-tight line-clamp-2 h-6">{panel.name}</h4>
+                                <p className="text-[8px] text-slate-400 mt-1 font-bold uppercase">{panel.width}x{panel.height}mm</p>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-white border-t flex items-center justify-between shrink-0">
+                        <span className="text-[10px] font-black text-slate-400 uppercase">Página {currentPage} de {totalPages}</span>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
 
@@ -322,7 +397,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
               {result.optimizedLayout.map((panel, idx) => (
                 <div key={idx} className="space-y-4">
                   <div className="flex items-center justify-between px-6 py-3 bg-slate-900 text-white rounded-xl shadow-lg border-b-4 border-primary">
-                    <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — Espesor: {targetThickness}mm — {selectedPanel.width}x{selectedPanel.height}mm</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest">Hoja de Corte #{panel.panelNumber} — Espesor: {result.selectedThickness}mm — {selectedPanel.width}x{selectedPanel.height}mm</h3>
                     <span className="text-xs font-black text-primary">{panel.efficiency.toFixed(1)}% USO</span>
                   </div>
                   
