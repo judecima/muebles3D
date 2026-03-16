@@ -23,7 +23,9 @@ import {
   LogOut,
   Loader2,
   ChevronLeft,
-  Cpu
+  Cpu,
+  ArrowRightToLine,
+  Maximize2
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -198,7 +200,19 @@ export default function SteelFramingPage() {
     } else {
       const targetRot = (parent.rotation - 90 + 360) % 360;
       let maxLen = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
-      const newIW: InternalWall = { id: Math.random().toString(36).substr(2, 9), parentWallId: wallId, xPosition: Math.round(x), length: Math.min(2000, maxLen), height: config.globalWallHeight, rotation: targetRot, x: 0, z: 0, openings: [] };
+      
+      const newIW: InternalWall = { 
+        id: Math.random().toString(36).substr(2, 9), 
+        parentWallId: wallId, 
+        xPosition: Math.round(x), 
+        length: Math.min(2000, maxLen), 
+        height: config.globalWallHeight, 
+        rotation: targetRot, 
+        x: 0, 
+        z: 0, 
+        openings: [] 
+      };
+      
       const updatedConfig = { ...config, internalWalls: [...config.internalWalls, newIW] };
       setConfig(updatedConfig);
       fetchAnalysis(updatedConfig);
@@ -206,6 +220,23 @@ export default function SteelFramingPage() {
       setLocalIWData({ length: newIW.length.toString(), xPosition: Math.round(x).toString() });
     }
   }, [config]);
+
+  const extendWallToContact = () => {
+    if (!editingInternalWall) return;
+    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
+    if (!parent) return;
+    
+    // Si nace de w1 o w3, cruza el eje Z (length de la casa)
+    // Si nace de w2 o w4, cruza el eje X (width de la casa)
+    let fullDistance = 0;
+    if (parent.id === 'w1' || parent.id === 'w3') {
+      fullDistance = config.length - EXTERIOR_WALL_THICKNESS;
+    } else {
+      fullDistance = config.width - EXTERIOR_WALL_THICKNESS;
+    }
+
+    setLocalIWData(prev => prev ? { ...prev, length: fullDistance.toString() } : null);
+  };
 
   const commitInternalWallChange = () => {
     if (!editingInternalWall || !localIWData) return;
@@ -361,6 +392,9 @@ export default function SteelFramingPage() {
                 <Label className="text-right text-[10px] font-black uppercase">Largo (mm)</Label>
                 <div className="col-span-3 flex gap-2">
                   <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} className="flex-1" />
+                  <Button variant="outline" size="icon" onClick={extendWallToContact} className="shrink-0 border-primary text-primary" title="Cerrar hasta pared opuesta">
+                    <ArrowRightToLine className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
