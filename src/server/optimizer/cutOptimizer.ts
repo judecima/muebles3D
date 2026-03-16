@@ -55,14 +55,12 @@ export function runOptimization(
     let bestPanelForThisStep: OptimizedPanel | null = null;
     let bestScore = -Infinity;
 
-    // Intensidad de búsqueda para encontrar el equilibrio perfecto
     const maxIterations = 8000;
     const targetEfficiency = 95.3;
 
     for (let iter = 0; iter < maxIterations; iter++) {
       const currentAvailablePieces = globalPool.filter(p => !p.placed).map(p => ({ ...p }));
       
-      // Heurísticas de ordenamiento variables
       if (iter === 0) {
         currentAvailablePieces.sort((a, b) => (b.width * b.height) - (a.width * a.height));
       } else if (iter < 1000) {
@@ -96,7 +94,6 @@ export function runOptimization(
         }
       }
 
-      // Si alcanzamos la perfección industrial, salimos antes para ganar velocidad
       if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= targetEfficiency) {
         const hasMajorLeftover = (bestPanelForThisStep.leftovers || []).some(l => Math.min(l.width, l.height) >= 400);
         if (hasMajorLeftover) break;
@@ -156,7 +153,6 @@ function fillSinglePanel(
   const uniqueStrips = new Set<number>();
 
   while (freeRects.length > 0) {
-    // Mantener la guillotina limpia
     freeRects.sort((a, b) => {
       if (strategy === 'horizontal') return (a.y - b.y) || (a.x - b.x);
       return (a.x - b.x) || (a.y - b.y);
@@ -173,7 +169,6 @@ function fillSinglePanel(
       const part = pieces[i];
       if (part.placed) continue;
 
-      // Evaluar sin rotar
       if (part.width <= r.width && part.height <= r.height) {
         const score = calculateIndustrialScore(part.width, part.height, r, strategy);
         if (score > bestScore) {
@@ -181,7 +176,6 @@ function fillSinglePanel(
         }
       }
 
-      // Evaluar rotación
       const canRotate = !hasGrain || part.grainDirection === 'libre';
       if (canRotate && part.height <= r.width && part.width <= r.height) {
         const score = calculateIndustrialScore(part.height, part.width, r, strategy);
@@ -207,7 +201,6 @@ function fillSinglePanel(
       uniqueStrips.add(strategy === 'vertical' ? r.x : r.y);
       splitGuillotine(freeRects, r, w, h, kerf, strategy);
     } else {
-      // Registrar sobrante potencial
       if (r.width >= 10 || r.height >= 10) {
         leftovers.push({
           name: `S${leftovers.length + 1}`,
@@ -219,17 +212,13 @@ function fillSinglePanel(
     }
   }
 
-  // Resetear estado de las piezas para la siguiente simulación de este panel
   pieces.forEach(p => p.placed = false);
 
   const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
   const totalArea = panelWidth * panelHeight;
-  
-  // Filtrar solo sobrantes útiles para las estadísticas visuales (Stes)
   const usefulLeftovers = leftovers.filter(l => Math.min(l.width, l.height) >= 100);
   const leftoverArea = usefulLeftovers.reduce((acc, l) => acc + (l.width * l.height), 0);
 
-  // Métricas Lepton Target
   const displacements = 4 + (uniqueStrips.size * 2) + (placedParts.length * 0.8);
   const linearMeters = (panelWidth * 2 + panelHeight * 2 + (usedArea / 1000)) / 1000;
 
@@ -255,45 +244,30 @@ function fillSinglePanel(
   };
 }
 
-/**
- * Función de Calidad Industrial JADSI v38.0
- * Busca el equilibrio entre eficiencia y utilidad de stock.
- */
 function evaluatePanelQuality(panel: OptimizedPanel, panelWidth: number, panelHeight: number): number {
-  // 1. Base: Eficiencia (Prioridad secundaria frente a calidad)
   let score = panel.efficiency * 100000;
-  
   const leftovers = panel.leftovers || [];
-  
-  // 2. Penalizar Fragmentación
-  // Cada sobrante extra resta puntos, forzando la consolidación.
   score -= (leftovers.length * 5000000);
 
-  // 3. Evaluar Utilidad de cada Sobrante
   leftovers.forEach(l => {
     const minDim = Math.min(l.width, l.height);
     const maxDim = Math.max(l.width, l.height);
     const area = l.width * l.height;
     const aspectRatio = maxDim / minDim;
 
-    // PREMIO: Piezas cuadradas y grandes (Stock de Oro)
     if (minDim >= 400) {
       score += (area / panel.totalArea) * 2000000000;
     } else if (minDim >= 250) {
       score += (area / panel.totalArea) * 800000000;
     }
 
-    // PENALIZACIÓN: Tiras inútiles ("Fideos" de madera)
-    if (minDim < 80) score -= 500000000; // Demasiado fino para ser útil
-    if (aspectRatio > 10) score -= 300000000; // Demasiado largo y estrecho
+    if (minDim < 80) score -= 500000000; 
+    if (aspectRatio > 10) score -= 300000000;
   });
 
-  // 4. El Master Block (Sobrante más grande)
   const maxLeftoverArea = Math.max(0, ...leftovers.map(l => l.width * l.height));
   score += (maxLeftoverArea / panel.totalArea) * 1000000000;
 
-  // 5. REGLA DE ORO: Dominancia Vertical de Medio Panel (X-Rip)
-  // Si en vertical todo cabe en menos del 55% de la placa, es la ganadora absoluta.
   if (panel.strategy === 'vertical' && panel.parts.length > 0) {
     const maxX = Math.max(...panel.parts.map(p => p.x + p.width));
     if (maxX <= (panelWidth * 0.55)) {
@@ -306,19 +280,13 @@ function evaluatePanelQuality(panel: OptimizedPanel, panelWidth: number, panelHe
 
 function calculateIndustrialScore(w: number, h: number, r: FreeRect, strategy: 'vertical' | 'horizontal'): number {
   let score = 0;
-  // Bono por alineación perfecta con la franja de corte (evita escalones)
   if (strategy === 'horizontal') {
     if (Math.abs(h - r.height) < 0.5) score += 50000000;
   } else {
     if (Math.abs(w - r.width) < 0.5) score += 50000000;
   }
-  
-  // Priorizar área grande primero
   score += (w * h) * 10;
-  
-  // Bono por cercanía al origen (compactación)
   if (r.x === 10 || r.y === 10) score += 1000000; 
-  
   return score;
 }
 
