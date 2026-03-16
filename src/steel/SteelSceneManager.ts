@@ -8,6 +8,7 @@ import { InputController } from '@/engine/player/InputController';
 import { CollisionSystem } from '@/engine/player/CollisionSystem';
 import { PlayerController } from '@/engine/player/PlayerController';
 import { ThirdPersonCamera } from '@/engine/player/ThirdPersonCamera';
+import { StructuralEngine } from '@/server/steel/structuralEngine';
 
 const THREE = THREE_LIB;
 
@@ -209,7 +210,7 @@ export class SteelSceneManager {
       }
       
       if (config.layers.steelProfiles && processed) {
-        this.renderProcessedStructure(wall, processed, wallGroup, config.layers);
+        this.renderProcessedStructure(wall, processed, wallGroup, config);
       }
       this.createOpeningTriggers(wall.id, wall.length, wall.height, wall.rotation, wall.x, wall.z, wall.openings, false, processed?.headers || [], 100);
     });
@@ -237,7 +238,7 @@ export class SteelSceneManager {
     this.houseGroup.add(this.floorMesh);
   }
 
-  private renderProcessedStructure(wall: SteelWall, processed: any, group: THREE.Group, layers: LayerVisibility) {
+  private renderProcessedStructure(wall: SteelWall, processed: any, group: THREE.Group, config: SteelHouseConfig) {
     const structuralGroup = new THREE.Group();
     group.add(structuralGroup);
     const studHeight = wall.height - (this.profileFlange * 2);
@@ -259,9 +260,21 @@ export class SteelSceneManager {
       if (p.isWallEnd) { for (let i = 0; i < 3; i++) structuralGroup.add(this.createProfile(studHeight, p.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner)); }
     });
 
-    if (layers.horizontalBlocking) {
+    if (config.layers.horizontalBlocking) {
       processed.blockings.forEach((b: any) => structuralGroup.add(this.createProfile(b.xEnd - b.xStart, b.xStart, b.y, 0, 'PGU', this.colors.blocking)));
     }
+
+    // Refuerzos de uniones (Ladders) en muros externos
+    const junctions = StructuralEngine.findJunctions(wall, config);
+    junctions.forEach(j => {
+      // Montante de respaldo
+      structuralGroup.add(this.createProfile(studHeight, j.x - 5, this.profileFlange, 90, 'PGC', this.colors.ladder));
+      // Escalerillas (PGU cortas)
+      const ladders = StructuralEngine.calculateLadderBacking(wall.height);
+      ladders.forEach(l => {
+        structuralGroup.add(this.createProfile(l.xEnd - l.xStart, j.x + l.xStart, l.y, 0, 'PGU', this.colors.ladder));
+      });
+    });
 
     wall.openings.forEach(op => {
       const headerData = processed.headers.find((h: any) => h.openingId === op.id);
@@ -292,7 +305,7 @@ export class SteelSceneManager {
 
   private renderProcessedInternalWall(iw: InternalWall, processed: any, group: THREE.Group, config: SteelHouseConfig) {
     const thickness = this.drywallProfileWidth;
-    const studHeight = iw.height - 60; // 30mm solera inferior + 30mm solera superior
+    const studHeight = iw.height - 60; 
 
     if (processed) {
       processed.panels.forEach((p: any) => {
@@ -307,11 +320,9 @@ export class SteelSceneManager {
         group.add(structuralGroup);
         
         processed.panels.forEach((p: any) => {
-          // Soleras PGU 70
           structuralGroup.add(this.createProfile(p.width, p.xStart, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness, 30));
           structuralGroup.add(this.createProfile(p.width, p.xStart, iw.height - 30, 0, 'PGU', this.colors.steelDrywall, 0, thickness, 30));
           
-          // Montantes PGC 70
           for (let x = p.xStart; x <= p.xEnd; x += 400) {
             const inOpening = (iw.openings || []).some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
             if (!inOpening) {
@@ -320,7 +331,16 @@ export class SteelSceneManager {
           }
         });
 
-        // Refuerzos técnicos de vanos en tabiques (Normativa Drywall/Steel)
+        // Refuerzos de uniones entre muros internos (Drywall corners/Ts)
+        const junctions = StructuralEngine.findJunctions(iw, config);
+        junctions.forEach(j => {
+          structuralGroup.add(this.createProfile(studHeight, j.x - 15, 30, 90, 'PGC', this.colors.ladder, 0, thickness, 30));
+          const ladders = StructuralEngine.calculateLadderBacking(iw.height);
+          ladders.forEach(l => {
+            structuralGroup.add(this.createProfile(l.xEnd - l.xStart, j.x + l.xStart, l.y, 0, 'PGU', this.colors.ladder, 0, thickness, 30));
+          });
+        });
+
         (iw.openings || []).forEach(op => {
           const headerData = processed.headers.find((h: any) => h.openingId === op.id);
           if (!headerData) return;
@@ -330,21 +350,17 @@ export class SteelSceneManager {
           const headerBottom = sill + op.height;
           const headerHeight = analysis.actualHeight;
 
-          // Montantes Rey (King Studs)
           structuralGroup.add(this.createProfile(studHeight, op.position - 30, 30, 90, 'PGC', this.colors.king, 0, thickness, 30));
           structuralGroup.add(this.createProfile(studHeight, op.position + op.width, 30, 90, 'PGC', this.colors.king, 0, thickness, 30));
 
-          // Montantes de Apoyo (Jack Studs)
           if (headerBottom > 30) {
             structuralGroup.add(this.createProfile(headerBottom - 30, op.position - 15, 30, 90, 'PGC', this.colors.jack, 0, thickness, 30));
             structuralGroup.add(this.createProfile(headerBottom - 30, op.position + op.width - 15, 30, 90, 'PGC', this.colors.jack, 0, thickness, 30));
           }
 
-          // Dintel Reforzado
           const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
           structuralGroup.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, thickness, headerHeight));
 
-          // Cripples Superiores
           headerData.cripples.forEach((c: any) => {
             structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness, 30));
           });

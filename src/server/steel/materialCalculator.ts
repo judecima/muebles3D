@@ -47,15 +47,15 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       totalConnections += 2;
     });
 
-    config.internalWalls.forEach(iw => {
-      if (iw.parentWallId === wall.id) {
-        pgc100_090 += studHeight; // Refuerzo unión
-        const ladders = StructuralEngine.calculateLadderBacking(wall.height);
-        ladders.forEach(l => {
-          pgu100Len += (l.xEnd - l.xStart);
-          totalConnections += 2;
-        });
-      }
+    // Refuerzos de uniones (Ladders) contra muros externos
+    const junctions = StructuralEngine.findJunctions(wall, config);
+    junctions.forEach(() => {
+      pgc100_090 += studHeight; // Montante extra de respaldo
+      const ladders = StructuralEngine.calculateLadderBacking(wall.height);
+      ladders.forEach(l => {
+        pgu100Len += (l.xEnd - l.xStart);
+        totalConnections += 2;
+      });
     });
 
     wall.openings.forEach(op => {
@@ -99,7 +99,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     areaInteriorTotal += wallArea;
   });
 
-  // Procesar muros internos (No-Estructurales / Tabiquería)
+  // Procesar muros internos (Tabiquería)
   config.internalWalls.forEach(iw => {
     const studHeight = iw.height - 60;
     pgu70Len += iw.length * 2;
@@ -107,10 +107,20 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     pgc70Len += baseStudCount * studHeight;
     totalConnections += baseStudCount * 4;
 
+    // Refuerzos de uniones (Ladders) entre muros internos
+    const junctions = StructuralEngine.findJunctions(iw, config);
+    junctions.forEach(() => {
+      pgc70Len += studHeight; // Montante extra
+      const ladders = StructuralEngine.calculateLadderBacking(iw.height);
+      ladders.forEach(l => {
+        pgu70Len += (l.xEnd - l.xStart);
+        totalConnections += 2;
+      });
+    });
+
     (iw.openings || []).forEach(op => {
-      // Refuerzos de vano: 2 Kings + 2 Jacks
       pgc70Len += 4 * studHeight; 
-      pgc70Len += op.width; // Dintel
+      pgc70Len += op.width; 
       
       const cripples = StructuralEngine.calculateCrippleStuds(iw, op, config);
       cripples.forEach(c => { 

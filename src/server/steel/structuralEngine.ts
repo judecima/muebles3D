@@ -31,8 +31,9 @@ export interface CrippleData {
 }
 
 export interface JunctionData {
+  wallId: string;
   x: number;
-  type: 'T' | 'cross';
+  type: 'T' | 'L' | 'cross';
   targetWallId: string;
 }
 
@@ -221,6 +222,30 @@ export class StructuralEngine {
       ladders.push({ xStart: -35, xEnd: 35, y: i * spacing });
     }
     return ladders;
+  }
+
+  static findJunctions(wall: SteelWall | InternalWall, config: SteelHouseConfig): JunctionData[] {
+    const junctions: JunctionData[] = [];
+    
+    // Buscar muros que nazcan de este muro
+    const children = config.internalWalls.filter(iw => iw.parentWallId === wall.id);
+    children.forEach(child => {
+      junctions.push({
+        wallId: wall.id,
+        x: child.xPosition,
+        type: 'T',
+        targetWallId: child.id
+      });
+    });
+
+    // Buscar si este muro (si es interno) termina contra otro muro
+    if ('parentWallId' in wall) {
+      // Un muro interno siempre nace de un parent (T-junction en xPosition)
+      // Pero podría terminar contra otro muro (L-junction o T-junction al final)
+      // Por simplicidad, el motor detecta uniones basadas en la estructura del árbol de muros
+    }
+
+    return junctions;
   }
 
   static validateStructure(config: SteelHouseConfig): { wallId: string, status: 'ok' | 'warning' | 'error', message: string }[] {
