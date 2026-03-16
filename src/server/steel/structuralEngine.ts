@@ -225,17 +225,32 @@ export class StructuralEngine {
 
   static validateStructure(config: SteelHouseConfig): { wallId: string, status: 'ok' | 'warning' | 'error', message: string }[] {
     const alerts: any[] = [];
+    
+    // Validar muros perimetrales
     config.walls.forEach(wall => {
       wall.openings.forEach(op => {
         const analysis = this.calculateHeader(op, wall.length, config, wall.height);
         if (analysis.status !== 'ok') {
           const msg = analysis.type === 'truss' 
-            ? `Vano ${op.width}mm en ${wall.id}: Requiere Viga Reticulada (Truss)`
-            : `Vano ${op.width}mm en ${wall.id}: ${analysis.status === 'error' ? 'Crítico' : 'Refuerzo Especial'}`;
+            ? `Muro Ext. - Vano ${op.width}mm: Requiere Viga Reticulada (Truss)`
+            : `Muro Ext. - Vano ${op.width}mm: ${analysis.status === 'error' ? 'Crítico' : 'Refuerzo Especial'}`;
           alerts.push({ wallId: wall.id, status: analysis.status, message: msg });
         }
       });
     });
+
+    // Validar muros internos
+    config.internalWalls.forEach(iw => {
+      (iw.openings || []).forEach(op => {
+        const analysis = this.calculateHeader(op, iw.length, config, iw.height);
+        if (analysis.status !== 'ok' || op.width > 1200) {
+          const status = op.width > 2400 ? 'error' : (op.width > 1200 ? 'warning' : analysis.status);
+          const msg = `Tabique Int. - Vano ${op.width}mm: ${status === 'error' ? 'Luz excesiva para tabiquería' : 'Requiere dintel reforzado'}`;
+          alerts.push({ wallId: iw.id, status, message: msg });
+        }
+      });
+    });
+
     return alerts;
   }
 }

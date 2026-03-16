@@ -27,6 +27,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     if (item.quantity > 0) items.push(item);
   }
 
+  // Procesar muros perimetrales (Estructurales)
   config.walls.forEach(wall => {
     const panels = StructuralEngine.calculateWallPanels(wall, config);
     const studHeight = wall.height - 80;
@@ -60,10 +61,17 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     wall.openings.forEach(op => {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+      const headerBottom = sill + op.height;
       const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
       const numKings = analysis.type === 'truss' ? 3 : 1;
-      if (fusion === 'none') pgc100_090 += numKings * 2 * studHeight;
-      else pgc100_090 += numKings * studHeight;
+      const numJacks = 1;
+
+      if (fusion === 'none') {
+        pgc100_090 += (numKings + numJacks) * 2 * studHeight;
+      } else {
+        pgc100_090 += (numKings + numJacks) * studHeight;
+      }
+      
       pgc100_090 += 2 * (sill + op.height - 40);
 
       if (analysis.type === 'truss') {
@@ -91,18 +99,24 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     areaInteriorTotal += wallArea;
   });
 
+  // Procesar muros internos (No-Estructurales / Tabiquería)
   config.internalWalls.forEach(iw => {
     const studHeight = iw.height - 60;
     pgu70Len += iw.length * 2;
-    const studCount = Math.ceil(iw.length / 400) + 1;
-    pgc70Len += studCount * studHeight;
-    totalConnections += studCount * 4;
+    const baseStudCount = Math.ceil(iw.length / 400) + 1;
+    pgc70Len += baseStudCount * studHeight;
+    totalConnections += baseStudCount * 4;
 
     (iw.openings || []).forEach(op => {
-      pgc70Len += 2 * studHeight;
-      pgc70Len += op.width;
+      // Refuerzos de vano: 2 Kings + 2 Jacks
+      pgc70Len += 4 * studHeight; 
+      pgc70Len += op.width; // Dintel
+      
       const cripples = StructuralEngine.calculateCrippleStuds(iw, op, config);
-      cripples.forEach(c => { pgc70Len += (c.yEnd - c.yStart); totalConnections += 4; });
+      cripples.forEach(c => { 
+        pgc70Len += (c.yEnd - c.yStart); 
+        totalConnections += 4; 
+      });
       totalConnections += 16;
       areaInternalWallsNet -= (op.width * op.height) / 1000000;
     });

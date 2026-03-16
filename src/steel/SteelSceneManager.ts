@@ -67,7 +67,7 @@ export class SteelSceneManager {
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(this.colors.background);
-    this.camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 10, 100000);
+    this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
     this.camera.position.set(8000, 6000, 8000);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -292,27 +292,64 @@ export class SteelSceneManager {
 
   private renderProcessedInternalWall(iw: InternalWall, processed: any, group: THREE.Group, config: SteelHouseConfig) {
     const thickness = this.drywallProfileWidth;
+    const studHeight = iw.height - 60; // 30mm solera inferior + 30mm solera superior
+
     if (processed) {
       processed.panels.forEach((p: any) => {
         const collMesh = new THREE.Mesh(new THREE.BoxGeometry(p.width, iw.height, thickness + 20), new THREE.MeshBasicMaterial({ visible: false }));
         collMesh.position.set(p.xStart + p.width/2, iw.height/2, 0);
-        group.add(collMesh); this.collisions.registerWall(collMesh);
+        group.add(collMesh); 
+        this.collisions.registerWall(collMesh);
       });
-    }
 
-    if (config.layers.steelProfiles && processed) {
-      const structuralGroup = new THREE.Group();
-      group.add(structuralGroup);
-      const studHeight = iw.height - 60;
-      processed.panels.forEach((p: any) => {
-        structuralGroup.add(this.createProfile(p.width, p.xStart, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness, 30));
-        structuralGroup.add(this.createProfile(p.width, p.xStart, iw.height - 30, 0, 'PGU', this.colors.steelDrywall, 0, thickness, 30));
-        for (let x = p.xStart; x <= p.xEnd; x += 400) {
-          const inOpening = iw.openings.some(op => x >= (op.position - 5) && x <= (op.position + op.width + 5));
-          if (!inOpening) structuralGroup.add(this.createProfile(studHeight, x, 30, 90, 'PGC', this.colors.steelDrywall, 0, thickness, 30));
-        }
-      });
-      // Renderizar refuerzos de unión (escalerillas) si existen contactos
+      if (config.layers.steelProfiles) {
+        const structuralGroup = new THREE.Group();
+        group.add(structuralGroup);
+        
+        processed.panels.forEach((p: any) => {
+          // Soleras PGU 70
+          structuralGroup.add(this.createProfile(p.width, p.xStart, 0, 0, 'PGU', this.colors.steelDrywall, 0, thickness, 30));
+          structuralGroup.add(this.createProfile(p.width, p.xStart, iw.height - 30, 0, 'PGU', this.colors.steelDrywall, 0, thickness, 30));
+          
+          // Montantes PGC 70
+          for (let x = p.xStart; x <= p.xEnd; x += 400) {
+            const inOpening = (iw.openings || []).some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
+            if (!inOpening) {
+              structuralGroup.add(this.createProfile(studHeight, x, 30, 90, 'PGC', this.colors.steelDrywall, 0, thickness, 30));
+            }
+          }
+        });
+
+        // Refuerzos técnicos de vanos en tabiques (Normativa Drywall/Steel)
+        (iw.openings || []).forEach(op => {
+          const headerData = processed.headers.find((h: any) => h.openingId === op.id);
+          if (!headerData) return;
+
+          const analysis = headerData.analysis;
+          const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+          const headerBottom = sill + op.height;
+          const headerHeight = analysis.actualHeight;
+
+          // Montantes Rey (King Studs)
+          structuralGroup.add(this.createProfile(studHeight, op.position - 30, 30, 90, 'PGC', this.colors.king, 0, thickness, 30));
+          structuralGroup.add(this.createProfile(studHeight, op.position + op.width, 30, 90, 'PGC', this.colors.king, 0, thickness, 30));
+
+          // Montantes de Apoyo (Jack Studs)
+          if (headerBottom > 30) {
+            structuralGroup.add(this.createProfile(headerBottom - 30, op.position - 15, 30, 90, 'PGC', this.colors.jack, 0, thickness, 30));
+            structuralGroup.add(this.createProfile(headerBottom - 30, op.position + op.width - 15, 30, 90, 'PGC', this.colors.jack, 0, thickness, 30));
+          }
+
+          // Dintel Reforzado
+          const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
+          structuralGroup.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, thickness, headerHeight));
+
+          // Cripples Superiores
+          headerData.cripples.forEach((c: any) => {
+            structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness, 30));
+          });
+        });
+      }
     }
 
     if (!config.structuralMode) {
@@ -330,7 +367,7 @@ export class SteelSceneManager {
         const p2 = new THREE.Mesh(panelGeom, new THREE.MeshStandardMaterial({ color: this.colors.panel_int }));
         p2.position.z = -thickness/2 - 12.5; group.add(p2);
       }
-      // Renderizar lana de vidrio (Aislación)
+      
       const insulGeom = new THREE.BoxGeometry(iw.length, iw.height, thickness - 10);
       const insulMesh = new THREE.Mesh(insulGeom, new THREE.MeshStandardMaterial({ color: this.colors.insulation, transparent: true, opacity: 0.4 }));
       insulMesh.position.set(iw.length/2, iw.height/2, 0);
