@@ -9,7 +9,7 @@ export interface HeaderAnalysis {
   requiredIx: number;
   status: 'ok' | 'warning' | 'error';
   isFusedWithCorner: 'none' | 'left' | 'right';
-  actualHeight: number; // Altura real ocupada por el dintel
+  actualHeight: number;
   trussData?: {
     height: number;
     numDiagonals: number;
@@ -28,6 +28,12 @@ export interface CrippleData {
   yStart: number;
   yEnd: number;
   type: 'upper' | 'lower';
+}
+
+export interface JunctionData {
+  x: number;
+  type: 'T' | 'cross';
+  targetWallId: string;
 }
 
 export class StructuralEngine {
@@ -78,7 +84,8 @@ export class StructuralEngine {
 
       if (width > 0) {
         const loads = this.calculatePanelLoads(width, wall.height, config);
-        const needsBracing = (loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * width / 1000) || (currentX === 0 || targetX === wall.length);
+        const isExternal = !('parentWallId' in wall);
+        const needsBracing = isExternal && ((loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * width / 1000) || (currentX === 0 || targetX === wall.length));
 
         panels.push({
           id: `${wall.id}-p${panelIndex}`,
@@ -110,99 +117,49 @@ export class StructuralEngine {
   }
 
   static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig, wallHeight: number): HeaderAnalysis {
-
-    const L = opening.width; // mm
-  
+    const L = opening.width;
     const tributaryWidthM = Math.max(2, config.length / 2000);
-    const dead = this.DEAD_LOAD_KPA;
-    const live = this.LIVE_LOAD_ROOF_KPA;
-  
-    const loadKNm = (dead + live) * tributaryWidthM;
-    const loadNmm = (loadKNm * 1000) / 1000; // kN/m → N/mm
-  
+    const loadKNm = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * tributaryWidthM;
+    const loadNmm = (loadKNm * 1000) / 1000;
     const maxAllowableDeflection = L / 360;
-  
-    const requiredIx =
-      (5 * loadNmm * Math.pow(L, 4)) /
-      (384 * this.STEEL_MODULUS * maxAllowableDeflection);
-  
+    const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
     const fusion = this.analyzeOpeningFusion(opening, wallLen);
-  
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-  
-    const availableHeight = Math.max(
-      120,
-      wallHeight - headerBottom - 40
-    );
-  
+    const availableHeight = Math.max(120, wallHeight - headerBottom - 40);
+
     let type: HeaderAnalysis['type'] = 'single';
     let status: HeaderAnalysis['status'] = 'ok';
     let actualHeight = 100;
     let trussData: HeaderAnalysis['trussData'] | undefined;
-  
-    const pgcIx = this.PGC_IX_SINGLE;
-  
-    if (requiredIx <= pgcIx) {
+
+    if (requiredIx <= this.PGC_IX_SINGLE) {
       type = 'single';
       actualHeight = 100;
-    }
-  
-    else if (requiredIx <= pgcIx * 2) {
+    } else if (requiredIx <= this.PGC_IX_SINGLE * 2) {
       type = 'double';
       actualHeight = 100;
-    }
-  
-    else if (requiredIx <= pgcIx * 3) {
+    } else if (requiredIx <= this.PGC_IX_SINGLE * 3) {
       type = 'triple';
       actualHeight = 100;
-    }
-  
-    else if (requiredIx <= this.TUBE_IX) {
+    } else if (requiredIx <= this.TUBE_IX) {
       type = 'tube';
       actualHeight = 120;
-    }
-  
-    else {
-  
+    } else {
       type = 'truss';
-  
-      const trussHeight = Math.min(
-        Math.max(L / 8, 200),
-        availableHeight
-      );
-  
+      const trussHeight = Math.min(Math.max(L / 8, 200), availableHeight);
       const panelSize = 400;
       const numPanels = Math.max(2, Math.round(L / panelSize));
-  
       let thickness = 1.25;
-  
       if (L > 3000) thickness = 1.6;
       if (L > 4500) thickness = 2;
-  
-      trussData = {
-        height: trussHeight,
-        numDiagonals: numPanels,
-        chordThickness: thickness
-      };
-  
+      trussData = { height: trussHeight, numDiagonals: numPanels, chordThickness: thickness };
       actualHeight = trussHeight;
-  
       if (L > 4000) status = 'warning';
       if (L > 5500) status = 'error';
     }
-  
-    return {
-      type,
-      loadNmm,
-      deflectionMm: 0,
-      maxAllowableDeflection,
-      requiredIx,
-      status,
-      isFusedWithCorner: fusion,
-      actualHeight,
-      trussData
-    };
+
+    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData };
   }
   
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
@@ -211,12 +168,8 @@ export class StructuralEngine {
     const wallH = wall.height;
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-
     const analysis = this.calculateHeader(opening, wall.length, config, wallH);
-    const headerHeight = analysis.actualHeight;
-    const headerTop = headerBottom + headerHeight;
-
-    // Solo generamos cripples si queda espacio libre sobre el dintel
+    const headerTop = headerBottom + analysis.actualHeight;
     const spaceAbove = (wallH - 40) - headerTop;
 
     if (spaceAbove > 10) {
@@ -227,7 +180,6 @@ export class StructuralEngine {
       }
     }
 
-    // Cripples INFERIORES: Ventanas
     if (opening.type === 'window' && sill > 80) {
       for (let x = spacing; x < wall.length; x += spacing) {
         if (x > opening.position + 10 && x < (opening.position + opening.width - 10)) {
@@ -242,7 +194,6 @@ export class StructuralEngine {
     const blockings: BlockingData[] = [];
     const numRows = wall.height > 2400 ? (wall.height > 3000 ? 2 : 1) : 0;
     if (numRows === 0) return [];
-
     const rowSpacing = wall.height / (numRows + 1);
     const studSpacing = ('studSpacing' in wall) ? wall.studSpacing : 400;
 

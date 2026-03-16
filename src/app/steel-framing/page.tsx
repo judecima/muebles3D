@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -125,16 +126,11 @@ export default function SteelFramingPage() {
   const getWallSegments = (wallId: string, clickX: number, totalLength: number, isInternalWall: boolean) => {
     const baseMargin = isInternalWall ? EDGE_MARGIN_INTERNAL : EDGE_MARGIN_EXTERIOR;
     const boundaries = [0];
-    
-    config.internalWalls.forEach(iw => {
-      if (iw.parentWallId === wallId) boundaries.push(iw.xPosition);
-    });
-
+    config.internalWalls.forEach(iw => { if (iw.parentWallId === wallId) boundaries.push(iw.xPosition); });
     const sortedBounds = Array.from(new Set([...boundaries, totalLength])).sort((a, b) => a - b);
     for (let i = 0; i < sortedBounds.length - 1; i++) {
       if (clickX >= sortedBounds[i] && clickX <= sortedBounds[i+1]) {
-        const start = sortedBounds[i];
-        const end = sortedBounds[i+1];
+        const start = sortedBounds[i]; const end = sortedBounds[i+1];
         const min = start === 0 ? baseMargin : start + INTERSECTION_MARGIN;
         const max = end === totalLength ? totalLength - baseMargin : end - INTERSECTION_MARGIN;
         return { start, end, min, max };
@@ -161,16 +157,13 @@ export default function SteelFramingPage() {
     const absPos = bounds.start + inputRelP;
     const finalW = Math.min(inputW, bounds.max - bounds.min);
     const finalP = Math.max(bounds.min, Math.min(absPos, bounds.max - finalW));
-
     let updatedConfig;
     if (selectedOpening.isInternal) {
       updatedConfig = { ...config, internalWalls: config.internalWalls.map(iw => iw.id === selectedOpening.wallId ? { ...iw, openings: iw.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : iw) };
     } else {
       updatedConfig = { ...config, walls: config.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.map(o => o.id === selectedOpening.opening.id ? { ...o, width: finalW, position: finalP } : o) } : w) };
     }
-    setConfig(updatedConfig);
-    fetchAnalysis(updatedConfig);
-    setSelectedOpening(null);
+    setConfig(updatedConfig); fetchAnalysis(updatedConfig); setSelectedOpening(null);
   };
 
   const deleteOpening = () => {
@@ -181,9 +174,7 @@ export default function SteelFramingPage() {
     } else {
       updatedConfig = { ...config, walls: config.walls.map(w => w.id === selectedOpening.wallId ? { ...w, openings: w.openings.filter(o => o.id !== selectedOpening.opening.id) } : w) };
     }
-    setConfig(updatedConfig);
-    fetchAnalysis(updatedConfig);
-    setSelectedOpening(null);
+    setConfig(updatedConfig); fetchAnalysis(updatedConfig); setSelectedOpening(null);
   };
 
   const handleInternalWallDoubleClick = useCallback((iw: InternalWall, x: number) => {
@@ -193,91 +184,97 @@ export default function SteelFramingPage() {
   const handleWallDoubleClick = useCallback((wallId: string, x: number, side: 'exterior' | 'interior') => {
     const parent = config.walls.find(w => w.id === wallId);
     if (!parent) return;
-
     if (side === 'exterior') {
       setAddingOpening({ wallId, x, isInternal: false });
       setNewOpeningData({ type: 'window', width: 1200, height: 1100, sill: DEFAULT_SILL });
     } else {
       const targetRot = (parent.rotation - 90 + 360) % 360;
-      let maxLen = (parent.id === 'w1' || parent.id === 'w3') ? config.length - EXTERIOR_WALL_THICKNESS : config.width - EXTERIOR_WALL_THICKNESS;
-      
       const newIW: InternalWall = { 
         id: Math.random().toString(36).substr(2, 9), 
-        parentWallId: wallId, 
-        xPosition: Math.round(x), 
-        length: Math.min(2000, maxLen), 
-        height: config.globalWallHeight, 
-        rotation: targetRot, 
-        x: 0, 
-        z: 0, 
-        openings: [] 
+        parentWallId: wallId, xPosition: Math.round(x), length: 1500, height: config.globalWallHeight, rotation: targetRot, x: 0, z: 0, openings: [] 
       };
-      
       const updatedConfig = { ...config, internalWalls: [...config.internalWalls, newIW] };
-      setConfig(updatedConfig);
-      fetchAnalysis(updatedConfig);
-      setEditingInternalWall(newIW);
+      setConfig(updatedConfig); fetchAnalysis(updatedConfig); setEditingInternalWall(newIW);
       setLocalIWData({ length: newIW.length.toString(), xPosition: Math.round(x).toString() });
     }
   }, [config]);
 
   const extendWallToContact = () => {
-    if (!editingInternalWall) return;
-    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId);
+    if (!editingInternalWall || !localIWData) return;
+    const currentLen = parseInt(localIWData.length) || 0;
+    const parent = config.walls.find(w => w.id === editingInternalWall.parentWallId) || config.internalWalls.find(iw => iw.id === editingInternalWall.parentWallId);
     if (!parent) return;
+
+    // Calculamos la dirección del rayo
+    const rad = (editingInternalWall.rotation * Math.PI) / 180;
+    const dir = { x: Math.cos(rad), z: -Math.sin(rad) };
     
-    // Si nace de w1 o w3, cruza el eje Z (length de la casa)
-    // Si nace de w2 o w4, cruza el eje X (width de la casa)
-    let fullDistance = 0;
-    if (parent.id === 'w1' || parent.id === 'w3') {
-      fullDistance = config.length - EXTERIOR_WALL_THICKNESS;
-    } else {
-      fullDistance = config.width - EXTERIOR_WALL_THICKNESS;
+    // Función para detectar intersecciones con todos los muros
+    const getIntersections = () => {
+      const points: number[] = [];
+      const allWalls = [...config.walls, ...config.internalWalls].filter(w => w.id !== editingInternalWall.id);
+      
+      allWalls.forEach(w => {
+        const wRad = (w.rotation * Math.PI) / 180;
+        const wDir = { x: Math.cos(wRad), z: -Math.sin(wRad) };
+        const wNormal = { x: -wDir.z, z: wDir.x };
+        
+        // Ecuación del muro: (P - P_wall) dot Normal = 0
+        // Ecuación del rayo: P = P_start + t * Dir
+        // t = ((P_wall - P_start) dot Normal) / (Dir dot Normal)
+        const pStart = calculateWallGlobalOrigin(editingInternalWall);
+        const pWall = calculateWallGlobalOrigin(w);
+        
+        const denom = (dir.x * wNormal.x + dir.z * wNormal.z);
+        if (Math.abs(denom) > 0.001) {
+          const t = ((pWall.x - pStart.x) * wNormal.x + (pWall.z - pStart.z) * wNormal.z) / denom;
+          if (t > 10) points.push(Math.round(t));
+        }
+      });
+      return Array.from(new Set(points)).sort((a, b) => a - b);
+    };
+
+    function calculateWallGlobalOrigin(wall: SteelWall | InternalWall): { x: number, z: number } {
+      if (!('parentWallId' in wall)) return { x: wall.x, z: wall.z };
+      const p = config.walls.find(w => w.id === wall.parentWallId) || config.internalWalls.find(iw => iw.id === wall.parentWallId);
+      if (!p) return { x: 0, z: 0 };
+      const origin = calculateWallGlobalOrigin(p);
+      const pRad = (p.rotation * Math.PI) / 180;
+      const offsetX = wall.xPosition * Math.cos(pRad);
+      const offsetZ = wall.xPosition * -Math.sin(pRad);
+      return { x: origin.x + offsetX, z: origin.z + offsetZ };
     }
 
-    setLocalIWData(prev => prev ? { ...prev, length: fullDistance.toString() } : null);
+    const intersections = getIntersections();
+    const nextContact = intersections.find(dist => dist > currentLen + 5);
+    const finalDist = nextContact || intersections[0] || currentLen;
+    setLocalIWData({ ...localIWData, length: finalDist.toString() });
   };
 
   const commitInternalWallChange = () => {
     if (!editingInternalWall || !localIWData) return;
     const updatedConfig = { ...config, internalWalls: config.internalWalls.map(iw => iw.id === editingInternalWall.id ? { ...iw, length: parseInt(localIWData.length) || 500, xPosition: parseInt(localIWData.xPosition) || 0 } : iw) };
-    setConfig(updatedConfig);
-    fetchAnalysis(updatedConfig);
-    setEditingInternalWall(null);
+    setConfig(updatedConfig); fetchAnalysis(updatedConfig); setEditingInternalWall(null);
   };
 
   const deleteInternalWall = () => {
     if (!editingInternalWall) return;
     const updatedConfig = { ...config, internalWalls: config.internalWalls.filter(iw => iw.id !== editingInternalWall.id) };
-    setConfig(updatedConfig);
-    fetchAnalysis(updatedConfig);
-    setEditingInternalWall(null);
+    setConfig(updatedConfig); fetchAnalysis(updatedConfig); setEditingInternalWall(null);
   };
 
   const handleFloorDoubleClick = (x: number, z: number) => {
     const candidates = config.internalWalls.filter(iw => iw.length < (config.width - 200));
-    if (candidates.length >= 2) {
-      setRoomGenerator({ x, z, p1: candidates[0], p2: candidates[1] });
-    }
+    if (candidates.length >= 2) setRoomGenerator({ x, z, p1: candidates[0], p2: candidates[1] });
   };
 
   const closeRoomWithNewWall = () => {
     if (!roomGenerator) return;
     const { p1, p2 } = roomGenerator;
     const dist = Math.abs(p1.xPosition - p2.xPosition);
-    const newWall: InternalWall = {
-      id: Math.random().toString(36).substr(2,9),
-      parentWallId: p1.id,
-      xPosition: p1.length,
-      length: dist,
-      height: config.globalWallHeight,
-      rotation: (p1.rotation + 90) % 360,
-      x: 0, z: 0, openings: []
-    };
+    const newWall: InternalWall = { id: Math.random().toString(36).substr(2,9), parentWallId: p1.id, xPosition: p1.length, length: dist, height: config.globalWallHeight, rotation: (p1.rotation + 90) % 360, x: 0, z: 0, openings: [] };
     const updatedConfig = { ...config, internalWalls: [...config.internalWalls, newWall] };
-    setConfig(updatedConfig);
-    fetchAnalysis(updatedConfig);
-    setRoomGenerator(null);
+    setConfig(updatedConfig); fetchAnalysis(updatedConfig); setRoomGenerator(null);
   };
 
   const createOpening = () => {
@@ -288,16 +285,13 @@ export default function SteelFramingPage() {
     const finalW = Math.min(newOpData.width, bounds.max - bounds.min);
     const finalP = Math.max(bounds.min, Math.min(addingOpening.x - finalW / 2, bounds.max - finalW));
     const newOp: SteelOpening = { id: Math.random().toString(36).substr(2, 9), type: newOpData.type, width: finalW, height: newOpData.height, position: finalP, sillHeight: newOpData.type === 'window' ? newOpData.sill : 0 };
-    
     let updatedConfig;
     if (addingOpening.isInternal) {
       updatedConfig = { ...config, internalWalls: config.internalWalls.map(iw => iw.id === wall.id ? { ...iw, openings: [...iw.openings, newOp] } : iw) };
     } else {
       updatedConfig = { ...config, walls: config.walls.map(w => w.id === wall.id ? { ...w, openings: [...w.openings, newOp] } : w) };
     }
-    setConfig(updatedConfig);
-    fetchAnalysis(updatedConfig);
-    setAddingOpening(null);
+    setConfig(updatedConfig); fetchAnalysis(updatedConfig); setAddingOpening(null);
   };
 
   return (
@@ -337,11 +331,7 @@ export default function SteelFramingPage() {
         </header>
 
         {isWalkModeActive && (
-          <Button 
-            variant="destructive" 
-            className="absolute top-4 right-4 z-[60] font-black uppercase text-[10px] shadow-2xl h-10 px-6 rounded-full border-4 border-white"
-            onClick={() => viewerRef.current?.exitWalkMode()}
-          >
+          <Button variant="destructive" className="absolute top-4 right-4 z-[60] font-black uppercase text-[10px] shadow-2xl h-10 px-6 rounded-full border-4 border-white" onClick={() => viewerRef.current?.exitWalkMode()}>
             <LogOut className="w-4 h-4 mr-2" /> Salir de Inspección
           </Button>
         )}
@@ -349,16 +339,7 @@ export default function SteelFramingPage() {
         <div className="flex-1 relative overflow-hidden">
           <Tabs value={activeTab} className="w-full h-full">
             <TabsContent value="3d" className="w-full h-full m-0 p-0 relative">
-              <SteelViewer 
-                ref={viewerRef}
-                config={config} 
-                structuralResult={structuralResult}
-                onOpeningDoubleClick={handleOpeningDoubleClick}
-                onInternalWallDoubleClick={handleInternalWallDoubleClick}
-                onWallDoubleClick={handleWallDoubleClick}
-                onFloorDoubleClick={handleFloorDoubleClick}
-                onWalkModeLock={(locked) => setIsWalkModeActive(locked)}
-              />
+              <SteelViewer ref={viewerRef} config={config} structuralResult={structuralResult} onOpeningDoubleClick={handleOpeningDoubleClick} onInternalWallDoubleClick={handleInternalWallDoubleClick} onWallDoubleClick={handleWallDoubleClick} onFloorDoubleClick={handleFloorDoubleClick} onWalkModeLock={(locked) => setIsWalkModeActive(locked)} />
               {isLoading && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border shadow-xl flex items-center gap-2 z-50">
                   <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -370,20 +351,6 @@ export default function SteelFramingPage() {
           </Tabs>
         </div>
 
-        <Dialog open={!!roomGenerator} onOpenChange={(open) => !open && setRoomGenerator(null)}>
-          <DialogContent className="sm:max-w-[400px]">
-            <DialogHeader>
-              <DialogTitle className="uppercase font-black text-primary flex items-center gap-2">
-                <LayoutTemplate className="w-5 h-5" /> Generar Ambiente
-              </DialogTitle>
-              <DialogDescription className="text-[10px] font-bold uppercase">Se han detectado tabiques paralelos libres. ¿Deseas unirlos para cerrar el recinto?</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={closeRoomWithNewWall} className="w-full bg-primary font-black uppercase text-xs h-11">Unir Tabiques y Cerrar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         <Dialog open={!!editingInternalWall} onOpenChange={(open) => !open && setEditingInternalWall(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader><DialogTitle className="uppercase font-black text-slate-900">Editar Tabique Interno</DialogTitle></DialogHeader>
@@ -392,7 +359,7 @@ export default function SteelFramingPage() {
                 <Label className="text-right text-[10px] font-black uppercase">Largo (mm)</Label>
                 <div className="col-span-3 flex gap-2">
                   <Input type="number" value={localIWData?.length || ''} onChange={(e) => setLocalIWData(prev => prev ? { ...prev, length: e.target.value } : null)} className="flex-1" />
-                  <Button variant="outline" size="icon" onClick={extendWallToContact} className="shrink-0 border-primary text-primary" title="Cerrar hasta pared opuesta">
+                  <Button variant="outline" size="icon" onClick={extendWallToContact} className="shrink-0 border-primary text-primary" title="Ciclar contacto con muros">
                     <ArrowRightToLine className="w-4 h-4" />
                   </Button>
                 </div>
@@ -426,9 +393,9 @@ export default function SteelFramingPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right text-[10px] font-black">Tipo</Label>
-                <Select value={newOpData.type} disabled={addingOpening?.isInternal} onValueChange={(v: any) => { const isDoor = v === 'door'; setNewOpeningData({ ...newOpData, type: v, height: isDoor ? 2050 : 1100, sill: isDoor ? 0 : DEFAULT_SILL }); }}>
+                <Select value={newOpData.type} onValueChange={(v: any) => { const isDoor = v === 'door'; setNewOpeningData({ ...newOpData, type: v, height: isDoor ? 2050 : 1100, sill: isDoor ? 0 : DEFAULT_SILL }); }}>
                   <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                  <SelectContent>{!addingOpening?.isInternal && <SelectItem value="window">Ventana</SelectItem>}<SelectItem value="door">Puerta</SelectItem></SelectContent>
+                  <SelectContent><SelectItem value="window">Ventana</SelectItem><SelectItem value="door">Puerta</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4"><Label className="text-right text-[10px] font-black">Ancho</Label><Input type="number" value={newOpData.width} onChange={(e) => setNewOpeningData({ ...newOpData, width: parseInt(e.target.value) || 0 })} className="col-span-3" /></div>
