@@ -26,13 +26,19 @@ import {
   ChevronLeft,
   Cpu,
   ArrowRightToLine,
-  Maximize2
+  Maximize2,
+  FileDown,
+  Map as MapIcon
 } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet as SheetUI, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import { PlanGenerator } from '@/modules/plan-generator/engine/PlanGenerator';
+import { PdfRenderer } from '@/modules/plan-generator/render/PdfRenderer';
 
 const EDGE_MARGIN_EXTERIOR = 400; 
 const EDGE_MARGIN_INTERNAL = 50; 
@@ -73,6 +79,7 @@ export default function SteelFramingPage() {
   const [materialEstimate, setMaterialEstimate] = useState<MaterialEstimate | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   const [selectedOpening, setSelectedOpening] = useState<{ wallId: string, opening: SteelOpening, isInternal?: boolean } | null>(null);
   const [localOpeningData, setLocalOpeningData] = useState<{ width: string, position: string } | null>(null);
@@ -219,9 +226,6 @@ export default function SteelFramingPage() {
         const wDir = { x: Math.cos(wRad), z: -Math.sin(wRad) };
         const wNormal = { x: -wDir.z, z: wDir.x };
         
-        // Ecuación del muro: (P - P_wall) dot Normal = 0
-        // Ecuación del rayo: P = P_start + t * Dir
-        // t = ((P_wall - P_start) dot Normal) / (Dir dot Normal)
         const pStart = calculateWallGlobalOrigin(editingInternalWall);
         const pWall = calculateWallGlobalOrigin(w);
         
@@ -268,15 +272,6 @@ export default function SteelFramingPage() {
     if (candidates.length >= 2) setRoomGenerator({ x, z, p1: candidates[0], p2: candidates[1] });
   };
 
-  const closeRoomWithNewWall = () => {
-    if (!roomGenerator) return;
-    const { p1, p2 } = roomGenerator;
-    const dist = Math.abs(p1.xPosition - p2.xPosition);
-    const newWall: InternalWall = { id: Math.random().toString(36).substr(2,9), parentWallId: p1.id, xPosition: p1.length, length: dist, height: config.globalWallHeight, rotation: (p1.rotation + 90) % 360, x: 0, z: 0, openings: [] };
-    const updatedConfig = { ...config, internalWalls: [...config.internalWalls, newWall] };
-    setConfig(updatedConfig); fetchAnalysis(updatedConfig); setRoomGenerator(null);
-  };
-
   const createOpening = () => {
     if (!addingOpening) return;
     const wall = addingOpening.isInternal ? config.internalWalls.find(iw => iw.id === addingOpening.wallId) : config.walls.find(w => w.id === addingOpening.wallId);
@@ -294,6 +289,66 @@ export default function SteelFramingPage() {
     setConfig(updatedConfig); fetchAnalysis(updatedConfig); setAddingOpening(null);
   };
 
+  const exportMaterialsPDF = () => {
+    if (!materialEstimate) return;
+    const doc = new jsPDF();
+    const BRAND_COLOR = [13, 110, 253];
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+    doc.text("JADSI INDUSTRIAL", 105, 30, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.setTextColor(80, 80, 80);
+    doc.text("Listado de Materiales - Steel Framing (AISI)", 105, 40, { align: 'center' });
+    
+    doc.setDrawColor(BRAND_COLOR[0], BRAND_COLOR[1], BRAND_COLOR[2]);
+    doc.line(20, 45, 190, 45);
+
+    const stats = [
+      ["Peso Acero Total", `${materialEstimate.totalSteelWeightKg} KG`],
+      ["Dimensiones Proyecto", `${config.width} x ${config.length} mm`],
+      ["Altura Global", `${config.globalWallHeight} mm`],
+      ["Fecha", new Date().toLocaleDateString()]
+    ];
+
+    (doc as any).autoTable({
+      head: [['Parámetro', 'Valor']],
+      body: stats,
+      startY: 55,
+      theme: 'grid',
+      styles: { fontSize: 9 }
+    });
+
+    const rows = materialEstimate.items.map(i => [
+      i.name, i.category.toUpperCase(), i.quantity.toLocaleString(), i.unit.toUpperCase(), i.description
+    ]);
+
+    (doc as any).autoTable({
+      head: [['Material', 'Categoría', 'Cant.', 'Unid.', 'Descripción']],
+      body: rows,
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      headStyles: { fillColor: BRAND_COLOR },
+      styles: { fontSize: 8 }
+    });
+
+    doc.save(`Materiales-JADSI-${Date.now()}.pdf`);
+  };
+
+  const exportTechnicalPlans = async () => {
+    setIsExporting(true);
+    try {
+      const sheets = PlanGenerator.generateAll(config, 'PROYECTO JADSI');
+      const doc = await PdfRenderer.generate(sheets, 'PROYECTO JADSI');
+      doc.save(`Legajo-JADSI-${Date.now()}.pdf`);
+    } catch (e) {
+      console.error("Error exporting plans:", e);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-100">
       <aside className={`hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0 z-40 transition-all ${isWalkModeActive ? '-ml-80' : ''}`}>
@@ -308,10 +363,10 @@ export default function SteelFramingPage() {
                 <ChevronLeft className="w-5 h-5" />
               </Link>
             </Button>
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetUI open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild><Button variant="ghost" size="icon" className="md:hidden"><Menu className="w-5 h-5" /></Button></SheetTrigger>
               <SheetContent side="left" className="p-0 w-80"><SteelControlPanel config={config} onConfigChange={setConfig} structuralAlerts={structuralAlerts} /></SheetContent>
-            </Sheet>
+            </SheetUI>
             <div className="flex items-center gap-1.5">
               <div className="bg-primary p-1 rounded">
                 <Cpu className="w-3.5 h-3.5 text-white" />
@@ -347,7 +402,20 @@ export default function SteelFramingPage() {
                 </div>
               )}
             </TabsContent>
-            <TabsContent value="materials" className="w-full h-full m-0 bg-slate-50 overflow-y-auto p-4 md:p-8"><div className="max-w-4xl mx-auto"><SteelMaterialsTable estimate={materialEstimate} /></div></TabsContent>
+            <TabsContent value="materials" className="w-full h-full m-0 bg-slate-50 overflow-y-auto p-4 md:p-8">
+              <div className="max-w-4xl mx-auto space-y-6">
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" size="sm" className="h-9 px-4 text-[10px] font-black uppercase gap-2 border-primary text-primary" onClick={exportMaterialsPDF}>
+                    <FileDown className="w-4 h-4" /> Exportar Materiales
+                  </Button>
+                  <Button variant="default" size="sm" className="h-9 px-4 text-[10px] font-black uppercase gap-2 bg-primary hover:bg-primary/90" onClick={exportTechnicalPlans} disabled={isExporting}>
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
+                    Descargar Legajo Técnico
+                  </Button>
+                </div>
+                <SteelMaterialsTable estimate={materialEstimate} />
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
 
