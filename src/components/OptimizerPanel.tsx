@@ -33,7 +33,8 @@ import {
   ArrowRightToLine,
   PackageCheck,
   Scissors,
-  FileCode
+  FileCode,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -41,6 +42,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+import Image from 'next/image';
 
 interface OptimizerPanelProps {
   parts: Part[];
@@ -83,20 +85,6 @@ const FURNITURE_PRESETS = [
       { name: "Lat. Cajón", width: 450, height: 140, quantity: 4, grainDirection: 'vertical' },
       { name: "Fdo/Cont. Cajón", width: 508, height: 140, quantity: 4, grainDirection: 'horizontal' },
     ]
-  },
-  {
-    id: 'test-dataset',
-    name: "Dataset Mesopotamia (XML Industrial)",
-    parts: [
-      { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-      { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
-      { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'libre' },
-      { name: "(4) Piso/Techo", width: 500, height: 582, quantity: 2, grainDirection: 'libre' },
-      { name: "(5) Piso/Techo", width: 500, height: 562, quantity: 1, grainDirection: 'libre' },
-      { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-      { name: "(7) Amarre", width: 463, height: 150, quantity: 3, grainDirection: 'libre' },
-      { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-    ]
   }
 ];
 
@@ -109,6 +97,9 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [targetThickness, setTargetThickness] = useState<number>(18);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Top 6 panels for visual selection
+  const topPanels = AVAILABLE_PANELS.slice(0, 6);
 
   useEffect(() => {
     const woodParts = initialParts.filter(p => !p.isHardware);
@@ -126,7 +117,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
       }, {} as Record<string, any>);
       setLocalCutlist(Object.values(aggregated));
     }
-    // Se ha eliminado la carga automática del dataset por defecto
   }, [initialParts]);
 
   const updatePart = (index: number, field: string, value: any) => {
@@ -272,6 +262,43 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   return (
     <div className="flex-1 w-full bg-slate-50 overflow-y-auto">
       <div className="flex flex-col gap-6 p-4 md:p-8 max-w-7xl mx-auto pb-40">
+        
+        {/* Visual Panel Selector (Top 6) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {topPanels.map((panel, idx) => (
+            <button
+              key={panel.id}
+              onClick={() => onPanelChange(panel)}
+              className={`group relative flex flex-col items-start p-2 bg-white rounded-xl border-2 transition-all hover:shadow-lg ${selectedPanel.id === panel.id ? 'border-primary ring-4 ring-primary/10' : 'border-slate-100'}`}
+            >
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden mb-2 bg-slate-100">
+                <Image 
+                  src={`https://picsum.photos/seed/${idx + 10}/200/200`} 
+                  alt={panel.name}
+                  fill
+                  className="object-cover group-hover:scale-110 transition-transform duration-500"
+                  data-ai-hint="wood texture"
+                />
+                {selectedPanel.id === panel.id && (
+                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                    <PackageCheck className="w-8 h-8 text-white drop-shadow-md" />
+                  </div>
+                )}
+              </div>
+              <div className="w-full text-left">
+                <p className="text-[10px] font-black text-slate-900 truncate uppercase leading-tight">{panel.name.replace('MDF FAPLAC ', '')}</p>
+                <p className="text-[8px] font-bold text-slate-400 mt-0.5">{panel.width}x{panel.height}mm</p>
+                <div className="mt-1 flex items-center gap-1">
+                  <Badge variant="outline" className={`text-[7px] h-3.5 px-1 font-bold ${panel.hasGrain ? 'text-amber-600 border-amber-200 bg-amber-50' : 'text-slate-500 border-slate-200'}`}>
+                    {panel.hasGrain ? 'VETA' : 'LISO'}
+                  </Badge>
+                  <span className="text-[8px] font-black text-primary">{panel.thickness}mm</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
             <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
@@ -286,13 +313,13 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
             <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Material Industrial</Label>
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Material Industrial Activo</Label>
                   <Button variant="outline" className="w-full justify-between h-14 bg-slate-50 border-slate-200 group hover:border-primary transition-all" onClick={() => setIsModalOpen(true)}>
                     <div className="text-left">
-                      <div className="text-[10px] font-black text-primary uppercase">{selectedPanel.name}</div>
+                      <div className="text-[10px] font-black text-primary uppercase truncate max-w-[200px]">{selectedPanel.name}</div>
                       <div className="text-[9px] text-slate-400 font-bold uppercase">{selectedPanel.width}x{selectedPanel.height}mm — {selectedPanel.thickness}mm</div>
                     </div>
-                    <Maximize className="w-3.5 h-3.5 text-slate-300" />
+                    <Database className="w-3.5 h-3.5 text-slate-300" />
                   </Button>
                 </div>
                 <div className="space-y-2">
@@ -410,7 +437,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
         <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 uppercase font-black text-slate-900">
-              <Database className="w-5 h-5 text-primary" /> Seleccionar Material Industrial
+              <Database className="w-5 h-5 text-primary" /> Catálogo de Materiales Industriales
             </DialogTitle>
           </DialogHeader>
           <div className="relative mt-4">
