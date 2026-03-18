@@ -85,7 +85,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [currentPage, setCurrentPage] = useState(0);
   const panelsPerPage = 6;
 
-  // Filtrado y paginación de paneles
+  // Filtrado y paginación de paneles industriales
   const filteredPanels = AVAILABLE_PANELS.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -288,7 +288,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
                       data-ai-hint="wood texture"
-                      onError={(e: any) => { e.target.src = "https://placehold.co/200x200?text=SIN+TEXTURA"; }}
+                      onError={(e: any) => { (e.target as any).src = "https://placehold.co/200x200?text=SIN+TEXTURA"; }}
                     />
                     {selectedPanel.id === panel.id && (
                       <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
