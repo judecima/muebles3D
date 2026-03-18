@@ -3,41 +3,27 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult, OptimizedPanel, OptimizedPart } from '@/lib/types';
+import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Loader2, 
   LayoutGrid, 
-  AlertTriangle, 
-  ChevronDown, 
-  ChevronUp, 
   Ruler, 
   FileDown, 
   ZoomIn, 
   ZoomOut, 
-  Info, 
-  List, 
   Cpu, 
-  Plus, 
   Search, 
   ChevronLeft, 
   ChevronRight,
-  Maximize,
   Trash2,
   Database,
-  RotateCcw,
-  ArrowDownToLine,
   ArrowRightToLine,
   PackageCheck,
-  Scissors,
-  FileCode,
-  Image as ImageIcon
+  FileCode
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { jsPDF } from 'jspdf';
@@ -95,22 +81,29 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [localCutlist, setLocalCutlist] = useState<any[]>([]);
   const [zoom, setZoom] = useState(1);
   const [targetThickness, setTargetThickness] = useState<number>(18);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(0);
+  const panelsPerPage = 6;
 
-  // Top 6 panels for visual selection
-  const topPanels = AVAILABLE_PANELS.slice(0, 6);
+  // Filtrado y paginación de paneles
+  const filteredPanels = AVAILABLE_PANELS.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const totalPages = Math.ceil(filteredPanels.length / panelsPerPage);
+  const currentPanels = filteredPanels.slice(currentPage * panelsPerPage, (currentPage + 1) * panelsPerPage);
 
   useEffect(() => {
-    const woodParts = initialParts.filter(p => !p.isHardware);
-    if (woodParts.length > 0) {
+    // La lista inicia vacía por defecto hasta que se cargue un preset o piezas manuales
+    if (initialParts.length > 0) {
+      const woodParts = initialParts.filter(p => !p.isHardware);
       const aggregated = woodParts.reduce((acc, part) => {
         const l = Math.round(part.cutLargo);
         const a = Math.round(part.cutAncho);
         const e = Math.round(part.cutEspesor);
         const key = `${part.name}-${l}-${a}-${e}-${part.grainDirection}`;
         if (!acc[key]) {
-          acc[key] = { name: part.name, width: l, height: a, quantity: 0, grainDirection: 'libre', thickness: e };
+          acc[key] = { name: part.name, width: l, height: a, quantity: 0, grainDirection: part.grainDirection, thickness: e };
         }
         acc[key].quantity += 1;
         return acc;
@@ -263,69 +256,120 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
     <div className="flex-1 w-full bg-slate-50 overflow-y-auto">
       <div className="flex flex-col gap-6 p-4 md:p-8 max-w-7xl mx-auto pb-40">
         
-        {/* Visual Panel Selector (Top 6) */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {topPanels.map((panel, idx) => (
-            <button
-              key={panel.id}
-              onClick={() => onPanelChange(panel)}
-              className={`group relative flex flex-col items-start p-2 bg-white rounded-xl border-2 transition-all hover:shadow-lg ${selectedPanel.id === panel.id ? 'border-primary ring-4 ring-primary/10' : 'border-slate-100'}`}
-            >
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden mb-2 bg-slate-100">
-                <Image 
-                  src={`https://picsum.photos/seed/${idx + 10}/200/200`} 
-                  alt={panel.name}
-                  fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  data-ai-hint="wood texture"
-                />
-                {selectedPanel.id === panel.id && (
-                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                    <PackageCheck className="w-8 h-8 text-white drop-shadow-md" />
+        {/* Card de Selección de Paneles Paginado */}
+        <Card className="border-none shadow-xl shadow-slate-200/50 bg-white overflow-hidden">
+          <CardHeader className="bg-slate-900 text-white p-4 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-primary" />
+              <CardTitle className="text-sm font-black uppercase tracking-widest">Catálogo Industrial Activo</CardTitle>
+            </div>
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Input 
+                placeholder="Buscar material..." 
+                className="h-8 pl-8 bg-white/10 border-white/20 text-xs text-white placeholder:text-slate-500 focus-visible:ring-primary"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {currentPanels.map((panel) => (
+                <button
+                  key={panel.id}
+                  onClick={() => onPanelChange(panel)}
+                  className={`group relative flex flex-col items-start p-2 bg-white rounded-xl border-2 transition-all hover:shadow-lg ${selectedPanel.id === panel.id ? 'border-primary ring-4 ring-primary/10' : 'border-slate-100'}`}
+                >
+                  <div className="relative w-full aspect-square rounded-lg overflow-hidden mb-2 bg-slate-100 border border-slate-100">
+                    <Image 
+                      src={`https://optionline-prod-files.s3.amazonaws.com/textures/${panel.idEmpresa}/${panel.idTextura}.jpg`}
+                      alt={panel.name}
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      data-ai-hint="wood texture"
+                      onError={(e: any) => { e.target.src = "https://placehold.co/200x200?text=SIN+TEXTURA"; }}
+                    />
+                    {selectedPanel.id === panel.id && (
+                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                        <PackageCheck className="w-8 h-8 text-white drop-shadow-md" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="w-full text-left">
-                <p className="text-[10px] font-black text-slate-900 truncate uppercase leading-tight">{panel.name.replace('MDF FAPLAC ', '')}</p>
-                <p className="text-[8px] font-bold text-slate-400 mt-0.5">{panel.width}x{panel.height}mm</p>
-                <div className="mt-1 flex items-center gap-1">
-                  <Badge variant="outline" className={`text-[7px] h-3.5 px-1 font-bold ${panel.hasGrain ? 'text-amber-600 border-amber-200 bg-amber-50' : 'text-slate-500 border-slate-200'}`}>
-                    {panel.hasGrain ? 'VETA' : 'LISO'}
-                  </Badge>
-                  <span className="text-[8px] font-black text-primary">{panel.thickness}mm</span>
+                  <div className="w-full text-left">
+                    <p className="text-[9px] font-black text-slate-900 truncate uppercase leading-tight">{panel.name.replace('MDF FAPLAC ', '')}</p>
+                    <p className="text-[8px] font-bold text-slate-400 mt-0.5">{panel.width}x{panel.height}mm</p>
+                    <div className="mt-1 flex items-center gap-1">
+                      <Badge variant="outline" className={`text-[7px] h-3.5 px-1 font-bold ${panel.hasGrain ? 'text-amber-600 border-amber-200 bg-amber-50' : 'text-slate-500 border-slate-200'}`}>
+                        {panel.hasGrain ? 'VETA' : 'LISO'}
+                      </Badge>
+                      <span className="text-[8px] font-black text-primary">{panel.thickness}mm</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            {/* Controles de Paginación */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mostrando {currentPanels.length} de {filteredPanels.length} materiales</span>
+              <div className="flex gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8" 
+                  disabled={currentPage === 0} 
+                  onClick={() => setCurrentPage(p => p - 1)}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center px-3 text-[10px] font-black text-primary">
+                  PÁGINA {currentPage + 1} / {totalPages || 1}
                 </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8" 
+                  disabled={currentPage >= totalPages - 1} 
+                  onClick={() => setCurrentPage(p => p + 1)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
               </div>
-            </button>
-          ))}
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 shadow-sm border-slate-200 bg-white">
-            <CardHeader className="p-4 bg-slate-900 text-white rounded-t-lg flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" /> JADSI INDUSTRIAL v38.0
+            <CardHeader className="p-4 bg-slate-100 border-b flex flex-row items-center justify-between">
+              <CardTitle className="text-xs font-black uppercase flex items-center gap-2 text-slate-600">
+                <Cpu className="w-4 h-4 text-primary" /> Motor JADSI v38.0 Stock Ready
               </CardTitle>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-white" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><ZoomIn className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-7 w-7 bg-white" onClick={() => setZoom(z => Math.max(0.4, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" className="h-7 w-7 bg-white" onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}><ZoomIn className="w-4 h-4" /></Button>
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Material Industrial Activo</Label>
-                  <Button variant="outline" className="w-full justify-between h-14 bg-slate-50 border-slate-200 group hover:border-primary transition-all" onClick={() => setIsModalOpen(true)}>
-                    <div className="text-left">
-                      <div className="text-[10px] font-black text-primary uppercase truncate max-w-[200px]">{selectedPanel.name}</div>
-                      <div className="text-[9px] text-slate-400 font-bold uppercase">{selectedPanel.width}x{selectedPanel.height}mm — {selectedPanel.thickness}mm</div>
-                    </div>
-                    <Database className="w-3.5 h-3.5 text-slate-300" />
-                  </Button>
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Espesor de Trabajo (mm)</Label>
+                  <Select value={targetThickness.toString()} onValueChange={(v) => { setTargetThickness(parseInt(v)); setResult(null); }}>
+                    <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[3, 5.5, 12, 15, 18, 25].map(t => (
+                        <SelectItem key={t} value={t.toString()}>{t} mm</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold text-slate-500 uppercase">Cargar Dataset de Muebles</Label>
                   <Select onValueChange={loadPreset}>
-                    <SelectTrigger className="h-14 bg-slate-50 border-slate-200">
+                    <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
                       <SelectValue placeholder="Seleccionar mueble..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -339,7 +383,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
 
               <div className="flex gap-2">
                 <Button className="flex-1 font-black uppercase text-xs bg-primary text-white h-11" onClick={handleOptimize} disabled={loading || localCutlist.length === 0}>
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Optimización v38.0 Stock Ready'}
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Ejecutar Optimización v38.0'}
                 </Button>
                 {result && (
                   <>
@@ -432,54 +476,6 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           </div>
         )}
       </div>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 uppercase font-black text-slate-900">
-              <Database className="w-5 h-5 text-primary" /> Catálogo de Materiales Industriales
-            </DialogTitle>
-          </DialogHeader>
-          <div className="relative mt-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input 
-              placeholder="Buscar por nombre, veta o espesor..." 
-              className="pl-10 h-11"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <ScrollArea className="flex-1 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-1">
-              {AVAILABLE_PANELS.filter(p => 
-                p.name.toLowerCase().includes(searchTerm.toLowerCase())
-              ).map(panel => (
-                <Button 
-                  key={panel.id} 
-                  variant="outline" 
-                  className={`h-auto p-4 flex flex-col items-start gap-1 text-left hover:border-primary transition-all ${selectedPanel.id === panel.id ? 'border-primary bg-primary/5' : ''}`}
-                  onClick={() => {
-                    onPanelChange(panel);
-                    setIsModalOpen(false);
-                  }}
-                >
-                  <div className="text-[10px] font-black text-primary uppercase">{panel.name}</div>
-                  <div className="text-[9px] text-slate-500 font-bold uppercase">
-                    {panel.width} x {panel.height} mm — {panel.thickness} mm
-                  </div>
-                  <div className="flex gap-2 mt-1">
-                    {panel.hasGrain ? (
-                      <Badge variant="secondary" className="text-[8px] h-4 bg-amber-50 text-amber-700 border-amber-100">CON VETA</Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-[8px] h-4 bg-slate-100 text-slate-600 border-slate-200">LISO</Badge>
-                    )}
-                  </div>
-                </Button>
-              ))}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
