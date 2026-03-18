@@ -7,7 +7,7 @@ import { Part, AVAILABLE_PANELS, PanelSize, OptimizationResult, OptimizedPanel, 
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Loader2, 
   LayoutGrid, 
@@ -36,13 +36,11 @@ import {
   FileCode
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import Image from 'next/image';
 
 interface OptimizerPanelProps {
   parts: Part[];
@@ -52,8 +50,43 @@ interface OptimizerPanelProps {
 
 const FURNITURE_PRESETS = [
   {
+    id: 'bajo-mesada',
+    name: "Bajo Mesada Estándar (1.20m)",
+    parts: [
+      { name: "Lateral Izquierdo", width: 720, height: 580, quantity: 1, grainDirection: 'vertical' },
+      { name: "Lateral Derecho", width: 720, height: 580, quantity: 1, grainDirection: 'vertical' },
+      { name: "Piso", width: 1164, height: 580, quantity: 1, grainDirection: 'horizontal' },
+      { name: "Estante", width: 1163, height: 550, quantity: 1, grainDirection: 'horizontal' },
+      { name: "Amarre Frontal", width: 1164, height: 100, quantity: 1, grainDirection: 'horizontal' },
+      { name: "Amarre Trasero", width: 1164, height: 100, quantity: 1, grainDirection: 'horizontal' },
+      { name: "Puerta", width: 597, height: 715, quantity: 2, grainDirection: 'vertical' },
+    ]
+  },
+  {
+    id: 'alacena',
+    name: "Alacena Superior (0.80m)",
+    parts: [
+      { name: "Lateral Izq/Der", width: 600, height: 300, quantity: 2, grainDirection: 'vertical' },
+      { name: "Techo/Piso", width: 764, height: 300, quantity: 2, grainDirection: 'horizontal' },
+      { name: "Estante", width: 763, height: 280, quantity: 1, grainDirection: 'horizontal' },
+      { name: "Puerta", width: 397, height: 595, quantity: 2, grainDirection: 'vertical' },
+    ]
+  },
+  {
+    id: 'placard-mod',
+    name: "Módulo Placard (2 Cajones)",
+    parts: [
+      { name: "Lateral", width: 2100, height: 550, quantity: 2, grainDirection: 'vertical' },
+      { name: "Techo/Piso", width: 564, height: 550, quantity: 2, grainDirection: 'horizontal' },
+      { name: "Divisor", width: 564, height: 550, quantity: 1, grainDirection: 'horizontal' },
+      { name: "Frente Cajón", width: 560, height: 200, quantity: 2, grainDirection: 'horizontal' },
+      { name: "Lat. Cajón", width: 450, height: 140, quantity: 4, grainDirection: 'vertical' },
+      { name: "Fdo/Cont. Cajón", width: 508, height: 140, quantity: 4, grainDirection: 'horizontal' },
+    ]
+  },
+  {
     id: 'test-dataset',
-    name: "Dataset Mesopotamia (73 Piezas)",
+    name: "Dataset Mesopotamia (XML Industrial)",
     parts: [
       { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
       { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
@@ -63,29 +96,6 @@ const FURNITURE_PRESETS = [
       { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
       { name: "(7) Amarre", width: 463, height: 150, quantity: 3, grainDirection: 'libre' },
       { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'libre' },
-      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "(22) Contrafrente v1 v2 caj", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "(24) Taco Pieza 2", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'libre' }
     ]
   }
 ];
@@ -95,15 +105,10 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [localCutlist, setLocalCutlist] = useState<any[]>([]);
-  const [isPartsListOpen, setIsPartsListOpen] = useState(true);
-  const [isDetailedListOpen, setIsDetailedListOpen] = useState(false);
-  const [isStockOpen, setIsStockOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [targetThickness, setTargetThickness] = useState<number>(18);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 6;
 
   useEffect(() => {
     const woodParts = initialParts.filter(p => !p.isHardware);
@@ -120,9 +125,8 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
         return acc;
       }, {} as Record<string, any>);
       setLocalCutlist(Object.values(aggregated));
-    } else if (localCutlist.length === 0) {
-      loadPreset('test-dataset');
     }
+    // Se ha eliminado la carga automática del dataset por defecto
   }, [initialParts]);
 
   const updatePart = (index: number, field: string, value: any) => {
@@ -145,6 +149,7 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
   };
 
   const handleOptimize = async () => {
+    if (localCutlist.length === 0) return;
     setLoading(true);
     setError(null);
     try {
@@ -291,20 +296,22 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Cargar Dataset</Label>
+                  <Label className="text-[10px] font-bold text-slate-500 uppercase">Cargar Dataset de Muebles</Label>
                   <Select onValueChange={loadPreset}>
                     <SelectTrigger className="h-14 bg-slate-50 border-slate-200">
-                      <SelectValue placeholder="Seleccionar..." />
+                      <SelectValue placeholder="Seleccionar mueble..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {FURNITURE_PRESETS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      {FURNITURE_PRESETS.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div className="flex gap-2">
-                <Button className="flex-1 font-black uppercase text-xs bg-primary text-white h-11" onClick={handleOptimize} disabled={loading}>
+                <Button className="flex-1 font-black uppercase text-xs bg-primary text-white h-11" onClick={handleOptimize} disabled={loading || localCutlist.length === 0}>
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Optimización v38.0 Stock Ready'}
                 </Button>
                 {result && (
@@ -318,15 +325,19 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
               <div className="border rounded-xl p-4 bg-slate-50">
                 <h4 className="text-[10px] font-black uppercase text-slate-500 mb-4 flex items-center gap-2"><Ruler className="w-3.5 h-3.5" /> Lista de Piezas ({localCutlist.length})</h4>
                 <div className="space-y-2 max-h-[300px] overflow-auto">
-                  {localCutlist.map((part, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded-lg border">
-                      <div className="col-span-4 text-[10px] font-bold truncate">{part.name}</div>
-                      <div className="col-span-2 text-center text-[10px] font-mono">{part.width}</div>
-                      <div className="col-span-2 text-center text-[10px] font-mono">{part.height}</div>
-                      <div className="col-span-2 text-center text-[10px] font-black text-primary">x{part.quantity}</div>
-                      <Button variant="ghost" size="icon" className="col-span-2 h-7 w-7 text-slate-300 hover:text-red-500" onClick={() => removePart(idx)}><Trash2 className="w-3 h-3" /></Button>
-                    </div>
-                  ))}
+                  {localCutlist.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs italic">La lista está vacía. Carga un mueble para comenzar.</div>
+                  ) : (
+                    localCutlist.map((part, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded-lg border">
+                        <div className="col-span-4 text-[10px] font-bold truncate">{part.name}</div>
+                        <div className="col-span-2 text-center text-[10px] font-mono">{part.width}</div>
+                        <div className="col-span-2 text-center text-[10px] font-mono">{part.height}</div>
+                        <div className="col-span-2 text-center text-[10px] font-black text-primary">x{part.quantity}</div>
+                        <Button variant="ghost" size="icon" className="col-span-2 h-7 w-7 text-slate-300 hover:text-red-500" onClick={() => removePart(idx)}><Trash2 className="w-3 h-3" /></Button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -394,6 +405,54 @@ export function OptimizerPanel({ parts: initialParts, selectedPanel, onPanelChan
           </div>
         )}
       </div>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 uppercase font-black text-slate-900">
+              <Database className="w-5 h-5 text-primary" /> Seleccionar Material Industrial
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative mt-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input 
+              placeholder="Buscar por nombre, veta o espesor..." 
+              className="pl-10 h-11"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <ScrollArea className="flex-1 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-1">
+              {AVAILABLE_PANELS.filter(p => 
+                p.name.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map(panel => (
+                <Button 
+                  key={panel.id} 
+                  variant="outline" 
+                  className={`h-auto p-4 flex flex-col items-start gap-1 text-left hover:border-primary transition-all ${selectedPanel.id === panel.id ? 'border-primary bg-primary/5' : ''}`}
+                  onClick={() => {
+                    onPanelChange(panel);
+                    setIsModalOpen(false);
+                  }}
+                >
+                  <div className="text-[10px] font-black text-primary uppercase">{panel.name}</div>
+                  <div className="text-[9px] text-slate-500 font-bold uppercase">
+                    {panel.width} x {panel.height} mm — {panel.thickness} mm
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    {panel.hasGrain ? (
+                      <Badge variant="secondary" className="text-[8px] h-4 bg-amber-50 text-amber-700 border-amber-100">CON VETA</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[8px] h-4 bg-slate-100 text-slate-600 border-slate-200">LISO</Badge>
+                    )}
+                  </div>
+                </Button>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

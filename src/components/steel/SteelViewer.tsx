@@ -36,13 +36,24 @@ export const SteelViewer = forwardRef(({
         setIsWalkMode(true);
       }
     },
-    exitWalkMode: () => {
+    /* exitWalkMode: () => {
       if (managerRef.current) {
         managerRef.current.exitWalkMode();
         setIsWalkMode(false);
       }
-    }
+    } */
   }));
+
+  const prevConfigRef = useRef<SteelHouseConfig | null>(null);
+
+  useEffect(() => {
+    if (!managerRef.current || !structuralResult) return;
+
+    if (prevConfigRef.current !== config) {
+      managerRef.current.buildHouse(config, structuralResult);
+      prevConfigRef.current = config;
+    }
+  }, [config, structuralResult]);
 
   useEffect(() => {
     if (containerRef.current && !managerRef.current) {
@@ -58,23 +69,32 @@ export const SteelViewer = forwardRef(({
   }, []);
 
   useEffect(() => {
-    if (managerRef.current) {
-      managerRef.current.onOpeningDoubleClick = onOpeningDoubleClick || null;
-      managerRef.current.onWallDoubleClick = onWallDoubleClick || null;
-      managerRef.current.onInternalWallDoubleClick = onInternalWallDoubleClick || null;
-      managerRef.current.onFloorDoubleClick = onFloorDoubleClick || null;
-      managerRef.current.onWalkModeLock = (locked) => {
-        setIsWalkMode(locked);
-        if (onWalkModeLock) onWalkModeLock(locked);
-      };
-    }
-  }, [onOpeningDoubleClick, onWallDoubleClick, onInternalWallDoubleClick, onFloorDoubleClick, onWalkModeLock]);
+    const manager = managerRef.current;
+    if (!manager) return;
+  
+    manager.onOpeningDoubleClick = onOpeningDoubleClick || null;
+    manager.onWallDoubleClick = onWallDoubleClick || null;
+    manager.onInternalWallDoubleClick = onInternalWallDoubleClick || null;
+    manager.onFloorDoubleClick = onFloorDoubleClick || null;
+  
+    manager.onWalkModeLock = (locked) => {
+      setIsWalkMode(locked);
+      onWalkModeLock?.(locked);
+    };
+  }, [
+    onOpeningDoubleClick,
+    onWallDoubleClick,
+    onInternalWallDoubleClick,
+    onFloorDoubleClick,
+    onWalkModeLock
+  ]);
 
   useEffect(() => {
-    if (managerRef.current && structuralResult) {
-      managerRef.current.buildHouse(config, structuralResult);
-    }
-  }, [config, structuralResult]);
+    if (!managerRef.current || !structuralResult) return;
+  
+    managerRef.current.buildHouse(config, structuralResult);
+  
+  }, [structuralResult]);
 
   return (
     <div className="w-full h-full relative">

@@ -293,7 +293,17 @@ export class SteelSceneManager {
       if (fusion !== 'left') structuralGroup.add(this.createProfile(headerBottom - this.profileFlange, op.position - this.profileFlange, this.profileFlange, 90, 'PGC', this.colors.jack));
       if (fusion !== 'right') structuralGroup.add(this.createProfile(headerBottom - this.profileFlange, op.position + op.width, this.profileFlange, 90, 'PGC', this.colors.jack));
 
-      if (analysis.type === 'truss') this.drawTrussHeader(structuralGroup, op.position, headerBottom, op.width, headerHeight, this.profileWidth);
+      if (analysis.type === 'truss') {
+        this.drawTrussHeader(
+          structuralGroup,
+          op.position,
+          headerBottom,
+          op.width,
+          headerHeight,
+          this.profileWidth,
+          analysis.trussData // 👈 CLAVE
+        );
+      }
       else {
         const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
         structuralGroup.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, this.profileWidth, headerHeight));
@@ -406,21 +416,89 @@ export class SteelSceneManager {
     return new THREE.Vector3();
   }
 
-  private drawTrussHeader(group: THREE.Group, x: number, y: number, w: number, h: number, thickness: number) {
-    const chordHeight = this.profileFlange; const webOffset = chordHeight;
-    group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    group.add(this.createProfile(w, x, y + h - chordHeight, 0, 'PGC', this.colors.header_truss, 0, thickness));
-    const moduleSize = 400; const numModules = Math.max(1, Math.ceil(w / moduleSize)); const step = w / numModules;
+  private drawTrussHeader(
+    group: THREE.Group,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    thickness: number,
+    trussData?: any // 👈 NUEVO
+  ) {
+    const chordHeight = this.profileFlange;
+  
+    // 🔥 cordones
+    const isDouble = trussData?.chordThickness > 1.5;
+
+    const offset = isDouble ? 10 : 0;
+
+    // inferior
+    group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, -offset, thickness));
+    if (isDouble) {
+      group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, offset, thickness));
+    }
+
+    // superior
+    group.add(this.createProfile(w, x, y + h - chordHeight, 0, 'PGC', this.colors.header_truss, -offset, thickness));
+    if (isDouble) {
+      group.add(this.createProfile(w, x, y + h - chordHeight, 0, 'PGC', this.colors.header_truss, offset, thickness));
+    }
+    if (!trussData) return;
+  
+    const { panelWidth, numDiagonals, diagonalAngle } = trussData;
     const webHeight = h - chordHeight * 2;
-    for (let i = 1; i < numModules; i++) {
-      const posX = x + i * step;
-      group.add(this.createProfile(webHeight, posX, y + webOffset, 90, 'PGC', this.colors.header_truss, 0, thickness));
-      const prevX = x + (i - 1) * step; const diagLen = Math.sqrt(step * step + webHeight * webHeight); const angle = Math.atan2(webHeight, step);
+  
+    for (let i = 0; i < numDiagonals; i++) {
+      const xStart = x + i * panelWidth;
+      const xEnd = xStart + panelWidth;
+  
+      // 🔥 vertical (nodo SIEMPRE)
+      group.add(
+        this.createProfile(
+          webHeight,
+          xStart,
+          y + chordHeight,
+          90,
+          'PGC',
+          this.colors.header_truss,
+          0,
+          thickness
+        )
+      );
+  
+      // 🔥 diagonal real
+      const diagLen = Math.sqrt(panelWidth ** 2 + webHeight ** 2);
+  
       const diagGeom = new THREE.BoxGeometry(diagLen, 15, thickness - 10);
-      const diag = new THREE.Mesh(diagGeom, new THREE.MeshStandardMaterial({ color: this.colors.header_truss, metalness: 0.8 }));
-      diag.position.set(prevX + step / 2, y + webOffset + webHeight / 2, 0); diag.rotation.z = (i % 2 === 0) ? angle : -angle;
+      const diag = new THREE.Mesh(
+        diagGeom,
+        new THREE.MeshStandardMaterial({ color: this.colors.header_truss })
+      );
+  
+      diag.position.set(
+        xStart + panelWidth / 2,
+        y + chordHeight + webHeight / 2,
+        0
+      );
+  
+      diag.rotation.z = i % 2 === 0 ? diagonalAngle : -diagonalAngle;
+  
       group.add(diag);
     }
+  
+    // 🔥 cierre extremo derecho (ANTES faltaba)
+    group.add(
+      this.createProfile(
+        webHeight,
+        x + w,
+        y + chordHeight,
+        90,
+        'PGC',
+        this.colors.header_truss,
+        0,
+        thickness
+      )
+    );
   }
   
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number, customHeight?: number): THREE.Mesh {

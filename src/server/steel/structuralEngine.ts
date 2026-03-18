@@ -15,6 +15,7 @@ export interface HeaderAnalysis {
     numDiagonals: number;
     chordThickness: number;
   };
+  supportsRequired?: number;
 }
 
 export interface BlockingData {
@@ -108,19 +109,41 @@ export class StructuralEngine {
     return panels;
   }
 
+  private static getTributaryWidth(config: SteelHouseConfig): number {
+    let tributaryWidthM = Math.max(2, config.length / 2000);
+  
+    if (config.roof) {
+      const roofSpanM = config.width / 1000;
+  
+      if (config.roof.type === 'two_slope') {
+        tributaryWidthM = roofSpanM / 2;
+      } else if (config.roof.type === 'one_slope') {
+        tributaryWidthM = roofSpanM;
+      }
+    }
+  
+    return tributaryWidthM;
+  }
+  
+
   private static calculatePanelLoads(widthMm: number, heightMm: number, config: SteelHouseConfig): PanelLoads {
     const widthM = widthMm / 1000;
     const heightM = heightMm / 1000;
-    const tributaryWidthM = Math.max(2, config.length / 2000); 
-    const verticalLoadKN = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * widthM * tributaryWidthM;
+    const tributaryWidthM = this.getTributaryWidth(config); 
+    const roofLoad = (config.roof?.coveringWeightKpa || this.DEAD_LOAD_KPA)
+               + this.LIVE_LOAD_ROOF_KPA;
+    const verticalLoadKN = roofLoad * widthM * tributaryWidthM;
     const shearForceKN = this.WIND_PRESSURE_KPA * widthM * heightM;
     return { verticalLoadN: verticalLoadKN * 1000, shearForceN: shearForceKN * 1000, overturningMomentNm: shearForceKN * heightM };
   }
 
   static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig, wallHeight: number): HeaderAnalysis {
     const L = opening.width;
-    const tributaryWidthM = Math.max(2, config.length / 2000);
-    const loadKNm = (this.DEAD_LOAD_KPA + this.LIVE_LOAD_ROOF_KPA) * tributaryWidthM;
+    const tributaryWidthM = this.getTributaryWidth(config);
+    const roofLoad = (config.roof?.coveringWeightKpa || this.DEAD_LOAD_KPA) 
+               + this.LIVE_LOAD_ROOF_KPA;
+    const windLoad = this.WIND_PRESSURE_KPA * (L / 1000);
+    const loadKNm = roofLoad * tributaryWidthM + windLoad;
     const loadNmm = (loadKNm * 1000) / 1000;
     const maxAllowableDeflection = L / 360;
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
@@ -148,19 +171,64 @@ export class StructuralEngine {
       actualHeight = 120;
     } else {
       type = 'truss';
-      const trussHeight = Math.min(Math.max(L / 8, 200), availableHeight);
-      const panelSize = 400;
-      const numPanels = Math.max(2, Math.round(L / panelSize));
+      // NUEVA REGLA: altura basada en luz (L/10), no L/8
+      const calculatedHeight = L / 10;
+
+      // límites constructivos
+      const clampedHeight = Math.min(Math.max(calculatedHeight, 200), 600);
+
+      // respetar altura disponible en muro
+      const trussHeight = Math.min(clampedHeight, availableHeight);
+      // NUEVO: panel basado en proporción estructural (cuasi cuadrado)
+      const targetPanelWidth = trussHeight;
+
+      // cantidad de paneles según geometría real
+      const numPanels = Math.max(2, Math.round(L / targetPanelWidth));
+      // 🔥 GEOMETRÍA REAL
+      const panelWidth = L / numPanels;
+
+      // ángulo real (radianes)
+      const diagonalAngle = Math.atan(trussHeight / panelWidth);
+      // espesor base
       let thickness = 1.25;
+
+      // refuerzo progresivo
       if (L > 3000) thickness = 1.6;
       if (L > 4500) thickness = 2;
-      trussData = { height: trussHeight, numDiagonals: numPanels, chordThickness: thickness };
-      actualHeight = trussHeight;
-      if (L > 4000) status = 'warning';
-      if (L > 5500) status = 'error';
-    }
 
-    return { type, loadNmm, deflectionMm: 0, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData };
+      // NUEVO: refuerzo de cordones (doble perfil)
+      // 🔥 PERFIL DOBLE SEGÚN ESFUERZO REAL (no solo L)
+      let chordMultiplier = 1;
+
+      // criterio combinado: luz + esbeltez + carga
+      if (L > 4000 || requiredIx > this.PGC_IX_SINGLE * 3) {
+        chordMultiplier = 2; // doble perfil
+      }
+      trussData = { 
+        height: trussHeight, 
+        numDiagonals: numPanels, 
+        chordThickness: thickness * chordMultiplier,
+        panelWidth,
+        diagonalAngle
+      };
+      actualHeight = trussHeight;
+
+      // relación luz / altura (criterio estructural)
+      const slenderness = L / trussHeight;
+
+      if (L > 5500 || slenderness > 12) {
+        status = 'error';
+      } else if (L > 4000 || slenderness > 10) {
+        status = 'warning';
+      }
+    }
+    const reactionKN = (loadKNm * L) / 2 / 1000; // kN
+
+    const studCapacityKN = 8; // valor aproximado PGC 100
+
+    const supportsRequired = Math.max(1, Math.ceil(reactionKN / studCapacityKN));
+    const deflectionMm = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * requiredIx);
+    return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData, supportsRequired };
   }
   
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {

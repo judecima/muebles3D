@@ -54,6 +54,11 @@ export interface SteelHouseConfig {
   internalWalls: InternalWall[];
   layers: LayerVisibility;
   structuralMode: boolean;
+  roof?: {
+    type: 'flat' | 'one_slope' | 'two_slope';
+    slope: number; // grados
+    coveringWeightKpa?: number;
+  };
 }
 
 export interface MaterialItem {
@@ -99,5 +104,7 @@ export interface HeaderAnalysis {
     height: number;
     numDiagonals: number;
     chordThickness: number;
+    panelWidth: number;
+    diagonalAngle: number;
   };
 }

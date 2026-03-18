@@ -63,9 +63,8 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerBottom = sill + op.height;
       const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
-      const numKings = analysis.type === 'truss' ? 3 : 1;
-      const numJacks = 1;
-
+      let numKings = analysis.supportsRequired || 1;
+      const numJacks = analysis.supportsRequired > 1 ? 2 : 1;
       if (fusion === 'none') {
         pgc100_090 += (numKings + numJacks) * 2 * studHeight;
       } else {
@@ -79,8 +78,8 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
         const numDiagonals = analysis.trussData?.numDiagonals || Math.ceil(op.width / 500);
         const thickness = analysis.trussData?.chordThickness || 1.25;
         const trussLen = op.width * 2 + numDiagonals * trussHeight * 1.5;
-        if (thickness === 1.25) pgc100_125 += trussLen;
-        else if (thickness === 1.6) pgc100_160 += trussLen;
+        if (thickness <= 1.25) pgc100_125 += trussLen;
+        else if (thickness <= 1.6) pgc100_160 += trussLen;
         else pgc100_200 += trussLen;
       } else {
         pgc100_090 += op.width;
