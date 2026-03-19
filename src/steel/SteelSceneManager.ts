@@ -263,7 +263,8 @@ export class SteelSceneManager {
     const studHeight = wall.height - (this.profileFlange * 2);
 
     processed.panels.forEach((p: any, index: number) => {
-
+    
+      structuralGroup.add(panelGroup);
       // =========================
       // 🔷 PANEL GROUP (CLAVE)
       // =========================
