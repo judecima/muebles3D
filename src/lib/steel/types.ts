@@ -82,6 +82,7 @@ export interface PanelLoads {
 
 export interface WallPanelData {
   id: string;
+  index: number;
   xStart: number;
   xEnd: number;
   width: number;
@@ -89,6 +90,7 @@ export interface WallPanelData {
   isWallEnd: boolean;
   needsBracing: boolean;
   loads: PanelLoads;
+  reinforcementFactor?: number;
 }
 
 export interface HeaderAnalysis {
@@ -107,4 +109,7 @@ export interface HeaderAnalysis {
     panelWidth: number;
     diagonalAngle: number;
   };
+  supportsRequired?: number;
+  kings?: number;
+  jacks?: number;
 }

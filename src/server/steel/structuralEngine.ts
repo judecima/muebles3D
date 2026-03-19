@@ -16,6 +16,8 @@ export interface HeaderAnalysis {
     chordThickness: number;
   };
   supportsRequired?: number;
+  kings?: number;
+  jacks?: number;
 }
 
 export interface BlockingData {
@@ -85,18 +87,57 @@ export class StructuralEngine {
       const width = targetX - currentX;
 
       if (width > 0) {
+        const isWallStart = currentX === 0;
+        const isWallEnd = targetX === wall.length;
+
         const loads = this.calculatePanelLoads(width, wall.height, config);
+
         const isExternal = !('parentWallId' in wall);
-        const needsBracing = isExternal && ((loads.shearForceN / 1000) > (this.UNBRACED_SHEAR_CAPACITY_KN_M * width / 1000) || (currentX === 0 || targetX === wall.length));
+
+        const needsBracing =
+          isExternal &&
+          (
+            (loads.shearForceN / 1000) >
+            (this.UNBRACED_SHEAR_CAPACITY_KN_M * width / 1000) ||
+            isWallStart ||
+            isWallEnd
+          );
+
+        // 🔥 ahora sí correcto
+        const highLoad = loads.verticalLoadN > (width * 10);
+
+        let reinforcementFactor = 1;
+
+        // extremos → muy rígidos
+        if (isWallStart || isWallEnd) {
+          reinforcementFactor = 2;
+        }
+
+        // cargas medias
+        if (needsBracing) {
+          reinforcementFactor = Math.max(reinforcementFactor, 1.5);
+        }
+
+        // cargas altas reales
+        if (highLoad) {
+          reinforcementFactor = Math.max(reinforcementFactor, 2);
+        }
+
+        // 🔥 opcional PRO: súper carga
+        if (loads.verticalLoadN > width * 20) {
+          reinforcementFactor = 2.5;
+        }
 
         panels.push({
-          id: `${wall.id}-p${panelIndex}`,
+          id: `${wall.id}-P${panelIndex + 1}`,
+          index: panelIndex + 1,
           xStart: currentX,
           xEnd: targetX,
           width: width,
-          isWallStart: currentX === 0,
-          isWallEnd: targetX === wall.length,
+          isWallStart,
+          isWallEnd,
           needsBracing,
+          reinforcementFactor, // ✅ OK
           loads
         });
       }
@@ -109,20 +150,34 @@ export class StructuralEngine {
     return panels;
   }
 
+  static isCorner(wall: SteelWall, config: SteelHouseConfig): boolean {
+    return config.walls.some(w =>
+      w.id !== wall.id &&
+      (
+        Math.abs(w.x - wall.x) < 50 ||
+        Math.abs(w.z - wall.z) < 50
+      )
+    );
+  }
+
   private static getTributaryWidth(config: SteelHouseConfig): number {
-    let tributaryWidthM = Math.max(2, config.length / 2000);
+    const baseWidthM = config.width / 1000;
   
-    if (config.roof) {
-      const roofSpanM = config.width / 1000;
+    if (!config.roof) return Math.max(2, baseWidthM / 2);
   
-      if (config.roof.type === 'two_slope') {
-        tributaryWidthM = roofSpanM / 2;
-      } else if (config.roof.type === 'one_slope') {
-        tributaryWidthM = roofSpanM;
-      }
+    const slopeRad = (config.roof.slope * Math.PI) / 180;
+  
+    if (config.roof.type === 'two_slope') {
+      // 🔥 cada lado proyectado + pendiente real
+      const halfSpan = baseWidthM / 2;
+      return halfSpan / Math.cos(slopeRad);
     }
   
-    return tributaryWidthM;
+    if (config.roof.type === 'one_slope') {
+      return baseWidthM / Math.cos(slopeRad);
+    }
+  
+    return baseWidthM;
   }
   
 
@@ -227,8 +282,13 @@ export class StructuralEngine {
     const studCapacityKN = 8; // valor aproximado PGC 100
 
     const supportsRequired = Math.max(1, Math.ceil(reactionKN / studCapacityKN));
+
+    // 🔥 REGLA UNIFICADA
+    const kings = supportsRequired;
+    const jacks = supportsRequired;
     const deflectionMm = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * requiredIx);
-    return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData, supportsRequired };
+    return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData, supportsRequired, kings,
+      jacks };
   }
   
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {

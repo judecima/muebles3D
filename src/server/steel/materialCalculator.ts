@@ -4,6 +4,7 @@ import { StructuralEngine } from './structuralEngine';
 
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
+  const studCuts: number[] = [];
   let pgc100_090 = 0;
   let pgc100_125 = 0;
   let pgc100_160 = 0;
@@ -36,9 +37,36 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
 
     panels.forEach(p => {
       const studsInPanel = Math.ceil(p.width / wall.studSpacing) + 1;
-      const structuralStuds = p.isWallStart || p.isWallEnd ? studsInPanel + 2 : studsInPanel;
-      pgc100_090 += structuralStuds * studHeight;
-      totalConnections += structuralStuds * 4;
+    
+      const structuralStuds =
+        p.isWallStart || p.isWallEnd
+          ? studsInPanel + 2
+          : studsInPanel;
+    
+      // 🔥 detectar carga real del panel
+      const loadRatio = p.loads.verticalLoadN / 20000; // normalización
+    
+      // 🔥 detectar cercanía a opening
+      const nearOpening = wall.openings.some(op =>
+        p.xStart < op.position + op.width + 300 &&
+        p.xEnd > op.position - 300
+      );
+    
+      // 🔥 % dinámico
+      let reinforcementFactor = 0;
+    
+      if (p.doubleStuds) reinforcementFactor += 0.2;
+      if (nearOpening) reinforcementFactor += 0.2;
+      if (loadRatio > 1) reinforcementFactor += 0.2;
+      if (loadRatio > 1.5) reinforcementFactor += 0.2;
+    
+      const extraStuds = Math.floor(structuralStuds * reinforcementFactor);
+    
+      const totalStuds = structuralStuds + extraStuds;
+    
+      pgc100_090 += totalStuds * studHeight;
+    
+      totalConnections += totalStuds * 4;
     });
 
     const blockings = StructuralEngine.calculateBlocking(wall);
@@ -63,8 +91,8 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const headerBottom = sill + op.height;
       const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
-      let numKings = analysis.supportsRequired || 1;
-      const numJacks = analysis.supportsRequired > 1 ? 2 : 1;
+      const numKings = analysis.kings || 1;
+      const numJacks = analysis.jacks || 1;
       if (fusion === 'none') {
         pgc100_090 += (numKings + numJacks) * 2 * studHeight;
       } else {

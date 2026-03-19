@@ -5,6 +5,7 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { SteelSceneManager } from '@/steel/SteelSceneManager';
 import { SteelHouseConfig, SteelOpening, InternalWall } from '@/lib/steel/types';
 import { SteelJoystick } from './SteelJoystick';
+import { exportWallPDF } from '@/steel/export/PlanPDFGenerator';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
@@ -99,7 +100,24 @@ export const SteelViewer = forwardRef(({
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full touch-none bg-slate-50" />
-      
+      <button
+  onClick={() => {
+    if (!config.walls.length || !structuralResult) return;
+
+    // 👉 ejemplo: primer muro
+    const wall = config.walls[0];
+    const processed = structuralResult.processedWalls?.find(
+      (w: any) => w.id === wall.id
+    );
+
+    if (processed) {
+      exportWallPDF(wall, processed.panels);
+    }
+  }}
+  className="absolute top-4 left-4 z-50 bg-black text-white px-4 py-2 rounded"
+>
+  Exportar PDF
+</button>
       {isWalkMode && (
         <>
           <div className="absolute bottom-8 left-8 z-50">

@@ -186,6 +186,25 @@ export class SteelSceneManager {
     this.renderer.render(this.scene, this.camera);
   };
 
+  private createTextLabel(text: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+  
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, 256, 128);
+  
+    ctx.fillStyle = 'black';
+    ctx.font = 'Bold 40px Arial';
+    ctx.fillText(text, 20, 70);
+  
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture });
+  
+    return new THREE.Sprite(material);
+  }
+  
   public buildHouse(config: SteelHouseConfig, structuralResult: any) {
     [this.houseGroup, this.openingsGroup, this.internalWallsGroup].forEach(group => {
       while (group.children.length > 0) {
@@ -243,21 +262,145 @@ export class SteelSceneManager {
     group.add(structuralGroup);
     const studHeight = wall.height - (this.profileFlange * 2);
 
-    processed.panels.forEach((p: any) => {
-      const collMesh = new THREE.Mesh(new THREE.BoxGeometry(p.width, wall.height, wall.thickness + 20), new THREE.MeshBasicMaterial({ visible: false }));
-      collMesh.position.set(p.xStart + p.width/2, wall.height/2, 0);
-      group.add(collMesh);
-      this.collisions.registerWall(collMesh);
+    processed.panels.forEach((p: any, index: number) => {
 
-      structuralGroup.add(this.createProfile(p.width, p.xStart, 0, 0, 'PGU'));
-      structuralGroup.add(this.createProfile(p.width, p.xStart, wall.height - this.profileFlange, 0, 'PGU'));
-      const startStudsCount = p.isWallStart ? 3 : 2; 
-      for (let i = 0; i < startStudsCount; i++) structuralGroup.add(this.createProfile(studHeight, p.xStart + (i * 10), this.profileFlange, 90, 'PGC', p.isWallStart ? this.colors.corner : this.colors.junction));
-      for (let x = p.xStart + wall.studSpacing; x < p.xEnd - 10; x += wall.studSpacing) {
-        const inOpening = wall.openings.some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
-        if (!inOpening) structuralGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC'));
+      // =========================
+      // 🔷 PANEL GROUP (CLAVE)
+      // =========================
+      const panelGroup = new THREE.Group();
+    
+      const panelGap = 8; // separación visual entre paneles
+      panelGroup.position.x = p.xStart + (index * panelGap);
+    
+      structuralGroup.add(panelGroup);
+    
+      const studHeight = wall.height - (this.profileFlange * 2);
+    
+      // 🎨 color alternado por panel (opcional pero recomendado)
+      const panelColor = index % 2 === 0
+        ? this.colors.steel
+        : 0x6b7280;
+    
+      // =========================
+      // 🔳 SOLERAS (PGU)
+      // =========================
+      panelGroup.add(
+        this.createProfile(p.width, 0, 0, 0, 'PGU', this.colors.steel)
+      );
+    
+      panelGroup.add(
+        this.createProfile(p.width, 0, wall.height - this.profileFlange, 0, 'PGU', this.colors.steel)
+      );
+    
+      // =========================
+      // 🔥 BORDE IZQUIERDO PANEL
+      // =========================
+      panelGroup.add(
+        this.createProfile(
+          studHeight,
+          0,
+          this.profileFlange,
+          90,
+          'PGC',
+          0x111111 // negro → marca corte de panel
+        )
+      );
+    
+      // =========================
+      // 🔥 DOBLE STUD EN JUNTA
+      // =========================
+      if (index > 0) {
+        panelGroup.add(
+          this.createProfile(
+            studHeight,
+            10,
+            this.profileFlange,
+            90,
+            'PGC',
+            this.colors.junction
+          )
+        );
       }
-      if (p.isWallEnd) { for (let i = 0; i < 3; i++) structuralGroup.add(this.createProfile(studHeight, p.xEnd - this.profileFlange - (i * 10), this.profileFlange, 90, 'PGC', this.colors.corner)); }
+    
+      // =========================
+      // 🔩 STUDS INTERNOS
+      // =========================
+      for (let x = wall.studSpacing; x < p.width - 10; x += wall.studSpacing) {
+    
+        const globalX = p.xStart + x;
+    
+        const inOpening = wall.openings.some(op =>
+          globalX >= (op.position - 10) &&
+          globalX <= (op.position + op.width + 10)
+        );
+    
+        if (!inOpening) {
+    
+          // stud principal
+          panelGroup.add(
+            this.createProfile(
+              studHeight,
+              x,
+              this.profileFlange,
+              90,
+              'PGC',
+              panelColor
+            )
+          );
+    
+          // 🔥 refuerzo real si el panel lo requiere
+          if (p.doubleStuds) {
+            panelGroup.add(
+              this.createProfile(
+                studHeight,
+                x + 15,
+                this.profileFlange,
+                90,
+                'PGC',
+                this.colors.junction
+              )
+            );
+          }
+
+          
+        }
+      }
+    
+      // =========================
+      // 🔥 BORDE DERECHO PANEL
+      // =========================
+      panelGroup.add(
+        this.createProfile(
+          studHeight,
+          p.width - 10,
+          this.profileFlange,
+          90,
+          'PGC',
+          this.colors.junction
+        )
+      );
+    
+      // =========================
+      // 🧱 COLISIÓN (IMPORTANTE)
+      // =========================
+      const collMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(p.width, wall.height, wall.thickness + 20),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+    
+      collMesh.position.set(p.width / 2, wall.height / 2, 0);
+    
+      panelGroup.add(collMesh);
+      this.collisions.registerWall(collMesh);
+      const label = this.createTextLabel(p.id);
+
+      label.position.set(
+        p.width / 2,
+        wall.height + 200,
+        0
+      );
+
+      panelGroup.add(label);
     });
 
     if (config.layers.horizontalBlocking) {
@@ -284,7 +427,33 @@ export class SteelSceneManager {
       const headerBottom = sill + op.height;
       const headerHeight = analysis.actualHeight;
       const fusion = analysis.isFusedWithCorner;
-      const numKings = analysis.type === 'truss' ? 3 : 1;
+      const numKings = analysis.kings || 1;
+      const numJacks = analysis.jacks || 1;
+      for (let i = 0; i < numJacks; i++) {
+        if (fusion !== 'left')
+          structuralGroup.add(
+            this.createProfile(
+              headerBottom - this.profileFlange,
+              op.position - this.profileFlange - i * 10,
+              this.profileFlange,
+              90,
+              'PGC',
+              this.colors.jack
+            )
+          );
+      
+        if (fusion !== 'right')
+          structuralGroup.add(
+            this.createProfile(
+              headerBottom - this.profileFlange,
+              op.position + op.width + i * 10,
+              this.profileFlange,
+              90,
+              'PGC',
+              this.colors.jack
+            )
+          );
+      }
 
       for (let i = 0; i < numKings; i++) {
         if (fusion !== 'left') structuralGroup.add(this.createProfile(studHeight, op.position - this.profileFlange * (2 + i), this.profileFlange, 90, 'PGC', this.colors.king));
