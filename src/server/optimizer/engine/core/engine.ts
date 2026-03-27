@@ -1,17 +1,19 @@
-import { InternalPart as InternalPartType, OptimizedPanel, OptimizedPart, PanelStats } from '@/lib/types';
-import { EngineConfig, EngineState, IndexedPieces, FeatureFlags, InternalPart } from '../types/engine';
+import { InternalPart, OptimizedPanel, OptimizedPart, PanelStats } from '../../lib/types';
+import { EngineConfig, EngineState, IndexedPieces, FeatureFlags } from '../types/engine';
 import { stableSortParts, orderFreeRects, pruneFreeRects, log, getStateSignature, approxEqual } from '../utils';
-import { evaluatePanelQuality } from '../scoring';
+import { scorePlacement, evaluatePanelQuality } from '../scoring';
 import { createSpaceStrategy } from '../space';
 import { selectBestPiece, removeFromIndex } from '../selection';
 
+// Función mejorada con kerf y longitud restante
 function hasFutureMatch(
   piece: InternalPart,
   config: EngineConfig,
   indexed: IndexedPieces,
-  rectDimension: number,
-  pieceDimension: number
+  rectDimension: number,   // ancho (horizontal) o alto (vertical) del rectángulo libre
+  pieceDimension: number   // ancho de la pieza ya colocada (en la orientación final)
 ): boolean {
+  // Espacio restante después de colocar la pieza actual (incluyendo kerf)
   const remaining = rectDimension - pieceDimension - config.kerf;
   if (remaining <= 0) return false;
 
@@ -20,6 +22,7 @@ function hasFutureMatch(
     ? indexed.byHeight.get(target) || []
     : indexed.byWidth.get(target) || [];
 
+  // Buscar una pieza que quepa en el espacio restante (incluyendo su kerf)
   return candidates.some(p =>
     !p.placed &&
     p !== piece &&
@@ -68,7 +71,7 @@ export function fillSinglePanel(
       useMultiStrip: features.useMultiStrip ?? true,
       useLookahead: features.useLookahead ?? true,
       useInvalidCache: features.useInvalidCache ?? true,
-      maxActiveStrips: features.maxActiveStrips ?? 2,
+      maxActiveStrips: features.maxActiveStrips ?? 4,
     },
     maxFreeRects: features.maxFreeRects ?? 100,
     minReusableDim: features.minReusableDim ?? 80,
@@ -93,6 +96,7 @@ export function fillSinglePanel(
     },
   };
 
+  // Indexación inicial
   const indexed: IndexedPieces = {
     byHeight: new Map(),
     byWidth: new Map(),
@@ -108,6 +112,7 @@ export function fillSinglePanel(
   const spaceStrategy = createSpaceStrategy(config);
   let safety = 0;
   let placedSomething = false;
+
   let lastSignature = '';
   let stagnationCount = 0;
 
@@ -119,7 +124,10 @@ export function fillSinglePanel(
       stagnationCount = 0;
       lastSignature = signature;
     }
-    if (stagnationCount > Math.max(25, state.freeRects.length)) break;
+    if (stagnationCount > Math.max(25, state.freeRects.length)) {
+      log(config, 'STAGNATION_BREAK', { stagnationCount });
+      break;
+    }
 
     state.freeRects = orderFreeRects(state.freeRects, config, state);
     const rect = state.freeRects.shift();
@@ -143,6 +151,7 @@ export function fillSinglePanel(
       piece.placed = true;
       state.stats.placements++;
 
+      // Manejo de strips (multi‑strip)
       if (config.features.useStripLock) {
         let foundStrip = -1;
         for (let i = 0; i < state.activeStrips.length; i++) {
@@ -157,21 +166,28 @@ export function fillSinglePanel(
         }
 
         if (foundStrip === -1) {
-          const rectDim = config.strategy === 'horizontal' ? rect.width : rect.height;
-          const rectOK = (config.strategy === 'horizontal' && rect.width > config.minReusableDim * 2) ||
-                         (config.strategy === 'vertical' && rect.height > config.minReusableDim * 2);
+          // Relajamos condiciones de creación de strips para permitir mayor densidad
+          const rectOK = (config.strategy === 'horizontal' && rect.width > config.minReusableDim * 1.2) ||
+                         (config.strategy === 'vertical' && rect.height > config.minReusableDim * 1.2);
           const pieceOK = (config.strategy === 'horizontal' && piece.height > config.minReusableDim) ||
                          (config.strategy === 'vertical' && piece.width > config.minReusableDim);
-          const futureOK = hasFutureMatch(piece, config, indexed, rectDim, w);
-          const canCreateStrip = rectOK && pieceOK && futureOK;
+          
+          const rectDim = config.strategy === 'horizontal' ? rect.width : rect.height;
+          
+          // Reducimos la dependencia estricta de hasFutureMatch para no bloquear el inicio de columnas
+          const canCreateStrip = rectOK && pieceOK; 
           
           if ((!config.features.useMultiStrip || state.activeStrips.length < config.features.maxActiveStrips) && canCreateStrip) {
+            const lockedDim = config.strategy === 'horizontal' ? piece.height : piece.width;
+            const startX = rect.x;
+            const startY = rect.y;
+            const remainingLength = rectDim - w - kerf;
             state.activeStrips.push({
               strategy: config.strategy,
-              lockedDim: config.strategy === 'horizontal' ? piece.height : piece.width,
-              startX: rect.x,
-              startY: rect.y,
-              remainingLength: rectDim - w - kerf,
+              lockedDim,
+              startX,
+              startY,
+              remainingLength,
             });
             state.stats.stripsCreated++;
           }
@@ -185,20 +201,41 @@ export function fillSinglePanel(
         }
       }
 
-      const { rects } = spaceStrategy.split(rect, w, h, config, state);
+      const { rects, closeStrip } = spaceStrategy.split(rect, w, h, config, state);
       state.freeRects.push(...rects);
-      state.stats.cutLength += (config.strategy === 'horizontal' ? rect.width : rect.height);
+
+      if (config.strategy === 'horizontal') {
+        state.stats.cutLength += rect.width;
+      } else {
+        state.stats.cutLength += rect.height;
+      }
+
       state.freeRects = pruneFreeRects(state.freeRects, config);
       removeFromIndex(indexed, piece);
+
+      if (state.invalidCache && state.invalidCache.size > 5000) {
+        const entries = Array.from(state.invalidCache);
+        const toKeep = entries.slice(-2000);
+        state.invalidCache = new Set(toKeep);
+        if (config.debug) log(config, 'CACHE_PRUNE', { oldSize: entries.length, newSize: toKeep.length });
+      }
     } else {
       state.stats.attemptsWithoutPlacement++;
       if (state.stats.attemptsWithoutPlacement > 50) {
         if (state.activeStrips.length > 0) {
           state.activeStrips = [];
           state.stats.attemptsWithoutPlacement = 0;
-        } else break;
+        } else {
+          break;
+        }
       }
     }
+
+    log(config, 'STEP', {
+      freeRectsCount: state.freeRects.length,
+      activeStripsCount: state.activeStrips.length,
+      placed: state.stats.placements,
+    });
   }
 
   if (!placedSomething) {
@@ -222,7 +259,17 @@ export function fillSinglePanel(
     };
   }
 
+  const xs = state.placedParts.map(p => p.x);
+  const ys = state.placedParts.map(p => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs.map((x, i) => x + state.placedParts[i].width));
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys.map((y, i) => y + state.placedParts[i].height));
+  const bboxArea = (maxX - minX) * (maxY - minY);
   const usedArea = state.placedParts.reduce((acc, p) => acc + p.width * p.height, 0);
+  const compactness = bboxArea > 0 ? usedArea / bboxArea : 0;
+  state.stats.compactness = compactness;
+
   const totalArea = panelWidth * panelHeight;
   const leftovers = state.freeRects
     .filter(r => r.width >= config.minReusableDim && r.height >= config.minReusableDim)
@@ -237,6 +284,16 @@ export function fillSinglePanel(
     }));
 
   const leftoverArea = leftovers.reduce((acc, l) => acc + l.width * l.height, 0);
+  const stats: PanelStats = {
+    totalAreaM2: Number((totalArea / 1000000).toFixed(2)),
+    usedAreaM2: Number((usedArea / 1000000).toFixed(2)),
+    leftoverAreaM2: Number((leftoverArea / 1000000).toFixed(2)),
+    wasteAreaM2: Number(((totalArea - usedArea - leftoverArea) / 1000000).toFixed(2)),
+    wastePercentage: Number(((1 - (usedArea / totalArea)) * 100).toFixed(3)),
+    displacements: state.stats.stripsCreated * 2 + state.placedParts.length,
+    linearMeters: Number(((panelWidth * 2 + panelHeight * 2 + (usedArea / 1000)) / 1000).toFixed(2)),
+  };
+
   return {
     panelNumber,
     parts: state.placedParts,
@@ -245,15 +302,7 @@ export function fillSinglePanel(
     totalArea,
     leftovers,
     strategy,
-    stats: {
-      totalAreaM2: Number((totalArea / 1000000).toFixed(2)),
-      usedAreaM2: Number((usedArea / 1000000).toFixed(2)),
-      leftoverAreaM2: Number((leftoverArea / 1000000).toFixed(2)),
-      wasteAreaM2: Number(((totalArea - usedArea - leftoverArea) / 1000000).toFixed(2)),
-      wastePercentage: Number(((1 - (usedArea / totalArea)) * 100).toFixed(3)),
-      displacements: state.stats.stripsCreated * 2 + state.placedParts.length,
-      linearMeters: Number(((panelWidth * 2 + panelHeight * 2 + (usedArea / 1000)) / 1000).toFixed(2)),
-    },
+    stats,
   };
 }
 
@@ -287,19 +336,46 @@ export function runOptimization(
   const finalPanels: OptimizedPanel[] = [];
   let panelCounter = 1;
 
+  const baseFeatures: Partial<FeatureFlags> = {
+    useStripLock: true,
+    useSmartSplit: true,
+    penalizeSmallLeftovers: true,
+    useContinuityBonus: true,
+    useSmartFreeRectOrder: true,
+    useGeometricContinuity: true,
+    useIndexedSelection: true,
+    useBacktracking: true,
+    useExplorationNoise: false,
+    useTopKSelection: false,
+    useMultiStrip: true,
+    useLookahead: false, // Desactivado temporalmente para estabilizar eficiencia
+    useInvalidCache: true,
+    maxActiveStrips: 4, // Aumentado para mayor flexibilidad
+    maxFreeRects: 100,
+    minReusableDim: 80,
+    eps: 1,
+    debug: false,
+  };
+
   const heights = globalPool.map(p => p.height);
   const widths = globalPool.map(p => p.width);
-  const baseStrategy = variance(heights) < variance(widths) ? 'horizontal' : 'vertical';
+  const varH = variance(heights);
+  const varW = variance(widths);
+  const baseStrategy = varH < varW ? 'horizontal' : 'vertical';
 
   while (globalPool.some(p => !p.placed)) {
     let bestPanelForThisStep: OptimizedPanel | null = null;
     let bestScore = -Infinity;
 
-    const strategies: ('horizontal' | 'vertical')[] = [baseStrategy, baseStrategy === 'horizontal' ? 'vertical' : 'horizontal'];
+    const strategies: ('horizontal' | 'vertical')[] = [baseStrategy];
+    if (baseFeatures.useBacktracking) {
+      strategies.push(baseStrategy === 'horizontal' ? 'vertical' : 'horizontal');
+    }
 
     for (const strategy of strategies) {
+      const currentAvailablePieces = globalPool.filter(p => !p.placed).map(p => ({ ...p }));
       const attempt = fillSinglePanel(
-        globalPool.filter(p => !p.placed).map(p => ({ ...p })),
+        currentAvailablePieces,
         usableW,
         usableH,
         kerf,
@@ -309,7 +385,8 @@ export function runOptimization(
         partColors,
         strategy,
         panelCounter,
-        hasGrain
+        hasGrain,
+        baseFeatures
       );
 
       const currentScore = evaluatePanelQuality(attempt);
@@ -332,7 +409,9 @@ export function runOptimization(
       });
       finalPanels.push(bestPanelForThisStep);
       panelCounter++;
-    } else break;
+    } else {
+      break;
+    }
   }
 
   const totalUsedArea = finalPanels.reduce((acc, p) => acc + p.usedArea, 0);
@@ -342,7 +421,7 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: finalPanels.length > 0 ? (totalUsedArea / totalAvailArea) * 100 : 0,
-    summary: `Motor v43 industrial - ${finalPanels.length} paneles, eficiencia ${(totalUsedArea / totalAvailArea * 100).toFixed(2)}%`,
+    summary: `Motor v43.1 industrial - ${finalPanels.length} paneles, eficiencia ${(totalUsedArea / totalAvailArea * 100).toFixed(2)}%`,
     kerf,
     trim,
     selectedThickness,
@@ -359,7 +438,6 @@ function generateColors(parts: any[]): Record<string, string> {
 }
 
 function variance(values: number[]): number {
-  if (values.length === 0) return 0;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
   return values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / values.length;
 }

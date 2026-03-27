@@ -64,7 +64,7 @@ export function scorePlacement(
     }
   }
 
-  // Penalización por fragmentación acumulada (global, proporcional y escalonada con raíz cuadrada)
+  // Penalización por fragmentación acumulada (Suavizada de 14000 a 8000)
   if (config.features.penalizeSmallLeftovers) {
     let accumulatedPenalty = 0;
     const panelArea = config.panelWidth * config.panelHeight;
@@ -77,15 +77,15 @@ export function scorePlacement(
           const normalizedArea = area / panelArea;
           const excess = ratio - 6;
           const softExcess = Math.sqrt(excess);
-          accumulatedPenalty += Math.min(5000, softExcess * normalizedArea * 14000);
+          accumulatedPenalty += Math.min(5000, softExcess * normalizedArea * 8000);
         }
       }
     }
     score -= accumulatedPenalty;
   }
 
-  // Penalización por muchos rectángulos libres (con tope)
-  score -= Math.min(5000, state.freeRects.length * 200);
+  // Penalización por muchos rectángulos libres (Suavizada de 200 a 50)
+  score -= Math.min(5000, state.freeRects.length * 50);
 
   // Ruido exploratorio
   if (config.features.useExplorationNoise && config.seed !== undefined) {
@@ -107,7 +107,6 @@ export function scoreWithLookahead(
   const immediateScore = scorePlacement(pieceW, pieceH, rect, config, state);
   if (!config.features.useLookahead) return immediateScore;
 
-  const simConfig = { ...config, features: { ...config.features, useLookahead: false } };
   const strategy = new GuillotineStrategy();
   const { rects: newRects } = strategy.split(rect, pieceW, pieceH, config, state);
 
