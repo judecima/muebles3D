@@ -10,16 +10,15 @@ interface InternalPart {
   placed: boolean;
 }
 
-interface FreeRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+interface Strip {
+  size: number; // Ancho compartido si modo=vertical (Columnas), Alto compartido si modo=horizontal (Filas)
+  pieces: InternalPart[];
 }
 
 /**
- * JADSI Industrial Engine v40.0 - Senior Implementation
- * Motor híbrido determinístico + heurístico para optimización de corte 2D Guillotina.
+ * JADSI v42.1 STRIP ENGINE
+ * Motor de optimización industrial basado en el agrupamiento por tiras (Strips).
+ * Corrige la simetría entre cortes verticales y horizontales para seccionadoras de guillotina.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -31,319 +30,249 @@ export function runOptimization(
   trim: number = 10
 ): OptimizationResult {
   const filteredParts = parts.filter(p => p.thickness === selectedThickness);
-  
+
   if (filteredParts.length === 0) {
     return { optimizedLayout: [], totalPanels: 0, totalEfficiency: 0, summary: "Sin piezas", kerf, trim, selectedThickness };
   }
 
-  const usableW = Math.max(0, panelWidth - (trim * 2));
-  const usableH = Math.max(0, panelHeight - (trim * 2));
-  const partColors = generateColors(filteredParts);
+  const usableW = panelWidth - trim * 2;
+  const usableH = panelHeight - trim * 2;
 
-  // Pre-procesamiento: Desglose y ordenamiento por área descendente
-  let globalPool: InternalPart[] = filteredParts.flatMap((p, idx) => 
+  let pool: InternalPart[] = filteredParts.flatMap((p, idx) =>
     Array.from({ length: p.quantity }, () => ({
       ...p,
       originalIndex: idx,
       placed: false
     }))
-  ).sort((a, b) => (b.width * b.height) - (a.width * a.height));
+  );
 
-  const finalPanels: OptimizedPanel[] = [];
-  let panelCounter = 1;
+  const panels: OptimizedPanel[] = [];
+  let panelNumber = 1;
 
-  while (globalPool.some(p => !p.placed)) {
-    let bestPanelForThisStep: OptimizedPanel | null = null;
-    let bestScore = -Infinity;
+  while (pool.some(p => !p.placed)) {
+    const remaining = pool.filter(p => !p.placed);
 
-    // Ejecutar múltiples estrategias de búsqueda para encontrar el mejor tablero local
-    const iterations = 8000;
-    const targetEfficiency = 97.5;
+    // Evaluamos ambas estrategias de corte para el panel actual de forma independiente
+    // Vertical: Cortes primarios verticales -> Forman Columnas -> Comparten Ancho
+    // Horizontal: Cortes primarios horizontales -> Forman Filas -> Comparten Alto
+    const verticalStrips = buildStrips(remaining, 'vertical', usableH, hasGrain, kerf);
+    const horizontalStrips = buildStrips(remaining, 'horizontal', usableW, hasGrain, kerf);
 
-    for (let iter = 0; iter < iterations; iter++) {
-      const currentAvailablePieces = globalPool.filter(p => !p.placed).map(p => ({ ...p }));
-      
-      // Variación de heurística de ordenamiento
-      if (iter > 0) {
-        if (iter < 1000) {
-          // Heurística de Dimensión Máxima
-          currentAvailablePieces.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
-        } else {
-          // Búsqueda estocástica inteligente
-          smartShuffle(currentAvailablePieces);
-        }
-      }
+    const bestStrategy = evaluateStripLayout(verticalStrips, horizontalStrips, usableW, usableH, kerf);
 
-      const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
-      
-      for (const strategy of strategies) {
-        const attempt = fillSinglePanel(
-          currentAvailablePieces,
-          usableW,
-          usableH,
-          kerf,
-          trim,
-          panelWidth,
-          panelHeight,
-          partColors,
-          strategy,
-          hasGrain,
-          panelCounter
-        );
+    const panel = layoutStrips(
+      bestStrategy,
+      usableW,
+      usableH,
+      trim,
+      kerf,
+      panelWidth,
+      panelHeight,
+      panelNumber
+    );
 
-        const currentScore = evaluatePanelQuality(attempt, panelWidth, panelHeight);
-        
-        if (currentScore > bestScore) {
-          bestScore = currentScore;
-          bestPanelForThisStep = attempt;
-        }
-      }
+    if (panel.parts.length === 0) break;
 
-      // Early exit si la eficiencia es excepcional
-      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= targetEfficiency) break;
-    }
-
-    if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
-      // Marcar piezas como colocadas en el pool global
-      bestPanelForThisStep.parts.forEach(placedPart => {
-        if (placedPart.isLeftover) return;
-        
-        const match = globalPool.find(p => 
-          !p.placed && 
-          p.name === placedPart.name && 
-          ((placedPart.rotated ? p.height : p.width) === placedPart.width) &&
-          ((placedPart.rotated ? p.width : p.height) === placedPart.height)
-        );
-        if (match) match.placed = true;
-      });
-
-      finalPanels.push(bestPanelForThisStep);
-      panelCounter++;
-    } else {
-      break; 
-    }
+    markPlaced(pool, panel.parts);
+    panels.push(panel);
+    panelNumber++;
+    
+    if (panelNumber > 50) break; // Límite de seguridad
   }
 
-  const totalUsedArea = finalPanels.reduce((acc, p) => acc + p.usedArea, 0);
-  const totalAvailArea = finalPanels.length * panelWidth * panelHeight;
+  const totalUsed = panels.reduce((a, p) => a + p.usedArea, 0);
+  const totalArea = panels.length * panelWidth * panelHeight;
 
   return {
-    optimizedLayout: finalPanels,
-    totalPanels: finalPanels.length,
-    totalEfficiency: finalPanels.length > 0 ? (totalUsedArea / totalAvailArea) * 100 : 0,
-    summary: `JADSI v40.0 - Motor Industrial: Optimización completada en ${panelCounter - 1} tableros con reducción de fragmentación y máximización de stock útil.`,
+    optimizedLayout: panels,
+    totalPanels: panels.length,
+    totalEfficiency: panels.length > 0 ? (totalUsed / totalArea) * 100 : 0,
+    summary: "JADSI v42.1 STRIP ENGINE - Optimización industrial por tiras simétricas (Filas/Columnas)",
     kerf,
     trim,
     selectedThickness
   };
 }
 
-function fillSinglePanel(
-  pieces: InternalPart[], 
-  usableW: number, 
-  usableH: number, 
-  kerf: number, 
-  trim: number, 
-  panelWidth: number,
-  panelHeight: number,
-  colors: Record<string, string>,
-  strategy: 'vertical' | 'horizontal',
+// ================= STRIPS =================
+
+function buildStrips(
+  pieces: InternalPart[],
+  mode: 'vertical' | 'horizontal',
+  stackLimit: number,
   hasGrain: boolean,
-  panelNumber: number
-): OptimizedPanel {
-  const placedParts: OptimizedPart[] = [];
-  const freeRects: FreeRect[] = [{ x: trim, y: trim, width: usableW, height: usableH }];
-  const leftovers: OptimizedPart[] = [];
-  const uniqueStrips = new Set<number>();
+  kerf: number
+): Strip[] {
+  const groups = new Map<number, InternalPart[]>();
 
-  while (freeRects.length > 0) {
-    // Priorización de rectángulos según estrategia de guillotina
-    freeRects.sort((a, b) => {
-      if (strategy === 'horizontal') return (a.y - b.y) || (a.x - b.x);
-      return (a.x - b.x) || (a.y - b.y);
-    });
+  for (const p of pieces) {
+    if (p.placed) continue;
 
-    const r = freeRects.shift()!;
-    if (r.width < 1 || r.height < 1) continue;
+    // En modo Vertical (Columnas), las piezas deben tener el mismo ANCHO para que el corte sea recto
+    // En modo Horizontal (Filas), las piezas deben tener el mismo ALTO
+    const key = mode === 'vertical' ? p.width : p.height;
 
-    let bestPieceIdx = -1;
-    let bestScore = -Infinity;
-    let rotated = false;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
 
-    for (let i = 0; i < pieces.length; i++) {
-      const part = pieces[i];
-      if (part.placed) continue;
-
-      // Evaluar Orientación Normal
-      if (part.width <= r.width && part.height <= r.height) {
-        const score = calculateFitScore(part.width, part.height, r, strategy);
-        if (score > bestScore) {
-          bestScore = score; bestPieceIdx = i; rotated = false;
-        }
-      }
-
-      // Evaluar Orientación Rotada (solo si se permite)
-      const canRotate = !hasGrain || part.grainDirection === 'libre';
-      if (canRotate && part.height <= r.width && part.width <= r.height) {
-        const score = calculateFitScore(part.height, part.width, r, strategy);
-        if (score > bestScore) {
-          bestScore = score; bestPieceIdx = i; rotated = true;
-        }
-      }
-    }
-
-    if (bestPieceIdx !== -1) {
-      const part = pieces[bestPieceIdx];
-      const w = rotated ? part.height : part.width;
-      const h = rotated ? part.width : part.height;
-
-      placedParts.push({
-        name: part.name,
-        x: r.x, y: r.y, width: w, height: h,
-        rotated,
-        color: colors[part.name]
-      });
-
-      part.placed = true;
-      uniqueStrips.add(strategy === 'vertical' ? r.x : r.y);
-      
-      // Aplicar Split Guillotina Inteligente
-      const newRects = splitGuillotineSmart(r, w, h, kerf, strategy);
-      freeRects.push(...newRects);
-    } else {
-      // Registrar sobrante si es de tamaño considerable
-      if (r.width >= 5 || r.height >= 5) {
-        leftovers.push({
-          name: `S${leftovers.length + 1}`,
-          x: r.x, y: r.y, width: r.width, height: r.height,
-          rotated: false,
-          isLeftover: true
-        });
+    // Probar rotación virtual para mejorar el agrupamiento (si se permite)
+    const canRotate = !hasGrain || p.grainDirection === 'libre';
+    if (canRotate && p.width !== p.height) {
+      const rotKey = mode === 'vertical' ? p.height : p.width;
+      if (rotKey !== key) {
+        if (!groups.has(rotKey)) groups.set(rotKey, []);
+        groups.get(rotKey)!.push({ ...p, width: p.height, height: p.width });
       }
     }
   }
 
-  // Limpiar estado de piezas para la siguiente iteración de simulación
-  pieces.forEach(p => p.placed = false);
+  const strips: Strip[] = [];
 
-  const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
-  const totalArea = panelWidth * panelHeight;
-  const usefulLeftovers = leftovers.filter(l => Math.min(l.width, l.height) >= 80);
-  const leftoverArea = usefulLeftovers.reduce((acc, l) => acc + (l.width * l.height), 0);
+  for (const [size, list] of groups.entries()) {
+    // Ordenamos piezas de la tira por área para maximizar densidad
+    const sorted = [...list].sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    const selected: InternalPart[] = [];
+    let usedInStack = 0;
 
-  const stats: PanelStats = {
-    totalAreaM2: Number((totalArea / 1000000).toFixed(2)),
-    usedAreaM2: Number((usedArea / 1000000).toFixed(2)),
-    leftoverAreaM2: Number((leftoverArea / 1000000).toFixed(2)),
-    wasteAreaM2: Number(((totalArea - usedArea - leftoverArea) / 1000000).toFixed(2)),
-    wastePercentage: Number(((1 - (usedArea / totalArea)) * 100).toFixed(3)),
-    displacements: Math.round(4 + (uniqueStrips.size * 2) + (placedParts.length * 0.5)),
-    linearMeters: Number(((panelWidth * 2 + panelHeight * 2 + (usedArea / 1000)) / 1000).toFixed(2))
+    for (const p of sorted) {
+      // En modo Vertical apilamos por ALTO (dimensión vertical)
+      // En modo Horizontal apilamos por ANCHO (dimensión horizontal)
+      const stackDim = mode === 'vertical' ? p.height : p.width;
+
+      if (usedInStack + stackDim <= stackLimit) {
+        selected.push(p);
+        usedInStack += stackDim + kerf;
+      }
+    }
+
+    if (selected.length > 0) {
+      strips.push({ size, pieces: selected });
+    }
+  }
+
+  // Ordenar tiras por área total ocupada para priorizar el llenado denso del panel
+  return strips.sort((a, b) => {
+    const areaA = a.size * a.pieces.reduce((sum, p) => sum + (mode === 'vertical' ? p.height : p.width), 0);
+    const areaB = b.size * b.pieces.reduce((sum, p) => sum + (mode === 'vertical' ? p.height : p.width), 0);
+    return areaB - areaA;
+  });
+}
+
+// ================= EVALUACION =================
+
+function evaluateStripLayout(
+  vertical: Strip[],
+  horizontal: Strip[],
+  usableW: number,
+  usableH: number,
+  kerf: number
+): { strips: Strip[], mode: 'vertical' | 'horizontal' } {
+  
+  const calculateTotalArea = (strips: Strip[], panelLimit: number, mode: 'vertical' | 'horizontal') => {
+    let totalArea = 0;
+    let currentPos = 0;
+    for (const s of strips) {
+      if (currentPos + s.size <= panelLimit) {
+        totalArea += s.size * s.pieces.reduce((sum, p) => sum + (mode === 'vertical' ? p.height : p.width), 0);
+        currentPos += s.size + kerf;
+      }
+    }
+    return totalArea;
   };
+
+  const areaV = calculateTotalArea(vertical, usableW, 'vertical');
+  const areaH = calculateTotalArea(horizontal, usableH, 'horizontal');
+
+  // Seleccionamos la estrategia que mejor aprovecha el área de ESTE tablero
+  return areaV >= areaH
+    ? { strips: vertical, mode: 'vertical' }
+    : { strips: horizontal, mode: 'horizontal' };
+}
+
+// ================= LAYOUT =================
+
+function layoutStrips(
+  config: { strips: Strip[], mode: 'vertical' | 'horizontal' },
+  usableW: number,
+  usableH: number,
+  trim: number,
+  kerf: number,
+  panelWidth: number,
+  panelHeight: number,
+  panelNumber: number
+): OptimizedPanel {
+  const parts: OptimizedPart[] = [];
+  let offsetX = trim;
+  let offsetY = trim;
+
+  const panelLimit = config.mode === 'vertical' ? usableW : usableH;
+
+  for (const strip of config.strips) {
+    const stripSize = strip.size;
+    const currentPos = config.mode === 'vertical' ? offsetX : offsetY;
+
+    // Validación de guillotina: si la tira entera no cabe, saltamos
+    if (currentPos + stripSize > trim + panelLimit) continue;
+
+    let cursor = trim; // El cursor avanza a lo largo de la tira
+
+    for (const p of strip.pieces) {
+      const pStackDim = config.mode === 'vertical' ? p.height : p.width;
+      const stackLimit = config.mode === 'vertical' ? usableH : usableW;
+
+      if (cursor + pStackDim > trim + stackLimit) break;
+
+      parts.push({
+        name: p.name,
+        x: config.mode === 'vertical' ? offsetX : cursor,
+        y: config.mode === 'vertical' ? cursor : offsetY,
+        width: p.width,
+        height: p.height,
+        rotated: false
+      });
+
+      cursor += pStackDim + kerf;
+    }
+
+    if (config.mode === 'vertical') {
+      offsetX += stripSize + kerf;
+    } else {
+      offsetY += stripSize + kerf;
+    }
+  }
+
+  const usedArea = parts.reduce((a, p) => a + (p.width * p.height), 0);
+  const totalArea = panelWidth * panelHeight;
 
   return {
     panelNumber,
-    parts: placedParts,
+    parts,
     efficiency: (usedArea / totalArea) * 100,
     usedArea,
     totalArea,
-    leftovers: usefulLeftovers,
-    strategy,
-    stats
+    leftovers: [],
+    strategy: config.mode,
+    stats: {
+      totalAreaM2: totalArea / 1000000,
+      usedAreaM2: usedArea / 1000000,
+      leftoverAreaM2: 0,
+      wasteAreaM2: (totalArea - usedArea) / 1000000,
+      wastePercentage: 100 - ((usedArea / totalArea) * 100),
+      displacements: parts.length + config.strips.length,
+      linearMeters: 0
+    }
   };
 }
 
-function calculateFitScore(
-  pieceW: number,
-  pieceH: number,
-  rect: FreeRect,
-  strategy: 'vertical' | 'horizontal'
-): number {
-  const areaFit = pieceW * pieceH;
-  const waste = (rect.width * rect.height) - areaFit;
+// ================= UTILS =================
 
-  // Penalización por desperdicio de área
-  let score = areaFit - (waste * 0.65);
-
-  // Bonus crítico: Llenar completamente la tira en el eje de guillotina
-  if (strategy === 'horizontal') {
-    if (Math.abs(pieceH - rect.height) < 0.1) score += 1000000;
-  } else {
-    if (Math.abs(pieceW - rect.width) < 0.1) score += 1000000;
+function markPlaced(pool: InternalPart[], placed: OptimizedPart[]) {
+  for (const p of placed) {
+    const match = pool.find(x => 
+      !x.placed && 
+      x.name === p.name && 
+      ((x.width === p.width && x.height === p.height) || (x.width === p.height && x.height === p.width))
+    );
+    if (match) match.placed = true;
   }
-
-  // Bonus secundario: Ajuste al ancho/alto restante para minimizar fragmentación
-  const diffW = rect.width - pieceW;
-  const diffH = rect.height - pieceH;
-  if (diffW < 10) score += 50000;
-  if (diffH < 10) score += 50000;
-
-  return score;
-}
-
-function evaluatePanelQuality(panel: OptimizedPanel, panelWidth: number, panelHeight: number): number {
-  let score = panel.efficiency * 1000000;
-  const leftovers = panel.leftovers || [];
-  
-  // Penalización por fragmentación excesiva
-  score -= (leftovers.length * 500000);
-
-  for (const l of leftovers) {
-    const minDim = Math.min(l.width, l.height);
-    const maxDim = Math.max(l.width, l.height);
-    const area = l.width * l.height;
-    const aspectRatio = maxDim / minDim;
-
-    // Penalizar tiras largas e inútiles
-    if (aspectRatio > 6) score -= 2000000;
-
-    // Bonificar bloques reutilizables industriales
-    if (minDim >= 500) score += (area / panel.totalArea) * 10000000;
-    else if (minDim >= 300) score += (area / panel.totalArea) * 2000000;
-
-    // Penalizar basura (recortes de menos de 80mm)
-    if (minDim < 80) score -= 1500000; 
-  }
-
-  return score;
-}
-
-function splitGuillotineSmart(
-  rect: FreeRect, 
-  pW: number, 
-  pH: number, 
-  kerf: number, 
-  strategy: 'vertical' | 'horizontal'
-): FreeRect[] {
-  const remW = rect.width - pW - kerf;
-  const remH = rect.height - pH - kerf;
-  const result: FreeRect[] = [];
-
-  // Elegir estrategia de split según la orientación global del tablero para mantener la guillotina
-  if (strategy === 'vertical') {
-    if (remW > 0) result.push({ x: rect.x + pW + kerf, y: rect.y, width: remW, height: rect.height });
-    if (remH > 0) result.push({ x: rect.x, y: rect.y + pH + kerf, width: pW, height: remH });
-  } else {
-    if (remH > 0) result.push({ x: rect.x, y: rect.y + pH + kerf, width: rect.width, height: remH });
-    if (remW > 0) result.push({ x: rect.x + pW + kerf, y: rect.y, width: remW, height: pH });
-  }
-
-  return result;
-}
-
-function smartShuffle(pieces: InternalPart[]) {
-  // Mezcla aleatoria limitada para explorar el espacio de soluciones sin perder el orden base
-  for (let i = 0; i < Math.min(pieces.length, 30); i++) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
-  }
-}
-
-function generateColors(parts: any[]): Record<string, string> {
-  const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
-  const colors: Record<string, string> = {};
-  uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 50%, 0.25)`;
-  });
-  return colors;
 }
