@@ -264,7 +264,6 @@ export class SteelSceneManager {
 
     processed.panels.forEach((p: any, index: number) => {
     
-      structuralGroup.add(panelGroup);
       // =========================
       // 🔷 PANEL GROUP (CLAVE)
       // =========================
@@ -334,8 +333,18 @@ export class SteelSceneManager {
           globalX >= (op.position - 10) &&
           globalX <= (op.position + op.width + 10)
         );
-    
-        if (!inOpening) {
+      
+        const inHeader = processed.headers?.some((h: any) => {
+          const op = wall.openings.find(o => o.id === h.openingId);
+          if (!op) return false;
+      
+          return (
+            globalX >= (op.position - 10) &&
+            globalX <= (op.position + op.width + 10)
+          );
+        });
+      
+        if (!inOpening && !inHeader) {
     
           // stud principal
           panelGroup.add(
