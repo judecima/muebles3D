@@ -1,4 +1,3 @@
-
 import { GrainDirection, OptimizationResult, OptimizedPanel, OptimizedPart, PanelStats } from '../../lib/types';
 
 interface InternalPart {
@@ -19,8 +18,8 @@ interface FreeRect {
 }
 
 /**
- * JADSI Industrial Engine v39.0 - OR-Tools Inspired Solver
- * Implementa búsqueda heurística avanzada con balance de stock reutilizable.
+ * JADSI Industrial Engine v40.0 - Senior Implementation
+ * Motor híbrido determinístico + heurístico para optimización de corte 2D Guillotina.
  */
 export function runOptimization(
   parts: { name: string; width: number; height: number; quantity: number; grainDirection: GrainDirection; thickness: number }[],
@@ -41,13 +40,14 @@ export function runOptimization(
   const usableH = Math.max(0, panelHeight - (trim * 2));
   const partColors = generateColors(filteredParts);
 
+  // Pre-procesamiento: Desglose y ordenamiento por área descendente
   let globalPool: InternalPart[] = filteredParts.flatMap((p, idx) => 
     Array.from({ length: p.quantity }, () => ({
       ...p,
       originalIndex: idx,
       placed: false
     }))
-  );
+  ).sort((a, b) => (b.width * b.height) - (a.width * a.height));
 
   const finalPanels: OptimizedPanel[] = [];
   let panelCounter = 1;
@@ -56,21 +56,22 @@ export function runOptimization(
     let bestPanelForThisStep: OptimizedPanel | null = null;
     let bestScore = -Infinity;
 
-    // Simulación de búsqueda por restricciones (CP Search)
-    const iterations = 12000;
-    const targetEfficiency = 96.5;
+    // Ejecutar múltiples estrategias de búsqueda para encontrar el mejor tablero local
+    const iterations = 8000;
+    const targetEfficiency = 97.5;
 
     for (let iter = 0; iter < iterations; iter++) {
       const currentAvailablePieces = globalPool.filter(p => !p.placed).map(p => ({ ...p }));
       
-      // Heurísticas de ordenamiento variables
-      if (iter === 0) {
-        currentAvailablePieces.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-      } else if (iter < 2000) {
-        currentAvailablePieces.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
-      } else {
-        // Shuffle aleatorio inteligente (OR-Tools style Randomized Search)
-        smartShuffle(currentAvailablePieces);
+      // Variación de heurística de ordenamiento
+      if (iter > 0) {
+        if (iter < 1000) {
+          // Heurística de Dimensión Máxima
+          currentAvailablePieces.sort((a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height));
+        } else {
+          // Búsqueda estocástica inteligente
+          smartShuffle(currentAvailablePieces);
+        }
       }
 
       const strategies: ('horizontal' | 'vertical')[] = ['horizontal', 'vertical'];
@@ -90,7 +91,6 @@ export function runOptimization(
           panelCounter
         );
 
-        // Función de evaluación de calidad industrial
         const currentScore = evaluatePanelQuality(attempt, panelWidth, panelHeight);
         
         if (currentScore > bestScore) {
@@ -99,14 +99,12 @@ export function runOptimization(
         }
       }
 
-      // Criterio de parada temprana (Optimización encontrada)
-      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= targetEfficiency) {
-        const hasMajorLeftover = (bestPanelForThisStep.leftovers || []).some(l => Math.min(l.width, l.height) >= 500);
-        if (hasMajorLeftover) break;
-      }
+      // Early exit si la eficiencia es excepcional
+      if (bestPanelForThisStep && bestPanelForThisStep.efficiency >= targetEfficiency) break;
     }
 
     if (bestPanelForThisStep && bestPanelForThisStep.parts.length > 0) {
+      // Marcar piezas como colocadas en el pool global
       bestPanelForThisStep.parts.forEach(placedPart => {
         if (placedPart.isLeftover) return;
         
@@ -133,7 +131,7 @@ export function runOptimization(
     optimizedLayout: finalPanels,
     totalPanels: finalPanels.length,
     totalEfficiency: finalPanels.length > 0 ? (totalUsedArea / totalAvailArea) * 100 : 0,
-    summary: `JADSI v39.0 - OR-Tools Search Engine: Búsqueda heurística completada en ${panelCounter - 1} tableros con balance de stock reutilizable.`,
+    summary: `JADSI v40.0 - Motor Industrial: Optimización completada en ${panelCounter - 1} tableros con reducción de fragmentación y máximización de stock útil.`,
     kerf,
     trim,
     selectedThickness
@@ -159,7 +157,7 @@ function fillSinglePanel(
   const uniqueStrips = new Set<number>();
 
   while (freeRects.length > 0) {
-    // Ordenamiento según estrategia de guillotina
+    // Priorización de rectángulos según estrategia de guillotina
     freeRects.sort((a, b) => {
       if (strategy === 'horizontal') return (a.y - b.y) || (a.x - b.x);
       return (a.x - b.x) || (a.y - b.y);
@@ -169,25 +167,25 @@ function fillSinglePanel(
     if (r.width < 1 || r.height < 1) continue;
 
     let bestPieceIdx = -1;
-    let bestScore = -1;
+    let bestScore = -Infinity;
     let rotated = false;
 
     for (let i = 0; i < pieces.length; i++) {
       const part = pieces[i];
       if (part.placed) continue;
 
-      // Fit Normal
+      // Evaluar Orientación Normal
       if (part.width <= r.width && part.height <= r.height) {
-        const score = calculateIndustrialScore(part.width, part.height, r, strategy);
+        const score = calculateFitScore(part.width, part.height, r, strategy);
         if (score > bestScore) {
           bestScore = score; bestPieceIdx = i; rotated = false;
         }
       }
 
-      // Fit Rotado
+      // Evaluar Orientación Rotada (solo si se permite)
       const canRotate = !hasGrain || part.grainDirection === 'libre';
       if (canRotate && part.height <= r.width && part.width <= r.height) {
-        const score = calculateIndustrialScore(part.height, part.width, r, strategy);
+        const score = calculateFitScore(part.height, part.width, r, strategy);
         if (score > bestScore) {
           bestScore = score; bestPieceIdx = i; rotated = true;
         }
@@ -208,8 +206,12 @@ function fillSinglePanel(
 
       part.placed = true;
       uniqueStrips.add(strategy === 'vertical' ? r.x : r.y);
-      splitGuillotine(freeRects, r, w, h, kerf, strategy);
+      
+      // Aplicar Split Guillotina Inteligente
+      const newRects = splitGuillotineSmart(r, w, h, kerf, strategy);
+      freeRects.push(...newRects);
     } else {
+      // Registrar sobrante si es de tamaño considerable
       if (r.width >= 5 || r.height >= 5) {
         leftovers.push({
           name: `S${leftovers.length + 1}`,
@@ -221,11 +223,12 @@ function fillSinglePanel(
     }
   }
 
+  // Limpiar estado de piezas para la siguiente iteración de simulación
   pieces.forEach(p => p.placed = false);
 
   const usedArea = placedParts.reduce((acc, p) => acc + (p.width * p.height), 0);
   const totalArea = panelWidth * panelHeight;
-  const usefulLeftovers = leftovers.filter(l => Math.min(l.width, l.height) >= 100);
+  const usefulLeftovers = leftovers.filter(l => Math.min(l.width, l.height) >= 80);
   const leftoverArea = usefulLeftovers.reduce((acc, l) => acc + (l.width * l.height), 0);
 
   const stats: PanelStats = {
@@ -234,7 +237,7 @@ function fillSinglePanel(
     leftoverAreaM2: Number((leftoverArea / 1000000).toFixed(2)),
     wasteAreaM2: Number(((totalArea - usedArea - leftoverArea) / 1000000).toFixed(2)),
     wastePercentage: Number(((1 - (usedArea / totalArea)) * 100).toFixed(3)),
-    displacements: Math.round(4 + (uniqueStrips.size * 2) + (placedParts.length * 0.8)),
+    displacements: Math.round(4 + (uniqueStrips.size * 2) + (placedParts.length * 0.5)),
     linearMeters: Number(((panelWidth * 2 + panelHeight * 2 + (usedArea / 1000)) / 1000).toFixed(2))
   };
 
@@ -250,55 +253,87 @@ function fillSinglePanel(
   };
 }
 
+function calculateFitScore(
+  pieceW: number,
+  pieceH: number,
+  rect: FreeRect,
+  strategy: 'vertical' | 'horizontal'
+): number {
+  const areaFit = pieceW * pieceH;
+  const waste = (rect.width * rect.height) - areaFit;
+
+  // Penalización por desperdicio de área
+  let score = areaFit - (waste * 0.65);
+
+  // Bonus crítico: Llenar completamente la tira en el eje de guillotina
+  if (strategy === 'horizontal') {
+    if (Math.abs(pieceH - rect.height) < 0.1) score += 1000000;
+  } else {
+    if (Math.abs(pieceW - rect.width) < 0.1) score += 1000000;
+  }
+
+  // Bonus secundario: Ajuste al ancho/alto restante para minimizar fragmentación
+  const diffW = rect.width - pieceW;
+  const diffH = rect.height - pieceH;
+  if (diffW < 10) score += 50000;
+  if (diffH < 10) score += 50000;
+
+  return score;
+}
+
 function evaluatePanelQuality(panel: OptimizedPanel, panelWidth: number, panelHeight: number): number {
-  let score = panel.efficiency * 100000;
+  let score = panel.efficiency * 1000000;
   const leftovers = panel.leftovers || [];
   
-  // Penalizar fragmentación (OR-Tools goal: Less chunks)
-  score -= (leftovers.length * 2000000);
+  // Penalización por fragmentación excesiva
+  score -= (leftovers.length * 500000);
 
-  leftovers.forEach(l => {
+  for (const l of leftovers) {
     const minDim = Math.min(l.width, l.height);
+    const maxDim = Math.max(l.width, l.height);
     const area = l.width * l.height;
+    const aspectRatio = maxDim / minDim;
 
-    // Bonificar sobrantes industriales reutilizables (>500mm)
-    if (minDim >= 500) score += (area / panel.totalArea) * 5000000000;
-    else if (minDim >= 300) score += (area / panel.totalArea) * 1000000000;
+    // Penalizar tiras largas e inútiles
+    if (aspectRatio > 6) score -= 2000000;
 
-    // Penalizar tiras inútiles
-    if (minDim < 80) score -= 1000000000; 
-  });
+    // Bonificar bloques reutilizables industriales
+    if (minDim >= 500) score += (area / panel.totalArea) * 10000000;
+    else if (minDim >= 300) score += (area / panel.totalArea) * 2000000;
 
-  return score;
-}
-
-function calculateIndustrialScore(w: number, h: number, r: FreeRect, strategy: 'vertical' | 'horizontal'): number {
-  let score = 0;
-  // Preferencia por llenar tiras completas (Guillotina perfecta)
-  if (strategy === 'horizontal') {
-    if (Math.abs(h - r.height) < 0.1) score += 50000000;
-  } else {
-    if (Math.abs(w - r.width) < 0.1) score += 50000000;
+    // Penalizar basura (recortes de menos de 80mm)
+    if (minDim < 80) score -= 1500000; 
   }
-  score += (w * h) * 5;
+
   return score;
 }
 
-function splitGuillotine(freeRects: FreeRect[], r: FreeRect, pW: number, pH: number, kerf: number, strategy: 'vertical' | 'horizontal') {
-  const remW = r.width - pW - kerf;
-  const remH = r.height - pH - kerf;
+function splitGuillotineSmart(
+  rect: FreeRect, 
+  pW: number, 
+  pH: number, 
+  kerf: number, 
+  strategy: 'vertical' | 'horizontal'
+): FreeRect[] {
+  const remW = rect.width - pW - kerf;
+  const remH = rect.height - pH - kerf;
+  const result: FreeRect[] = [];
 
+  // Elegir estrategia de split según la orientación global del tablero para mantener la guillotina
   if (strategy === 'vertical') {
-    if (remW > 0) freeRects.push({ x: r.x + pW + kerf, y: r.y, width: remW, height: r.height });
-    if (remH > 0) freeRects.push({ x: r.x, y: r.y + pH + kerf, width: pW, height: remH });
+    if (remW > 0) result.push({ x: rect.x + pW + kerf, y: rect.y, width: remW, height: rect.height });
+    if (remH > 0) result.push({ x: rect.x, y: rect.y + pH + kerf, width: pW, height: remH });
   } else {
-    if (remH > 0) freeRects.push({ x: r.x, y: r.y + pH + kerf, width: r.width, height: remH });
-    if (remW > 0) freeRects.push({ x: r.x + pW + kerf, y: r.y, width: remW, height: pH });
+    if (remH > 0) result.push({ x: rect.x, y: rect.y + pH + kerf, width: rect.width, height: remH });
+    if (remW > 0) result.push({ x: rect.x + pW + kerf, y: rect.y, width: remW, height: pH });
   }
+
+  return result;
 }
 
 function smartShuffle(pieces: InternalPart[]) {
-  for (let i = Math.min(20, pieces.length - 1); i < pieces.length; i++) {
+  // Mezcla aleatoria limitada para explorar el espacio de soluciones sin perder el orden base
+  for (let i = 0; i < Math.min(pieces.length, 30); i++) {
     const j = Math.floor(Math.random() * (i + 1));
     [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
   }
@@ -308,7 +343,7 @@ function generateColors(parts: any[]): Record<string, string> {
   const uniqueNames = Array.from(new Set(parts.map(p => p.name)));
   const colors: Record<string, string> = {};
   uniqueNames.forEach((name, i) => {
-    colors[name] = `hsla(${(i * 137.5) % 360}, 75%, 55%, 0.3)`;
+    colors[name] = `hsla(${(i * 137.5) % 360}, 70%, 50%, 0.25)`;
   });
   return colors;
 }
