@@ -153,6 +153,7 @@ export const AVAILABLE_PANELS: PanelSize[] = [
 ];
 
 export interface OptimizedPart {
+  id: string;
   name: string;
   x: number;
   y: number;
@@ -175,6 +176,8 @@ export interface PanelStats {
 
 export interface OptimizedPanel {
   panelNumber: number;
+  width: number;
+  height: number;
   parts: OptimizedPart[];
   efficiency: number;
   usedArea: number;
@@ -188,7 +191,7 @@ export interface OptimizationResult {
   optimizedLayout: OptimizedPanel[];
   totalPanels: number;
   totalEfficiency: number;
-  summary: string;
+  summary: any;
   kerf: number;
   trim: number;
   selectedThickness: number;
