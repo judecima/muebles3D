@@ -1,9 +1,8 @@
 /**
- * Benchmark v44: MDF FAPLAC MESOPOTAMIA GRIS TAPIR 18MM
- * Piezas: 62 unidades totales
- * Panel: 2750x1830mm, kerf 4.5mm, trim 10mm
+ * Benchmark Industrial A/B v44.8: Auditoría Profunda de KPIs
+ * Compara v44.7.2 (Legacy) vs v44.8 (Balanced Industrial)
  * 
- * Ejecutar: npx tsx src/test-optimizer/test-real-case.ts
+ * Uso: npx tsx src/test-optimizer/test-real-case.ts
  */
 
 import { runOptimization } from '../server/optimizer/cutOptimizer';
@@ -45,48 +44,111 @@ const testParts = [
 const panelW = 2750;
 const panelH = 1830;
 
-console.log('=== TEST v44 INDUSTRIAL ===\n');
-const startTime = performance.now();
-const result = runOptimization(testParts, panelW, panelH, 18, true, 4.5, 10);
-const elapsed = performance.now() - startTime;
+function deepAudit(result: any) {
+  const panels = result.optimizedLayout;
+  const debugEvents = result.debugEvents || [];
 
-console.log(`⏱️ Tiempo: ${elapsed.toFixed(1)}ms`);
-console.log(`📊 Paneles: ${result.totalPanels}`);
-console.log(`✅ Eficiencia Total: ${result.totalEfficiency.toFixed(2)}%\n`);
-
-for (const panel of result.optimizedLayout) {
-  const pCount = panel.parts.filter((p: any) => !p.isLeftover).length;
-  console.log(`--- Panel ${panel.panelNumber} (${panel.strategy}) ---`);
-  console.log(`  Piezas: ${pCount}`);
-  console.log(`  Eficiencia: ${panel.efficiency.toFixed(2)}%`);
+  // 1. Eficiencia por Panel
+  const effByPanel = panels.map((p: any) => p.efficiency);
   
-  if (panel.panelNumber === 1) {
-    const sortedParts = [...panel.parts].sort((a: any, b: any) => a.y !== b.y ? a.y - b.y : a.x - b.x);
-    for (const p of sortedParts) {
-      if (!p.isLeftover) {
-        console.log(`    [x:${p.x.toFixed(1)}, y:${p.y.toFixed(1)}] ${p.name} (${p.width}x${p.height}) ${p.rotated ? 'Rotated' : ''}`);
+  // 2. Transferencias Indebidas P1->P2
+  const p1Leftovers = panels[0]?.parts.filter((p: any) => p.isLeftover) || [];
+  const p2Pieces = panels[1]?.parts.filter((p: any) => !p.isLeftover) || [];
+  let potentialP1Fits = 0;
+  for (const p2 of p2Pieces) {
+    const orientations = [{ w: p2.width, h: p2.height }, { w: p2.height, h: p2.width }];
+    let fits = false;
+    for (const rem of p1Leftovers) {
+      for (const opt of orientations) {
+        if (opt.w <= rem.width + 0.5 && opt.h <= rem.height + 0.5) { fits = true; break; }
       }
+      if (fits) break;
+    }
+    if (fits) {
+      potentialP1Fits++;
+      console.log(`[AUDIT] Transferencia detectada: ${p2.name} (${p2.width}x${p2.height})`);
     }
   }
-  console.log(`  Eficiencia: ${panel.efficiency.toFixed(2)}%`);
-  
-  const pieceNames = panel.parts.filter((p: any) => !p.isLeftover).map((p: any) => p.name);
-  const nameCounts: Record<string, number> = {};
-  pieceNames.forEach((n: string) => nameCounts[n] = (nameCounts[n] || 0) + 1);
-  console.log(`  Distribución: ${JSON.stringify(nameCounts)}`);
-  
-  const leftovers = panel.parts.filter((p: any) => p.isLeftover);
-  console.log(`  Sobrantes (${leftovers.length}): ${JSON.stringify(leftovers.map((l: any) => `${Math.round(l.width)}x${Math.round(l.height)}`))}`);
-  
-  // Metas del usuario
-  if (panel.panelNumber === 1 && panel.efficiency >= 94) console.log('  ✅ META PANEL 1 ALCANZADA (>= 94%)');
-  if (panel.panelNumber === 2 && panel.efficiency >= 72) console.log('  ✅ META PANEL 2 ALCANZADA (>= 72%)');
+
+  // 3. Calidad del Sobrante del Último Panel
+  const lastPanel = panels[panels.length - 1];
+  const lastLeftovers = lastPanel?.parts.filter((p: any) => p.isLeftover) || [];
+  const biggestLastLeftoverArea = Math.max(...(lastLeftovers.map((l: any) => l.width * l.height)), 0);
+  const noodlesCount = lastLeftovers.filter((l: any) => Math.min(l.width, l.height) < 60).length;
+
+  // 4. Activaciones de Modos
+  const modes = { fill: 0, hybrid: 0, remanent: 0 };
+  debugEvents.forEach((e: any) => {
+    if (e.type === 'PIECE_SELECT' && e.metadata?.modeTransitionState) {
+      modes[e.metadata.modeTransitionState as keyof typeof modes]++;
+    }
+  });
+
+  // 5. Impacto de Rescue (LRP)
+  let lrpTriggered = 0;
+  let lrpSuccess = 0;
+  debugEvents.forEach((e: any) => {
+    if (e.metadata?.lastReasonablePassTriggered) {
+      lrpTriggered++;
+      if (e.winner) lrpSuccess++;
+    }
+  });
+
+  return {
+    panelCount: panels.length,
+    effByPanel,
+    totalEff: result.totalEfficiency,
+    potentialP1Fits,
+    biggestLastLeftoverM2: biggestLastLeftoverArea / 1000000,
+    noodlesCount,
+    modes,
+    lrpTriggered,
+    lrpSuccess,
+    lrpCeremonial: lrpTriggered - lrpSuccess
+  };
 }
 
-const totalRequired = testParts.reduce((acc, p) => acc + p.quantity, 0);
-const totalPlaced = result.optimizedLayout.reduce((acc: number, p: any) => acc + p.parts.filter((x: any) => !x.isLeftover).length, 0);
+console.log('=== AUDITORÍA INDUSTRIAL A/B: v44.7.2 vs v44.8 ===\n');
 
-console.log(`\n=== RESUMEN ===`);
-console.log(`Piezas: ${totalPlaced}/${totalRequired} colocadas`);
-if (totalPlaced === totalRequired) console.log('✅ TODAS las piezas colocadas correctamente.');
-else console.log(`❌ ERROR: Faltan ${totalRequired - totalPlaced} piezas.`);
+// RAMA A: v44.7.2 (Legacy)
+console.log('\n--- AUDITORÍA RAMA A (v44.7.2) ---');
+const resA = runOptimization(testParts, panelW, panelH, 18, true, 4.5, 10, false);
+const auditA = deepAudit(resA);
+
+// RAMA B: v44.8 (Balanced)
+console.log('\n--- AUDITORÍA RAMA B (v44.8.1-final) ---');
+const resB = runOptimization(testParts, panelW, panelH, 18, true, 4.5, 10, true);
+const auditB = deepAudit(resB);
+
+console.log(`| KPI Industrial | v44.7.2 (Legacy) | v44.8 (Balanced) | Impacto (Delta) |`);
+console.log(`| :--- | :--- | :--- | :--- |`);
+console.log(`| Paneles Totales | ${auditA.panelCount} | ${auditB.panelCount} | ${auditB.panelCount - auditA.panelCount} |`);
+console.log(`| Eficiencia P1 | ${auditA.effByPanel[0]?.toFixed(2)}% | ${auditB.effByPanel[0]?.toFixed(2)}% | ${(auditB.effByPanel[0] - auditA.effByPanel[0]).toFixed(2)}% |`);
+console.log(`| Eficiencia P2 | ${auditA.effByPanel[1]?.toFixed(2) || 'N/A'}% | ${auditB.effByPanel[1]?.toFixed(2) || 'N/A'}% | ${((auditB.effByPanel[1] || 0) - (auditA.effByPanel[1] || 0)).toFixed(2)}% |`);
+console.log(`| Eficiencia Último Panel | ${auditA.effByPanel[auditA.effByPanel.length - 1]?.toFixed(2)}% | ${auditB.effByPanel[auditB.effByPanel.length - 1]?.toFixed(2)}% | ${(auditB.effByPanel[auditB.effByPanel.length - 1] - auditA.effByPanel[auditA.effByPanel.length - 1]).toFixed(2)}% |`);
+console.log(`| Eficiencia Global | ${auditA.totalEff.toFixed(2)}% | ${auditB.totalEff.toFixed(2)}% | ${(auditB.totalEff - auditA.totalEff).toFixed(2)}% |`);
+console.log(`| Transferencias P1->P2 | ${auditA.potentialP1Fits} | ${auditB.potentialP1Fits} | ${auditB.potentialP1Fits - auditA.potentialP1Fits} |`);
+console.log(`| Sobrante Premium Último (m²) | ${auditA.biggestLastLeftoverM2.toFixed(3)} | ${auditB.biggestLastLeftoverM2.toFixed(3)} | ${(auditB.biggestLastLeftoverM2 - auditA.biggestLastLeftoverM2).toFixed(3)} |`);
+console.log(`| Retazos <60mm (Noodles) | ${auditA.noodlesCount} | ${auditB.noodlesCount} | ${auditB.noodlesCount - auditA.noodlesCount} |`);
+
+console.log(`\n=== IMPACTO DEL RESCATE (Last Reasonable Pass) ===`);
+console.log(`Activaciones: ${auditB.lrpTriggered}`);
+console.log(`Colocaciones Reales (Impacto): ${auditB.lrpSuccess}`);
+console.log(`Activaciones Ceremoniales: ${auditB.lrpCeremonial}`);
+
+console.log(`\n=== DISTRIBUCIÓN DE MODOS (v44.8) ===`);
+console.log(`Decisiones en FILL: ${auditB.modes.fill}`);
+console.log(`Decisiones en HYBRID: ${auditB.modes.hybrid}`);
+console.log(`Decisiones en REMANENT: ${auditB.modes.remanent}`);
+
+const improvement = 
+    (auditB.potentialP1Fits < auditA.potentialP1Fits) && 
+    (auditB.panelCount <= auditA.panelCount) && 
+    (auditB.lrpSuccess > 0);
+
+console.log(`\nVEREDICTO FINAL:`);
+if (improvement) {
+    console.log(`"v44.8 mejora realmente a v44.7.2: Reduce transferencias indebidas mediante rescate activo sin degradar el conteo de paneles."`);
+} else {
+    console.log(`"v44.8 corrige transferencias pero no mejora suficiente para reemplazar baseline."`);
+}

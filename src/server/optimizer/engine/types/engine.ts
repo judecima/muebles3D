@@ -5,6 +5,23 @@ export interface FreeRect {
   y: number;
   width: number;
   height: number;
+  colX?: number;
+  rowY?: number;
+}
+
+export interface EngineDebugEvent {
+  type: 'PIECE_SELECT' | 'PANEL_START' | 'PANEL_END' | 'CONTAINER_SELECT' | 'SPLIT' | 'REMNANT_EVAL' | 'PIECE_PLACED' | 'PIECE_BLOCKED' | 'BLOCK_DOWNGRADED_FOR_CONSOLIDATION' | 'NEW_PANEL';
+  stage: string;
+  message: string;
+  seq: number;
+  panelNumber?: number;
+  rect?: FreeRect;
+  pieceId?: string;
+  candidates?: any[];
+  discards?: any[];
+  winner?: any;
+  motive?: string;
+  metadata?: any;
 }
 
 export interface StripLight {
@@ -29,9 +46,11 @@ export interface FeatureFlags {
   useMultiStrip: boolean;
   useLookahead: boolean;
   useInvalidCache: boolean;
+  enableV44BalancedMode?: boolean; // v44.8: Modos Industriales y Confianza Normalizada
   maxActiveStrips: number;
   maxFreeRects?: number;
   minReusableDim?: number;
+  minWasteBlockDim?: number; // Fase 2: Umbral de bloqueo de basura
   eps?: number;
   seed?: number;
   debug?: boolean;
@@ -49,9 +68,11 @@ export interface EngineConfig {
   features: FeatureFlags;
   maxFreeRects: number;
   minReusableDim: number;
+  minWasteBlockDim: number; // Fase 2: Umbral de bloqueo de basura
   eps: number;
   seed?: number;
   debug?: boolean;
+  panelNumber?: number;
 }
 
 export interface EngineState {
@@ -59,8 +80,13 @@ export interface EngineState {
   activeStrips: StripLight[];
   closedStrips?: FreeRect[];
   placedParts?: OptimizedPart[];
+  debugSeq?: number; // Fase 2: Secuencia determinista de eventos
+  debugEvents?: EngineDebugEvent[];
   stats?: any;
   invalidCache?: Set<string>;
+  poolSize: number;
+  remainingArea: number;
+  isConsolidationMode: boolean;
 }
 
 export interface IndexedPieces {
