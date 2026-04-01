@@ -52,6 +52,7 @@ export interface FeatureFlags {
   enableForcedConsumptionZone?: boolean; // v44.9.2: Forced consumption zone detection and pool reduction
   enablePrimaryPanelAggression?: boolean; // v44.9.3: Reduce global penalties in early P1 to recover density
   enableStructuralPairClosure?: boolean; // v45.0: Evaluate combined piece area in P1 aggression window
+  enableComplementaryPoolAlignment?: boolean; // v45.1: Evaluate residual compatibility with remaining inventory
   maxActiveStrips: number;
   maxFreeRects?: number;
   minReusableDim?: number;

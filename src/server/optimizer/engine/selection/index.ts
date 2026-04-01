@@ -31,6 +31,8 @@ export function selectBestPiece(
   let pairClosurePairsEvaluated = 0;
   let pairClosureBestRatio = 0;
   let nearPerfectPairClosureFound = false;
+  let poolAlignmentApplied = false;
+  let poolAlignmentScore = 0;
 
   const rectSnapshot = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
 
@@ -296,6 +298,24 @@ export function selectBestPiece(
     poolContext.closureCriticalZone = closureCriticalScore >= 0.40;
   }
 
+  // v45.2.1: Calculate scaling early to affect base scoring of candidates
+  const panelEfficiency = poolContext.currentPanelEfficiency;
+  const primaryPanelAggressionActive = 
+    config.features.enablePrimaryPanelAggression &&
+    panelNumber === 1 &&
+    panelEfficiency < 0.85 &&
+    !poolContext.isLikelyLastPanel &&
+    (poolContext.closureCriticalZone || poolContext.reasonableFitCandidateCount > 0);
+
+  const bandMatchScalingActive = primaryPanelAggressionActive;
+  // Escalating to 0.25x as per user's "next step" instructions
+  const bandMatchScalingFactor = bandMatchScalingActive ? 0.25 : 1.0;
+  
+  poolContext.bandMatchScalingActive = bandMatchScalingActive;
+  poolContext.bandMatchScalingFactor = bandMatchScalingActive ? 0.35 : 1.0;
+  
+  const primaryPanelAggressionBonusValue = primaryPanelAggressionActive ? 20_000_000 : 0;
+
   const tryPiece = (piece: InternalPart, w: number, h: number, rotated: boolean) => {
     const pieceLabel = `${piece.name} (${w}x${h})`;
     const pieceArea = w * h;
@@ -418,31 +438,18 @@ export function selectBestPiece(
     });
   }
 
-  // --- v44.9.3: PRIMARY PANEL AGGRESSION (Asymmetric P1 Optimization) ---
-  const panelEfficiency = poolContext.currentPanelEfficiency;
-  const hasGeometricOpportunity = poolContext.closureCriticalZone || poolContext.reasonableFitCandidateCount > 0;
-  
-  const primaryPanelAggressionActive = 
-    config.features.enablePrimaryPanelAggression &&
-    panelNumber === 1 &&
-    panelEfficiency < 0.85 &&
-    !poolContext.isLikelyLastPanel &&
-    hasGeometricOpportunity;
-  
-  const primaryPanelAggressionBonusValue = primaryPanelAggressionActive ? 20_000_000 : 0;
-  
-  const primaryAggressionExpandedLookaheadActive =
-    primaryPanelAggressionActive;
+  let lookaheadWinnerChange = false;
+  let originalWinnerId = (bestPiece as any)?.id;
+  const primaryAggressionExpandedLookaheadActive = primaryPanelAggressionActive;
+  const lookaheadCandidateCount = primaryAggressionExpandedLookaheadActive ? 6 : 3;
   
   const aggressionReason = primaryPanelAggressionActive 
     ? `P1 early stage (Eff: ${(panelEfficiency * 100).toFixed(1)}%) with geometric opportunity`
     : (panelNumber === 1 && panelEfficiency >= 0.85 ? 'P1 reached efficiency threshold' : 'Not P1 or likely last panel');
 
-  let lookaheadWinnerChange = false;
-  let originalWinnerId = (bestPiece as any)?.id;
-  const lookaheadCandidateCount = primaryAggressionExpandedLookaheadActive ? 6 : 3;
   if (config.features.enableDepth1Lookahead && topCandidatesForLookahead.length > 1 && !poolContext.isLikelyLastPanel) {
     const topCandidates = topCandidatesForLookahead.sort((a, b) => b.finalScore - a.finalScore).slice(0, lookaheadCandidateCount);
+    
     const spaceManager = new GuillotineStrategy();
     for (const cat of topCandidates) {
       const currentPiece = pieces.find(p => p.id === cat.pieceId)!;
@@ -596,6 +603,76 @@ export function selectBestPiece(
       }
     }
 
+    // v45.1 Phase 4: Complementary Pool Alignment
+    // Evaluate how well the residual of the Top-N candidates matches the remaining inventory.
+    if (config.features.enableComplementaryPoolAlignment && primaryPanelAggressionActive && topCandidatesForLookahead.length > 1) {
+      poolAlignmentApplied = true;
+      const MIN_USABLE = config.minReusableDim || 60;
+      
+      for (const cat of topCandidatesForLookahead.slice(0, 6)) {
+        const remW = rect.width - cat.w;
+        const remH = rect.height - cat.h;
+        
+        let exactCount = 0;
+        let nearCount = 0;
+        let compatibleArea = 0;
+        
+        for (const p of activePool) {
+          if (p.id === cat.pieceId) continue;
+          
+          const dims = [
+            { w: p.width, h: p.height },
+            ...(!config.hasGrain || p.grainDirection === 'libre' ? [{ w: p.height, h: p.width }] : [])
+          ];
+          
+          let pieceFits = false;
+          let matched = false;
+          for (const d of dims) {
+            // Check for exact/near matches on the residual dimensions
+            const dw = Math.abs(d.w - remW);
+            const dh = Math.abs(d.h - remH);
+            
+            if (dw <= 2 || dh <= 2) {
+              if (!matched) exactCount++;
+              matched = true;
+            } else if (dw <= 6 || dh <= 6) {
+              if (!matched) nearCount++;
+              matched = true;
+            }
+            
+            if (d.w <= remW + 0.5 && d.h <= remH + 0.5) pieceFits = true;
+          }
+          if (pieceFits) compatibleArea += (p.width * p.height);
+        }
+        
+        const usability = (remW >= MIN_USABLE || remH >= MIN_USABLE) ? 1.0 : 0.1;
+        const areaRatio = compatibleArea / (remainingPoolArea + 1);
+        
+        // v45.1: Formula strictly weighted as requested by USER
+        // Main: Area (Coeff=60M so a 33% area fill = 20M cap)
+        // Reinforcement: Exact Count (2M each)
+        // Secondary: Near Count (0.5M each)
+        let alignmentScore = (areaRatio * 60_000_000) + (exactCount * 2_000_000) + (nearCount * 500_000);
+        alignmentScore *= usability;
+        
+        // CAP at 20M (Moderated cap as per user request)
+        const finalAlignmentBonus = Math.min(20_000_000, alignmentScore);
+        
+        cat.finalScore += finalAlignmentBonus;
+        cat.metadata = {
+          ...(cat.metadata || {}),
+          poolAlignmentApplied: true,
+          poolAlignmentScore: finalAlignmentBonus,
+          complementaryExactCount: exactCount,
+          complementaryNearCount: nearCount,
+          complementaryCompatibleArea: compatibleArea,
+          complementaryResidualUsability: usability
+        };
+        
+        if (finalAlignmentBonus > poolAlignmentScore) poolAlignmentScore = finalAlignmentBonus;
+      }
+    }
+
     // v44.9.3-rev2e: Track if the bonus flipped the top candidate before lookahead
     let preBonusTopCandidateId = "";
     if (primaryPanelAggressionBonusValue > 0 && topCandidatesForLookahead.length > 0) {
@@ -647,7 +724,11 @@ export function selectBestPiece(
         pairClosureChangedWinner,
         pairClosurePairsEvaluated,
         pairClosureBestRatio,
-        nearPerfectPairClosureFound
+        nearPerfectPairClosureFound,
+        poolAlignmentApplied,
+        poolAlignmentScore,
+        bandMatchScalingApplied: bandMatchScalingActive,
+        bandMatchScalingFactor: bandMatchScalingFactor
       },
       winner: winnerPiece ? { name: winnerPiece.name, score: bestScore, rotated: bestRotated } : null
     });

@@ -1,5 +1,5 @@
-// Benchmark Industrial A/B/C/D v45.0: Structural Pair Closure (Depth 1.5)
-// Comprehensive audit of global closure heuristics and industrial efficiency.
+// Benchmark Industrial A/B/C/D v45.2: Adaptive bandMatch Scaling (0.35x)
+// Comprehensive audit of inventory compatibility and strip consolidation.
 
 import { runOptimization } from '../server/optimizer/cutOptimizer';
 
@@ -51,25 +51,21 @@ function deepAudit(result: any) {
   const noodlesCount = lastLeftovers.filter((l: any) => Math.min(l.width, l.height) < 60).length;
 
   let lookaheadWinnerChange = 0;
-  let closureCriticalActivations = 0;
-  let forcedConsumptionApplied = 0;
-  let pairClosureApplied = 0;
-  let pairClosureChangedWinnerCount = 0;
-  let nearPerfectFoundCount = 0;
-  let bestPairRatioSum = 0;
-  let pairClosureEvents = 0;
+  let poolAlignmentApplied = 0;
+  let bandMatchScalingAppliedCount = 0;
+  let originalBandMatchSum = 0;
+  let scaledBandMatchSum = 0;
+  let scalingEvents = 0;
 
   debugEvents.forEach((e: any) => {
     if (e.metadata?.lookaheadWinnerChange) lookaheadWinnerChange++;
-    if (e.metadata?.closureCriticalZone) closureCriticalActivations++;
-    if (e.metadata?.forcedConsumptionOrderingApplied) forcedConsumptionApplied++;
-    if (e.metadata?.pairClosureApplied) {
-      pairClosureApplied++;
-      bestPairRatioSum += e.metadata.pairClosureBestRatio || 0;
-      pairClosureEvents++;
-      if (e.metadata.nearPerfectPairClosureFound) nearPerfectFoundCount++;
+    if (e.metadata?.poolAlignmentApplied) poolAlignmentApplied++;
+    if (e.metadata?.bandMatchScalingApplied) {
+      bandMatchScalingAppliedCount++;
+      originalBandMatchSum += e.metadata.originalBandMatchScore || 0;
+      scaledBandMatchSum += e.metadata.scaledBandMatchScore || 0;
+      scalingEvents++;
     }
-    if (e.metadata?.pairClosureChangedWinner) pairClosureChangedWinnerCount++;
   });
 
   return {
@@ -79,10 +75,9 @@ function deepAudit(result: any) {
     biggestLastLeftoverM2: biggestLastLeftoverArea / 1_000_000,
     noodlesCount,
     lookaheadWinnerChange,
-    pairClosureApplied,
-    pairClosureChangedWinnerCount,
-    nearPerfectFoundCount,
-    avgPairRatio: pairClosureEvents > 0 ? (bestPairRatioSum / pairClosureEvents) : 0,
+    poolAlignmentApplied,
+    bandMatchScalingAppliedCount,
+    avgScaling: scalingEvents > 0 ? (scaledBandMatchSum / Math.max(1, originalBandMatchSum)) : 0,
     timeMs: result.stats?.timeMs || 0,
   };
 }
@@ -99,12 +94,11 @@ const BASE_FEATURES = {
 
 const runs = [
   { name: 'v44.7.2 (Legacy)', config: { ...BASE_FEATURES } },
-  { name: 'v44.8.1 (Balanced)', config: { ...BASE_FEATURES, enableV44BalancedMode: true } },
-  { name: 'v44.9.3-rev2e (P1-Aggr)', config: { ...BASE_FEATURES, enableV44BalancedMode: true, enableDepth1Lookahead: true, enableDepth1LookaheadV2: true, enableForcedConsumptionZone: true, enablePrimaryPanelAggression: true } },
-  { name: 'v45.0 (Pair Closure)', config: { ...BASE_FEATURES, enableV44BalancedMode: true, enableDepth1Lookahead: true, enableDepth1LookaheadV2: true, enableForcedConsumptionZone: true, enablePrimaryPanelAggression: true, enableStructuralPairClosure: true } },
+  { name: 'v45.1 (Pool Align)', config: { ...BASE_FEATURES, enableV44BalancedMode: true, enableDepth1Lookahead: true, enableDepth1LookaheadV2: true, enableForcedConsumptionZone: true, enablePrimaryPanelAggression: true, enableStructuralPairClosure: true, enableComplementaryPoolAlignment: true } },
+  { name: 'v45.2 (BM Scale 035)', config: { ...BASE_FEATURES, enableV44BalancedMode: true, enableDepth1Lookahead: true, enableDepth1LookaheadV2: true, enableForcedConsumptionZone: true, enablePrimaryPanelAggression: true, enableStructuralPairClosure: true, enableComplementaryPoolAlignment: true } },
 ];
 
-console.log('=== BENCHMARK INDUSTRIAL COMPLETO: v44.7 -> v45.0 (Pair Closure) ===\n');
+console.log('=== BENCHMARK INDUSTRIAL COMPLETO: v44.7 -> v45.2 ===\n');
 
 const results: any[] = [];
 for (const run of runs) {
@@ -114,26 +108,24 @@ for (const run of runs) {
 }
 
 // Summary Table
-console.log('| Versión | Paneles | P1 Eff | Total Eff | Premium Sobrante | LH Changes | PC Applied | PC Winner Flips | Near-Perfect | PC Avg Ratio |');
-console.log('| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |');
+console.log('| Versión | Paneles | P1 Eff | Total Eff | Premium Sobrante | LH Changes | PC/PA App | BM Scale App | Avg Scaling |');
+console.log('| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |');
 results.forEach(r => {
-  console.log(`| ${r.name.padEnd(25)} | ${r.audit.panelCount} | ${r.audit.effByPanel[0]?.toFixed(2)}% | ${r.audit.totalEff.toFixed(2)}% | ${r.audit.biggestLastLeftoverM2.toFixed(3)} m² | ${r.audit.lookaheadWinnerChange} | ${r.audit.pairClosureApplied} | ${r.audit.pairClosureChangedWinnerCount} | ${r.audit.nearPerfectFoundCount} | ${r.audit.avgPairRatio.toFixed(3)} |`);
+  console.log(`| ${r.name.padEnd(25)} | ${r.audit.panelCount} | ${r.audit.effByPanel[0]?.toFixed(2)}% | ${r.audit.totalEff.toFixed(2)}% | ${r.audit.biggestLastLeftoverM2.toFixed(3)} m² | ${r.audit.lookaheadWinnerChange} | ${r.audit.poolAlignmentApplied} | ${r.audit.bandMatchScalingAppliedCount} | ${r.audit.avgScaling.toFixed(3)} |`);
 });
 
-const v93 = results[2].audit;
-const v45 = results[3].audit;
+const v451 = results[1].audit;
+const v452 = results[2].audit;
 
-console.log('\n--- Análisis v45.0 vs v44.9.3-rev2e ---');
-console.log(`PC Winner Flips (v45.0): ${v45.pairClosureChangedWinnerCount}`);
-console.log(`Near-Perfect Found (v45.0): ${v45.nearPerfectFoundCount}`);
-console.log(`P1 Efficiency (v45.0): ${v45.effByPanel[0]?.toFixed(2)}%`);
-console.log(`Total Panels: ${v45.panelCount}`);
+console.log('\n--- Análisis v45.2 vs v45.1 ---');
+console.log(`BM Scale Applied (v45.2): ${v452.bandMatchScalingAppliedCount}`);
+console.log(`P1 Efficiency (v45.2): ${v452.effByPanel[0]?.toFixed(2)}%`);
+console.log(`Total Panels: ${v452.panelCount}`);
 
 console.log('\n--- RESPUESTAS OBLIGATORIAS ---');
-console.log(`¿P1 sube por fin?: ${v45.effByPanel[0] > v93.effByPanel[0] ? 'SÍ ✅' : 'NO ❌ (' + v45.effByPanel[0].toFixed(2) + '%)'}`);
-console.log(`¿v45.0 vuelve a 2 paneles?: ${v45.panelCount === 2 ? 'SÍ ✅' : 'NO ❌ (' + v45.panelCount + ')'}`);
-console.log(`¿La mejora vino de pares y no de score?: ${v45.pairClosureChangedWinnerCount > 0 ? 'SÍ ✅' : 'NO'}`);
-console.log(`¿Se mantuvo controlado el remanente?: ${v45.biggestLastLeftoverM2 > 0.3 ? 'SÍ ✅' : 'NO'}`);
+console.log(`¿P1 sube por fin?: ${v452.effByPanel[0] > v451.effByPanel[0] ? 'SÍ ✅' : 'NO ❌ (' + v452.effByPanel[0].toFixed(2) + '%)'}`);
+console.log(`¿v45.2 vuelve a 2 paneles?: ${v452.panelCount === 2 ? 'SÍ ✅' : 'NO ❌ (' + v452.panelCount + ')'}`);
+console.log(`¿El cambio vino de bajar bandMatch?: ${v452.bandMatchScalingAppliedCount > 0 ? 'SÍ ✅' : 'NO'}`);
 
-const verdict = v45.panelCount === 2 ? 'LEPTON_GRADE_V45_SUCCESS' : (v45.effByPanel[0] > v93.effByPanel[0] ? 'INCREMENTAL_STRUCTURAL_IMPROVEMENT' : 'STILL_ROOM_FOR_GROWTH');
+const verdict = v452.panelCount === 2 ? 'LEPTON_GRADE_V45_2_SUCCESS' : (v452.effByPanel[0] > v451.effByPanel[0] ? 'INCREMENTAL_BEAUTY_SCALING_IMPROVEMENT' : 'STILL_ROOM_FOR_GROWTH');
 console.log(`\nVEREDICTO FINAL: ${verdict}`);

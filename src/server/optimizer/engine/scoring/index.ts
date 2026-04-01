@@ -21,19 +21,37 @@ export function scorePlacement(
   const pieceGuidingDim = config.strategy === 'horizontal' ? pieceH : pieceW;
   
   const fillRatio = (pieceGuidingDim + config.kerf) / guidingDim;
+  
+  // v45.2: Adaptive bandMatch Scaling
+  const bandMatchScalingActive = poolContext?.bandMatchScalingActive || false;
+  const bandMatchScalingFactor = poolContext?.bandMatchScalingFactor || 1.0;
+  let originalBandMatchScore = 0;
 
   if (approxEqual(pieceGuidingDim, guidingDim, config.eps)) {
-      score += 80000000;
+    originalBandMatchScore = 80000000;
   } else if (fillRatio > 0.995) {
-      score += 75000000;
+    originalBandMatchScore = 75000000;
   } else if (fillRatio > 0.98) {
-      score += 70000000;
+    originalBandMatchScore = 70000000;
   } else if (fillRatio > 0.95) {
-      score += 60000000;
+    originalBandMatchScore = 60000000;
   } else if (fillRatio > 0.90) {
-      score += 40000000;
+    originalBandMatchScore = 40000000;
   } else if (fillRatio > 0.6) {
-      score += Math.floor(fillRatio * 30000000);
+    originalBandMatchScore = Math.floor(fillRatio * 30000000);
+  }
+
+  const scaledBandMatchScore = Math.floor(originalBandMatchScore * bandMatchScalingFactor);
+  score += scaledBandMatchScore;
+
+  if (bandMatchScalingActive && (state as any)._currentMetadata) {
+    (state as any)._currentMetadata = {
+      ...(state as any)._currentMetadata || {},
+      bandMatchScalingApplied: true,
+      originalBandMatchScore,
+      scaledBandMatchScore,
+      bandMatchScalingFactor
+    };
   }
 
   const remW = rect.width - pieceW - config.kerf;
