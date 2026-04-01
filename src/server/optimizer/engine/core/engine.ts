@@ -14,10 +14,9 @@ export function runOptimization(
   hasGrain: boolean,
   kerf: number = 4.5,
   trim: number = 10,
-  enableV44BalancedMode: boolean = false
+  features: any = {}
 ): any {
   const thick = thickness || 18;
-  // User says trim is global sum (e.g. 10mm = 5mm per side), so we subtract it once from total dimensions
   const usableW = panelWidth - trim;
   const usableH = panelHeight - trim;
   const totalArea = panelWidth * panelHeight;
@@ -30,9 +29,13 @@ export function runOptimization(
     }))
   );
 
-  // [x] Entrega final del motor optimizado con REUSO DE SOBRANTES (Advanced Global Optimizer v45.0)
   const colors = generateColors(parts);
   
+  // v44.9: Normalización de flags para soportar objetos de configuración
+  const normalizedFeatures = (typeof features === 'boolean') 
+    ? { enableV44BalancedMode: features } 
+    : (features || {});
+
   const config = {
     kerf,
     trim,
@@ -40,7 +43,8 @@ export function runOptimization(
     panelHeight,
     strategy: 'horizontal' as const,
     hasGrain,
-    enableV44BalancedMode
+    ...normalizedFeatures,
+    features: normalizedFeatures // Para reuso en globalOptimizer
   };
 
   const { panels, debugEvents } = runGlobalOptimization(
@@ -50,7 +54,6 @@ export function runOptimization(
     config,
     colors
   );
-
 
   const usedAreaTotal = panels.reduce((acc: number, p: any) => acc + (p.efficiency / 100) * totalArea, 0);
   const totalAreaAllPanels = panels.length * panelWidth * panelHeight;
@@ -87,8 +90,12 @@ export function fillSinglePanel(
   panelNumber: number,
   hasGrain: boolean,
   debugOverride: boolean = true,
-  enableV44BalancedMode: boolean = false
+  features: any = {}
 ): OptimizedPanel {
+  const normalizedFeatures = (typeof features === 'boolean') 
+    ? { enableV44BalancedMode: features } 
+    : (features || {});
+
   const config: EngineConfig = {
     strategy, kerf, trim: trimSize, panelWidth: pW, panelHeight: pH, usableW, usableH, hasGrain,
     features: {
@@ -105,8 +112,9 @@ export function fillSinglePanel(
       useMultiStrip: false,
       useLookahead: true,
       useInvalidCache: true,
-      enableV44BalancedMode,
+      enableV44BalancedMode: false,
       maxActiveStrips: 0,
+      ...normalizedFeatures
     },
     maxFreeRects: 150,
     minReusableDim: 60,

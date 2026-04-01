@@ -225,24 +225,20 @@ export function scorePlacement(
       // --- v44.8.1-final: ASISTENCIA CONTEXTUAL LRP Y COMPARACIÓN H vs V ---
       let lastReasonablePassAssistance = 0;
       if (poolContext.lastReasonablePassActive) {
-          // Bono moderado (8M-12M) para capturar piezas estructurales casi-ganadoras
           lastReasonablePassAssistance = Math.floor(10000000 * panelIndexWeight);
       }
 
       let orientationRemnantAdvantage = 0;
       let preferredCutFlow = "standard";
       if (isV44Balanced) {
-          // Evaluar si la orientación actual es mejor que la alternativa localmente
           const altW = pieceH;
           const altH = pieceW;
-          const canRotate = (pieceW !== pieceH); // Simplificado
-          
+          const canRotate = (pieceW !== pieceH);
           if (canRotate && altW <= rect.width + 0.5 && altH <= rect.height + 0.5) {
               const currentMinRem = Math.min(remW, remH);
               const altRemW = rect.width - altW - config.kerf;
               const altRemH = rect.height - altH - config.kerf;
               const altMinRem = Math.min(altRemW, altRemH);
-              
               if (currentMinRem > altMinRem + 5) {
                   orientationRemnantAdvantage = 4000000;
                   preferredCutFlow = "better_remnant_alignment";
@@ -250,13 +246,58 @@ export function scorePlacement(
           }
       }
 
+      // --- v44.9: INDUSTRIAL REFINEMENT (LOOKAHEAD & STRUCTURE) ---
+      let lookaheadBonus = 0;
+      let bandClosureBonus = 0;
+      let fillerActivationBonus = 0;
+      let microBandPenalty = 0;
+
+      const isV449 = config.features.enableDepth1Lookahead;
+      
+      if (isV449) {
+          // 1. BAND CLOSURE PRIORITY (Cierre de Banda Proactivo)
+          const isClosingBand = config.strategy === 'horizontal' 
+            ? approxEqual(pieceW, rect.width, config.eps || 0.5)
+            : approxEqual(pieceH, rect.height, config.eps || 0.5);
+          
+          if (isClosingBand) {
+              const closureStrength = 10000000 * (1 - (confidence * 0.5)); // Más fuerte en FILL
+              bandClosureBonus = Math.floor(closureStrength * panelIndexWeight);
+          }
+
+          // 2. EARLY FILLER ACTIVATION (Piezas chicas para cierre)
+          const isSmallFiller = (pieceArea < 120000); // < 0.12m2
+          if (isSmallFiller && isClosingBand && mode === "fill") {
+              fillerActivationBonus = 5000000 * panelIndexWeight;
+          }
+
+          // 3. SOFT MICRO-BAND PENALTY (120mm Threshold) - DISABLED IN P1
+          const isP1 = config.panelNumber === 1;
+          const microThreshold = 120;
+          const resultingStripDim = config.strategy === 'horizontal' ? remH : remW;
+          
+          if (!isP1 && resultingStripDim > 0.5 && resultingStripDim < microThreshold) {
+              const severity = (microThreshold - resultingStripDim) / microThreshold;
+              const basePenalty = 4000000; // Reducido de 8M a 4M
+              
+              // Solo penalizar si NO hay match en el pool para ese espacio residual
+              const poolMatch = poolContext.topKPoolDims.some((d: any) => Math.abs(d.value - resultingStripDim) < 2.0);
+              const utilityFactor = (tier !== 'none' || poolMatch) ? 0.2 : 1.0;
+              
+              microBandPenalty = Math.floor(basePenalty * severity * utilityFactor * panelIndexWeight);
+          }
+      }
+
       // Aplicar Cierre de Banda, Higiene y Dominancia
       const legacyBonus = bandCloserValue - stripHygienePenalty + (isV44Balanced ? 0 : panel1DominanceBonus);
       const v448Bonus = balancedRetentionBonus + (bandCloserValue * (1 - remnantWeight)) - (stripHygienePenalty * (1 - remnantWeight));
+      const v449Bonus = bandClosureBonus + fillerActivationBonus - microBandPenalty;
       
-      const totalAdaptive = isV44Balanced 
-        ? v448Bonus + lastReasonablePassAssistance + orientationRemnantAdvantage 
-        : legacyBonus;
+      const totalAdaptive = (isV44Balanced ? v448Bonus : legacyBonus) + 
+                          lastReasonablePassAssistance + 
+                          orientationRemnantAdvantage +
+                          (isV449 ? v449Bonus : 0);
+
       const cappedBonus = Math.max(-25000000, Math.min(totalAdaptive, 25000000));
       const isCapped = totalAdaptive > 25000000 || totalAdaptive < -25000000;
       adaptiveBonus = cappedBonus;
@@ -274,6 +315,11 @@ export function scorePlacement(
           hybridRemnantWeight: remnantWeight.toFixed(3),
           blendingFactor: blendFactor.toFixed(3),
           balancedRetentionBonus,
+          // v44.9 Industrial Refinement
+          bandClosureBonus,
+          fillerActivationBonus,
+          microBandPenalty,
+          isV449Active: isV449,
           // Legacy Compatibility / Context
           panelIndexWeight: panelIndexWeight.toFixed(2),
           currentPanelOpportunityScore: (poolContext.currentPanelOpportunityScore || 0).toFixed(3),

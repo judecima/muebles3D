@@ -47,6 +47,11 @@ export interface FeatureFlags {
   useLookahead: boolean;
   useInvalidCache: boolean;
   enableV44BalancedMode?: boolean; // v44.8: Modos Industriales y Confianza Normalizada
+  enableDepth1Lookahead?: boolean; // v44.9: Anticipación Depth-1 y Cierre Estructural
+  enableDepth1LookaheadV2?: boolean; // v44.9.1: Lookahead with global closure pressure
+  enableForcedConsumptionZone?: boolean; // v44.9.2: Forced consumption zone detection and pool reduction
+  enablePrimaryPanelAggression?: boolean; // v44.9.3: Reduce global penalties in early P1 to recover density
+  enableStructuralPairClosure?: boolean; // v45.0: Evaluate combined piece area in P1 aggression window
   maxActiveStrips: number;
   maxFreeRects?: number;
   minReusableDim?: number;

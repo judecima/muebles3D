@@ -1,9 +1,5 @@
-/**
- * Benchmark Industrial A/B v44.8: Auditoría Profunda de KPIs
- * Compara v44.7.2 (Legacy) vs v44.8 (Balanced Industrial)
- * 
- * Uso: npx tsx src/test-optimizer/test-real-case.ts
- */
+// Benchmark Industrial A/B/C/D v45.0: Structural Pair Closure (Depth 1.5)
+// Comprehensive audit of global closure heuristics and industrial efficiency.
 
 import { runOptimization } from '../server/optimizer/cutOptimizer';
 
@@ -45,110 +41,99 @@ const panelW = 2750;
 const panelH = 1830;
 
 function deepAudit(result: any) {
-  const panels = result.optimizedLayout;
+  const panels = result.optimizedLayout || [];
   const debugEvents = result.debugEvents || [];
-
-  // 1. Eficiencia por Panel
-  const effByPanel = panels.map((p: any) => p.efficiency);
+  const effByPanel = panels.map((p: any) => p.efficiency || 0);
   
-  // 2. Transferencias Indebidas P1->P2
-  const p1Leftovers = panels[0]?.parts.filter((p: any) => p.isLeftover) || [];
-  const p2Pieces = panels[1]?.parts.filter((p: any) => !p.isLeftover) || [];
-  let potentialP1Fits = 0;
-  for (const p2 of p2Pieces) {
-    const orientations = [{ w: p2.width, h: p2.height }, { w: p2.height, h: p2.width }];
-    let fits = false;
-    for (const rem of p1Leftovers) {
-      for (const opt of orientations) {
-        if (opt.w <= rem.width + 0.5 && opt.h <= rem.height + 0.5) { fits = true; break; }
-      }
-      if (fits) break;
-    }
-    if (fits) {
-      potentialP1Fits++;
-      console.log(`[AUDIT] Transferencia detectada: ${p2.name} (${p2.width}x${p2.height})`);
-    }
-  }
-
-  // 3. Calidad del Sobrante del Último Panel
   const lastPanel = panels[panels.length - 1];
   const lastLeftovers = lastPanel?.parts.filter((p: any) => p.isLeftover) || [];
   const biggestLastLeftoverArea = Math.max(...(lastLeftovers.map((l: any) => l.width * l.height)), 0);
   const noodlesCount = lastLeftovers.filter((l: any) => Math.min(l.width, l.height) < 60).length;
 
-  // 4. Activaciones de Modos
-  const modes = { fill: 0, hybrid: 0, remanent: 0 };
-  debugEvents.forEach((e: any) => {
-    if (e.type === 'PIECE_SELECT' && e.metadata?.modeTransitionState) {
-      modes[e.metadata.modeTransitionState as keyof typeof modes]++;
-    }
-  });
+  let lookaheadWinnerChange = 0;
+  let closureCriticalActivations = 0;
+  let forcedConsumptionApplied = 0;
+  let pairClosureApplied = 0;
+  let pairClosureChangedWinnerCount = 0;
+  let nearPerfectFoundCount = 0;
+  let bestPairRatioSum = 0;
+  let pairClosureEvents = 0;
 
-  // 5. Impacto de Rescue (LRP)
-  let lrpTriggered = 0;
-  let lrpSuccess = 0;
   debugEvents.forEach((e: any) => {
-    if (e.metadata?.lastReasonablePassTriggered) {
-      lrpTriggered++;
-      if (e.winner) lrpSuccess++;
+    if (e.metadata?.lookaheadWinnerChange) lookaheadWinnerChange++;
+    if (e.metadata?.closureCriticalZone) closureCriticalActivations++;
+    if (e.metadata?.forcedConsumptionOrderingApplied) forcedConsumptionApplied++;
+    if (e.metadata?.pairClosureApplied) {
+      pairClosureApplied++;
+      bestPairRatioSum += e.metadata.pairClosureBestRatio || 0;
+      pairClosureEvents++;
+      if (e.metadata.nearPerfectPairClosureFound) nearPerfectFoundCount++;
     }
+    if (e.metadata?.pairClosureChangedWinner) pairClosureChangedWinnerCount++;
   });
 
   return {
     panelCount: panels.length,
     effByPanel,
     totalEff: result.totalEfficiency,
-    potentialP1Fits,
-    biggestLastLeftoverM2: biggestLastLeftoverArea / 1000000,
+    biggestLastLeftoverM2: biggestLastLeftoverArea / 1_000_000,
     noodlesCount,
-    modes,
-    lrpTriggered,
-    lrpSuccess,
-    lrpCeremonial: lrpTriggered - lrpSuccess
+    lookaheadWinnerChange,
+    pairClosureApplied,
+    pairClosureChangedWinnerCount,
+    nearPerfectFoundCount,
+    avgPairRatio: pairClosureEvents > 0 ? (bestPairRatioSum / pairClosureEvents) : 0,
+    timeMs: result.stats?.timeMs || 0,
   };
 }
 
-console.log('=== AUDITORÍA INDUSTRIAL A/B: v44.7.2 vs v44.8 ===\n');
+const BASE_FEATURES = {
+  useStripLock: true,
+  useSmartSplit: true,
+  penalizeSmallLeftovers: true,
+  useContinuityBonus: true,
+  useGeometricContinuity: true,
+  useBacktracking: true,
+  useInvalidCache: true,
+};
 
-// RAMA A: v44.7.2 (Legacy)
-console.log('\n--- AUDITORÍA RAMA A (v44.7.2) ---');
-const resA = runOptimization(testParts, panelW, panelH, 18, true, 4.5, 10, false);
-const auditA = deepAudit(resA);
+const runs = [
+  { name: 'v44.7.2 (Legacy)', config: { ...BASE_FEATURES } },
+  { name: 'v44.8.1 (Balanced)', config: { ...BASE_FEATURES, enableV44BalancedMode: true } },
+  { name: 'v44.9.3-rev2e (P1-Aggr)', config: { ...BASE_FEATURES, enableV44BalancedMode: true, enableDepth1Lookahead: true, enableDepth1LookaheadV2: true, enableForcedConsumptionZone: true, enablePrimaryPanelAggression: true } },
+  { name: 'v45.0 (Pair Closure)', config: { ...BASE_FEATURES, enableV44BalancedMode: true, enableDepth1Lookahead: true, enableDepth1LookaheadV2: true, enableForcedConsumptionZone: true, enablePrimaryPanelAggression: true, enableStructuralPairClosure: true } },
+];
 
-// RAMA B: v44.8 (Balanced)
-console.log('\n--- AUDITORÍA RAMA B (v44.8.1-final) ---');
-const resB = runOptimization(testParts, panelW, panelH, 18, true, 4.5, 10, true);
-const auditB = deepAudit(resB);
+console.log('=== BENCHMARK INDUSTRIAL COMPLETO: v44.7 -> v45.0 (Pair Closure) ===\n');
 
-console.log(`| KPI Industrial | v44.7.2 (Legacy) | v44.8 (Balanced) | Impacto (Delta) |`);
-console.log(`| :--- | :--- | :--- | :--- |`);
-console.log(`| Paneles Totales | ${auditA.panelCount} | ${auditB.panelCount} | ${auditB.panelCount - auditA.panelCount} |`);
-console.log(`| Eficiencia P1 | ${auditA.effByPanel[0]?.toFixed(2)}% | ${auditB.effByPanel[0]?.toFixed(2)}% | ${(auditB.effByPanel[0] - auditA.effByPanel[0]).toFixed(2)}% |`);
-console.log(`| Eficiencia P2 | ${auditA.effByPanel[1]?.toFixed(2) || 'N/A'}% | ${auditB.effByPanel[1]?.toFixed(2) || 'N/A'}% | ${((auditB.effByPanel[1] || 0) - (auditA.effByPanel[1] || 0)).toFixed(2)}% |`);
-console.log(`| Eficiencia Último Panel | ${auditA.effByPanel[auditA.effByPanel.length - 1]?.toFixed(2)}% | ${auditB.effByPanel[auditB.effByPanel.length - 1]?.toFixed(2)}% | ${(auditB.effByPanel[auditB.effByPanel.length - 1] - auditA.effByPanel[auditA.effByPanel.length - 1]).toFixed(2)}% |`);
-console.log(`| Eficiencia Global | ${auditA.totalEff.toFixed(2)}% | ${auditB.totalEff.toFixed(2)}% | ${(auditB.totalEff - auditA.totalEff).toFixed(2)}% |`);
-console.log(`| Transferencias P1->P2 | ${auditA.potentialP1Fits} | ${auditB.potentialP1Fits} | ${auditB.potentialP1Fits - auditA.potentialP1Fits} |`);
-console.log(`| Sobrante Premium Último (m²) | ${auditA.biggestLastLeftoverM2.toFixed(3)} | ${auditB.biggestLastLeftoverM2.toFixed(3)} | ${(auditB.biggestLastLeftoverM2 - auditA.biggestLastLeftoverM2).toFixed(3)} |`);
-console.log(`| Retazos <60mm (Noodles) | ${auditA.noodlesCount} | ${auditB.noodlesCount} | ${auditB.noodlesCount - auditA.noodlesCount} |`);
-
-console.log(`\n=== IMPACTO DEL RESCATE (Last Reasonable Pass) ===`);
-console.log(`Activaciones: ${auditB.lrpTriggered}`);
-console.log(`Colocaciones Reales (Impacto): ${auditB.lrpSuccess}`);
-console.log(`Activaciones Ceremoniales: ${auditB.lrpCeremonial}`);
-
-console.log(`\n=== DISTRIBUCIÓN DE MODOS (v44.8) ===`);
-console.log(`Decisiones en FILL: ${auditB.modes.fill}`);
-console.log(`Decisiones en HYBRID: ${auditB.modes.hybrid}`);
-console.log(`Decisiones en REMANENT: ${auditB.modes.remanent}`);
-
-const improvement = 
-    (auditB.potentialP1Fits < auditA.potentialP1Fits) && 
-    (auditB.panelCount <= auditA.panelCount) && 
-    (auditB.lrpSuccess > 0);
-
-console.log(`\nVEREDICTO FINAL:`);
-if (improvement) {
-    console.log(`"v44.8 mejora realmente a v44.7.2: Reduce transferencias indebidas mediante rescate activo sin degradar el conteo de paneles."`);
-} else {
-    console.log(`"v44.8 corrige transferencias pero no mejora suficiente para reemplazar baseline."`);
+const results: any[] = [];
+for (const run of runs) {
+  const res = runOptimization(testParts, panelW, panelH, 18, true, 4.5, 10, run.config as any);
+  const audit = deepAudit(res);
+  results.push({ name: run.name, audit });
 }
+
+// Summary Table
+console.log('| Versión | Paneles | P1 Eff | Total Eff | Premium Sobrante | LH Changes | PC Applied | PC Winner Flips | Near-Perfect | PC Avg Ratio |');
+console.log('| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |');
+results.forEach(r => {
+  console.log(`| ${r.name.padEnd(25)} | ${r.audit.panelCount} | ${r.audit.effByPanel[0]?.toFixed(2)}% | ${r.audit.totalEff.toFixed(2)}% | ${r.audit.biggestLastLeftoverM2.toFixed(3)} m² | ${r.audit.lookaheadWinnerChange} | ${r.audit.pairClosureApplied} | ${r.audit.pairClosureChangedWinnerCount} | ${r.audit.nearPerfectFoundCount} | ${r.audit.avgPairRatio.toFixed(3)} |`);
+});
+
+const v93 = results[2].audit;
+const v45 = results[3].audit;
+
+console.log('\n--- Análisis v45.0 vs v44.9.3-rev2e ---');
+console.log(`PC Winner Flips (v45.0): ${v45.pairClosureChangedWinnerCount}`);
+console.log(`Near-Perfect Found (v45.0): ${v45.nearPerfectFoundCount}`);
+console.log(`P1 Efficiency (v45.0): ${v45.effByPanel[0]?.toFixed(2)}%`);
+console.log(`Total Panels: ${v45.panelCount}`);
+
+console.log('\n--- RESPUESTAS OBLIGATORIAS ---');
+console.log(`¿P1 sube por fin?: ${v45.effByPanel[0] > v93.effByPanel[0] ? 'SÍ ✅' : 'NO ❌ (' + v45.effByPanel[0].toFixed(2) + '%)'}`);
+console.log(`¿v45.0 vuelve a 2 paneles?: ${v45.panelCount === 2 ? 'SÍ ✅' : 'NO ❌ (' + v45.panelCount + ')'}`);
+console.log(`¿La mejora vino de pares y no de score?: ${v45.pairClosureChangedWinnerCount > 0 ? 'SÍ ✅' : 'NO'}`);
+console.log(`¿Se mantuvo controlado el remanente?: ${v45.biggestLastLeftoverM2 > 0.3 ? 'SÍ ✅' : 'NO'}`);
+
+const verdict = v45.panelCount === 2 ? 'LEPTON_GRADE_V45_SUCCESS' : (v45.effByPanel[0] > v93.effByPanel[0] ? 'INCREMENTAL_STRUCTURAL_IMPROVEMENT' : 'STILL_ROOM_FOR_GROWTH');
+console.log(`\nVEREDICTO FINAL: ${verdict}`);

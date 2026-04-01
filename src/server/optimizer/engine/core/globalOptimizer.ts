@@ -43,7 +43,7 @@ export function runGlobalOptimization(pool: InternalPart[], panelW: number, pane
       panelIndex,
       config.hasGrain,
       true,
-      config.enableV44BalancedMode
+      config.features
     );
 
     // marcar piezas como colocadas
