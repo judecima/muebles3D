@@ -1,0 +1,35 @@
+<project>
+<panel1 l="2750" w="1830" material="MDF FAPLAC MESOPOTAMIA AMATISTA 18MM" thickness="18" saw="4.5" num="1">
+<no.1 l="2750" w="1830" trim="10" x="0" y="0" layer="1" id="0">
+<part cut="1100" num="1" type="2" id="1" code=""/>
+<part cut="500" num="1" type="2" id="2" code=""/>
+</no.1>
+<no.2 l="1830" w="500" trim="10" x="0" y="1104.5" layer="2" id="2">
+<part cut="860" num="1" type="1" id="3" code="3"/>
+<part cut="860" num="1" type="1" id="4" code="3"/>
+</no.2>
+<no.3 l="500" w="860" trim="0" x="864.5" y="1104.5" layer="3" id="4"> </no.3>
+<no.4 l="500" w="860" trim="0" x="0" y="1104.5" layer="3" id="3"> </no.4>
+<no.5 l="1830" w="1100" trim="10" x="0" y="0" layer="2" id="1">
+<part cut="500" num="1" type="1" id="5" code="1"/>
+<part cut="500" num="1" type="1" id="6" code="1"/>
+<part cut="500" num="1" type="2" id="7" code=""/>
+<part cut="100" num="1" type="2" id="8" code=""/>
+<part cut="100" num="1" type="2" id="9" code=""/>
+</no.5>
+<no.6 l="1100" w="100" trim="0" x="1618" y="0" layer="3" id="9">
+<part cut="860" num="1" type="1" id="10" code="4"/>
+</no.6>
+<no.7 l="100" w="860" trim="0" x="1618" y="0" layer="4" id="10"> </no.7>
+<no.8 l="1100" w="100" trim="0" x="1513.5" y="0" layer="3" id="8">
+<part cut="860" num="1" type="1" id="11" code="4"/>
+</no.8>
+<no.9 l="100" w="860" trim="0" x="1513.5" y="0" layer="4" id="11"> </no.9>
+<no.10 l="1100" w="500" trim="0" x="1009" y="0" layer="3" id="7">
+<part cut="900" num="1" type="1" id="12" code="2"/>
+</no.10>
+<no.11 l="500" w="900" trim="0" x="1009" y="0" layer="4" id="12"> </no.11>
+<no.12 l="1100" w="500" trim="0" x="504.5" y="0" layer="3" id="6"> </no.12>
+<no.13 l="1100" w="500" trim="0" x="0" y="0" layer="3" id="5"> </no.13>
+</panel1>
+</project>

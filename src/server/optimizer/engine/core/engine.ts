@@ -5,6 +5,13 @@ import { selectBestPiece } from '../selection';
 import { GuillotineStrategy } from '../space/guillotine';
 import { evaluatePanelQuality } from '../scoring';
 import { runGlobalOptimization } from './globalOptimizer';
+import { StripGenerator } from './stripGenerator';
+import { RipCutSelector } from './ripCutSelector';
+
+export const engineMetadata = {
+  version: 'v46.2.2-industrial',
+  name: 'Antigravity Industrial Engine'
+};
 
 export function runOptimization(
   parts: any[],
@@ -142,6 +149,28 @@ export function fillSinglePanel(
     isConsolidationMode: false
   };
 
+  // v46.0: INTELIGENCIA INDUSTRIAL (STRIP-BASED SOLVER)
+  // Si la flag está activa, cambiamos el modelo de decisión FreeRect por el de Franjas.
+  if (normalizedFeatures.enableStripBasedSolver) {
+      const generator = new StripGenerator(kerf);
+      const selector = new RipCutSelector(generator);
+      
+      const { strategy: bestStrategy, bestStrip } = selector.selectInitialStrategy(pieces, usableW, usableH, normalizedFeatures);
+      
+      // Forzar la estrategia ganadora por masa crítica
+      strategy = bestStrategy;
+
+      if (state.debugEvents) {
+          state.debugEvents.push({
+              type: 'CONTAINER_SELECT',
+              stage: 'STRATEGY',
+              message: `Industrial Strategy Selected: ${bestStrategy.toUpperCase()} (Top Strip Thickness: ${bestStrip?.thickness}mm)`,
+              seq: ++state.debugSeq!,
+              metadata: { bestStrategy, initialStrip: bestStrip?.thickness }
+          });
+      }
+  }
+
   // [NEW_PANEL] Apertura de panel industrial
   if (state.debugEvents) {
     state.debugEvents.push({
@@ -193,6 +222,84 @@ export function fillSinglePanel(
     const rect = state.freeRects.shift()!;
 
     if (rect.width < 1 || rect.height < 1) continue;
+
+    // v46.2.3: Filtrar pool por paridad de estado antes de generar candidatos
+    const unplacedInPanel = pieces.filter(p => !p.placed);
+    if (unplacedInPanel.length === 0) break;
+
+    if (normalizedFeatures.enableStripBasedSolver) {
+        const generator = new StripGenerator(kerf);
+        
+        // v46.2.4: Evolución Multimodal - Evaluamos todos los mundos posibles para este espacio
+        const hCandidates = generator.generateStrips(unplacedInPanel, rect.width, rect.height, 'horizontal', normalizedFeatures);
+        const vCandidates = generator.generateStrips(unplacedInPanel, rect.width, rect.height, 'vertical', normalizedFeatures);
+        
+        const allCandidates = [...hCandidates, ...vCandidates].sort((a, b) => b.finalScore - a.finalScore);
+        const bestStrip = allCandidates[0];
+
+        if (bestStrip) {
+            const currentStrategy = bestStrip.orientation;
+
+            if (state.debugEvents) {
+                state.debugEvents.push({
+                    type: 'CONTAINER_SELECT',
+                    stage: 'STRIP_PLACEMENT',
+                    message: `Placing ${currentStrategy.toUpperCase()} Strip: ${bestStrip.parts.length} pieces, efficiency ${bestStrip.efficiency.toFixed(1)}%`,
+                    seq: ++state.debugSeq!,
+                    metadata: { efficiency: bestStrip.efficiency, parts: bestStrip.parts.length, strategy: currentStrategy }
+                });
+            }
+
+            // Colocar cada pieza de la franja y sincronizar pool
+            for (const pInfo of bestStrip.parts) {
+                const { piece, rotated, x, y } = pInfo;
+                const target = pieces.find(p => p.id === piece.id && !p.placed);
+                if (target) {
+                    const w = rotated ? target.height : target.width;
+                    const h = rotated ? target.width : target.height;
+
+                    state.placedParts!.push({
+                        id: target.id,
+                        name: target.name,
+                        x: rect.x + x,
+                        y: rect.y + y,
+                        width: w,
+                        height: h,
+                        isLeftover: false,
+                        color: colors[target.name] || '#cccccc',
+                        rotated
+                    });
+                    target.placed = true;
+                }
+            }
+
+            // Generar el Split del resto del rectángulo (Guillotina Pura)
+            if (currentStrategy === 'horizontal') {
+                if (rect.height - bestStrip.thickness - kerf > 0) {
+                    state.freeRects.push({
+                        x: rect.x,
+                        y: rect.y + bestStrip.thickness + kerf,
+                        width: rect.width,
+                        height: rect.height - bestStrip.thickness - kerf,
+                        colX: rect.x,
+                        rowY: rect.y + bestStrip.thickness + kerf
+                    } as any);
+                }
+            } else {
+                if (rect.width - bestStrip.thickness - kerf > 0) {
+                    state.freeRects.push({
+                        x: rect.x + bestStrip.thickness + kerf,
+                        y: rect.y,
+                        width: rect.width - bestStrip.thickness - kerf,
+                        height: rect.height,
+                        colX: rect.x + bestStrip.thickness + kerf,
+                        rowY: rect.y
+                    } as any);
+                }
+            }
+            continue; 
+        }
+    }
 
     const selection = selectBestPiece(pieces, rect, config, state, panelNumber);
 

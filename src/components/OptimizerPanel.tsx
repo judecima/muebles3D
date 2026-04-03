@@ -53,40 +53,131 @@ interface OptimizerPanelProps {
 
 const FURNITURE_PRESETS = [
   {
-    id: 'test-dataset',
-    name: "Dataset Mesopotamia (73 Piezas)",
+    id: 'lepton-1',
+    name: "🚀 BENCHMARK: Lepton-1 (54 Piezas)",
     parts: [
-      { name: "(1) Lateral Izq/Der", width: 629, height: 570, quantity: 4, grainDirection: 'libre' },
-      { name: "(2) Lateral V2 Prefo", width: 610, height: 570, quantity: 4, grainDirection: 'libre' },
-      { name: "(3) Frente Cajon", width: 500, height: 178, quantity: 6, grainDirection: 'libre' },
-      { name: "(4) Piso/Techo", width: 500, height: 582, quantity: 2, grainDirection: 'libre' },
-      { name: "(5) Piso/Techo", width: 500, height: 562, quantity: 1, grainDirection: 'libre' },
-      { name: "(6) Amarre", width: 582, height: 150, quantity: 4, grainDirection: 'libre' },
-      { name: "(7) Amarre", width: 463, height: 150, quantity: 3, grainDirection: 'libre' },
-      { name: "(8) Amarre", width: 562, height: 150, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 622x245", width: 622, height: 245, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 602x245", width: 602, height: 245, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 70x482", width: 70, height: 482, quantity: 6, grainDirection: 'libre' },
-      { name: "Pieza 470x490", width: 470, height: 490, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 495x490", width: 495, height: 490, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 577x453", width: 577, height: 453, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 578x470", width: 578, height: 470, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 234x606", width: 234, height: 606, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 248x606", width: 248, height: 606, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 100x490", width: 100, height: 490, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 530x400", width: 530, height: 400, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 145x400", width: 145, height: 400, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 530x117", width: 530, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "(22) Contrafrente v1 v2 caj", width: 382, height: 117, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 193x117", width: 193, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "(24) Taco Pieza 2", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 124x117", width: 124, height: 117, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 400x128", width: 400, height: 128, quantity: 2, grainDirection: 'libre' },
-      { name: "Pieza 530x100", width: 530, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 250x100", width: 250, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 315x100", width: 315, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 382x100", width: 382, height: 100, quantity: 1, grainDirection: 'libre' },
-      { name: "Pieza 197x100", width: 197, height: 100, quantity: 1, grainDirection: 'libre' }
+      { name: "5", width: 582, height: 150, quantity: 1, grainDirection: 'libre' },
+      { name: "6", width: 582, height: 150, quantity: 1, grainDirection: 'libre' },
+      { name: "7", width: 582, height: 150, quantity: 1, grainDirection: 'libre' },
+      { name: "8", width: 582, height: 150, quantity: 1, grainDirection: 'libre' },
+      { name: "10", width: 117, height: 382, quantity: 1, grainDirection: 'libre' },
+      { name: "11", width: 582, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "12", width: 582, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "13", width: 562, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "15", width: 178, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "16", width: 178, height: 500, quantity: 1, grainDirection: 'libre' },
+      { name: "17", width: 470, height: 578, quantity: 1, grainDirection: 'libre' },
+      { name: "18", width: 610, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "19", width: 610, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "20", width: 610, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "21", width: 610, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "24", width: 382, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "25", width: 177, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "26", width: 562, height: 150, quantity: 1, grainDirection: 'libre' },
+      { name: "27", width: 629, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "28", width: 629, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "29", width: 629, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "30", width: 629, height: 570, quantity: 1, grainDirection: 'libre' },
+      { name: "32", width: 562, height: 150, quantity: 1, grainDirection: 'libre' },
+      { name: "38", width: 70, height: 482, quantity: 1, grainDirection: 'libre' },
+      { name: "39", width: 70, height: 482, quantity: 1, grainDirection: 'libre' },
+      { name: "44", width: 193, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "45", width: 124, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "46", width: 250, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "47", width: 197, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "48", width: 315, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "49", width: 382, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "50", width: 245, height: 602, quantity: 1, grainDirection: 'libre' },
+      { name: "64", width: 482, height: 70, quantity: 1, grainDirection: 'libre' },
+      { name: "65", width: 482, height: 70, quantity: 1, grainDirection: 'libre' },
+      { name: "66", width: 482, height: 70, quantity: 1, grainDirection: 'libre' },
+      { name: "67", width: 482, height: 70, quantity: 1, grainDirection: 'libre' },
+      { name: "68", width: 400, height: 128, quantity: 1, grainDirection: 'libre' },
+      { name: "69", width: 400, height: 128, quantity: 1, grainDirection: 'libre' },
+      { name: "70", width: 400, height: 145, quantity: 1, grainDirection: 'libre' },
+      { name: "71", width: 400, height: 145, quantity: 1, grainDirection: 'libre' },
+      { name: "72", width: 490, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "73", width: 530, height: 100, quantity: 1, grainDirection: 'libre' },
+      { name: "74", width: 530, height: 117, quantity: 1, grainDirection: 'libre' },
+      { name: "75", width: 463, height: 150, quantity: 1, grainDirection: 'libre' },
+      { name: "76", width: 500, height: 178, quantity: 1, grainDirection: 'libre' },
+      { name: "77", width: 400, height: 530, quantity: 1, grainDirection: 'libre' },
+      { name: "81", width: 500, height: 178, quantity: 1, grainDirection: 'libre' },
+      { name: "82", width: 248, height: 606, quantity: 1, grainDirection: 'libre' },
+      { name: "83", width: 234, height: 606, quantity: 1, grainDirection: 'libre' },
+      { name: "84", width: 245, height: 622, quantity: 1, grainDirection: 'libre' },
+      { name: "85", width: 245, height: 622, quantity: 1, grainDirection: 'libre' },
+      { name: "86", width: 470, height: 490, quantity: 1, grainDirection: 'libre' },
+      { name: "87", width: 470, height: 490, quantity: 1, grainDirection: 'libre' },
+      { name: "91", width: 463, height: 150, quantity: 1, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'lepton-4',
+    name: "🚀 BENCHMARK: Lepton-4 (81 Piezas)",
+    parts: [
+      { name: "P1", width: 882, height: 600, quantity: 5, grainDirection: 'libre' },
+      { name: "Z1", width: 70, height: 600, quantity: 4, grainDirection: 'libre' },
+      { name: "M1", width: 1518, height: 600, quantity: 1, grainDirection: 'libre' },
+      { name: "M2", width: 1200, height: 600, quantity: 1, grainDirection: 'libre' },
+      { name: "M3", width: 1554, height: 600, quantity: 1, grainDirection: 'libre' },
+      { name: "M4", width: 1164, height: 600, quantity: 1, grainDirection: 'libre' },
+      { name: "F1", width: 598, height: 880, quantity: 2, grainDirection: 'libre' },
+      { name: "S1", width: 626, height: 180, quantity: 33, grainDirection: 'libre' },
+      { name: "S2", width: 626, height: 100, quantity: 33, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'lepton-6',
+    name: "🚀 BENCHMARK: Lepton-6 (72 Piezas)",
+    parts: [
+      { name: "P-72", width: 450, height: 100, quantity: 72, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'lepton-5',
+    name: "🚀 BENCHMARK: Lepton-5 (Alta Densidad)",
+    parts: [
+      { name: "Ancla", width: 2110, height: 600, quantity: 2, grainDirection: 'libre' },
+      { name: "Filler A", width: 1270, height: 600, quantity: 2, grainDirection: 'libre' },
+      { name: "Filler B", width: 700, height: 600, quantity: 2, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'lepton-2',
+    name: "🚀 BENCHMARK: Lepton-2 (28 Piezas)",
+    parts: [
+      { name: "P1", width: 300, height: 200, quantity: 5, grainDirection: 'libre' },
+      { name: "T1", width: 60, height: 464, quantity: 4, grainDirection: 'libre' },
+      { name: "M1", width: 364, height: 330, quantity: 3, grainDirection: 'libre' },
+      { name: "M2", width: 345, height: 330, quantity: 2, grainDirection: 'libre' },
+      { name: "L1", width: 80, height: 673, quantity: 2, grainDirection: 'libre' },
+      { name: "L2", width: 647, height: 300, quantity: 1, grainDirection: 'libre' },
+      { name: "L3", width: 200, height: 609, quantity: 1, grainDirection: 'libre' },
+      { name: "C1", width: 70, height: 1364, quantity: 4, grainDirection: 'libre' },
+      { name: "C2", width: 1400, height: 350, quantity: 2, grainDirection: 'libre' },
+      { name: "C3", width: 330, height: 364, quantity: 1, grainDirection: 'libre' },
+      { name: "C4", width: 323, height: 697, quantity: 2, grainDirection: 'libre' },
+      { name: "C5", width: 464, height: 350, quantity: 1, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'lepton-3',
+    name: "🚀 BENCHMARK: Lepton-3 (7 Piezas)",
+    parts: [
+      { name: "G1", width: 860, height: 500, quantity: 2, grainDirection: 'libre' },
+      { name: "G2", width: 500, height: 1100, quantity: 2, grainDirection: 'libre' },
+      { name: "G3", width: 860, height: 100, quantity: 2, grainDirection: 'libre' },
+      { name: "G4", width: 900, height: 500, quantity: 1, grainDirection: 'libre' }
+    ]
+  },
+  {
+    id: 'lepton-7',
+    name: "🚀 BENCHMARK: Lepton-7 (Paridad total)",
+    parts: [
+      { name: "Pieza A", width: 600, height: 400, quantity: 4, grainDirection: 'libre' },
+      { name: "Pieza B", width: 1200, height: 300, quantity: 2, grainDirection: 'libre' },
+      { name: "Pieza C", width: 800, height: 200, quantity: 3, grainDirection: 'libre' }
     ]
   },
   {

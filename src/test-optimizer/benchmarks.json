@@ -1,0 +1,2018 @@
+[
+  {
+    "id": "lepton-1",
+    "name": "BENCHMARK: Lepton-1 (54 Piezas)",
+    "parts": [
+      {
+        "name": "5",
+        "width": 582,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "6",
+        "width": 582,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "7",
+        "width": 582,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "8",
+        "width": 582,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "10",
+        "width": 117,
+        "height": 382,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "11",
+        "width": 582,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "12",
+        "width": 582,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "13",
+        "width": 562,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "15",
+        "width": 178,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "16",
+        "width": 178,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "17",
+        "width": 470,
+        "height": 578,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "18",
+        "width": 610,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "19",
+        "width": 610,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "20",
+        "width": 610,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "21",
+        "width": 610,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "24",
+        "width": 382,
+        "height": 117,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "25",
+        "width": 177,
+        "height": 117,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "26",
+        "width": 562,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "27",
+        "width": 629,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "28",
+        "width": 629,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "29",
+        "width": 629,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "30",
+        "width": 629,
+        "height": 570,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "32",
+        "width": 562,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "38",
+        "width": 70,
+        "height": 482,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "39",
+        "width": 70,
+        "height": 482,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "44",
+        "width": 193,
+        "height": 117,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "45",
+        "width": 124,
+        "height": 117,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "46",
+        "width": 250,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "47",
+        "width": 197,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "48",
+        "width": 315,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "49",
+        "width": 382,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "50",
+        "width": 245,
+        "height": 602,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "64",
+        "width": 482,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "65",
+        "width": 482,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "66",
+        "width": 482,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "67",
+        "width": 482,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "68",
+        "width": 400,
+        "height": 128,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "69",
+        "width": 400,
+        "height": 128,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "70",
+        "width": 400,
+        "height": 145,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "71",
+        "width": 400,
+        "height": 145,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "72",
+        "width": 490,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "73",
+        "width": 530,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "74",
+        "width": 530,
+        "height": 117,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "75",
+        "width": 463,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "76",
+        "width": 500,
+        "height": 178,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "77",
+        "width": 400,
+        "height": 530,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "81",
+        "width": 500,
+        "height": 178,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "82",
+        "width": 248,
+        "height": 606,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "83",
+        "width": 234,
+        "height": 606,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "84",
+        "width": 245,
+        "height": 622,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "85",
+        "width": 245,
+        "height": 622,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "86",
+        "width": 470,
+        "height": 490,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "87",
+        "width": 470,
+        "height": 490,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "91",
+        "width": 463,
+        "height": 150,
+        "quantity": 1,
+        "grainDirection": "libre"
+      }
+    ],
+    "auditPanel": {
+      "width": 2750,
+      "height": 1830
+    }
+  },
+  {
+    "id": "lepton-2",
+    "name": "BENCHMARK: Lepton-2 (28 Piezas)",
+    "parts": [
+      {
+        "name": "6",
+        "width": 300,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "7",
+        "width": 300,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "8",
+        "width": 300,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "9",
+        "width": 300,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "10",
+        "width": 300,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "13",
+        "width": 60,
+        "height": 464,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "14",
+        "width": 60,
+        "height": 464,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "15",
+        "width": 60,
+        "height": 464,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "16",
+        "width": 60,
+        "height": 464,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "17",
+        "width": 364,
+        "height": 330,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "18",
+        "width": 364,
+        "height": 330,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "19",
+        "width": 364,
+        "height": 330,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "20",
+        "width": 345,
+        "height": 330,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "21",
+        "width": 345,
+        "height": 330,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "23",
+        "width": 80,
+        "height": 673,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "24",
+        "width": 80,
+        "height": 673,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "25",
+        "width": 647,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "28",
+        "width": 200,
+        "height": 609,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "29",
+        "width": 70,
+        "height": 1364,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "30",
+        "width": 70,
+        "height": 1364,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "31",
+        "width": 70,
+        "height": 1364,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "32",
+        "width": 70,
+        "height": 1364,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "33",
+        "width": 1400,
+        "height": 350,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "36",
+        "width": 330,
+        "height": 364,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "37",
+        "width": 323,
+        "height": 697,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "38",
+        "width": 1400,
+        "height": 350,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "40",
+        "width": 464,
+        "height": 350,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "41",
+        "width": 323,
+        "height": 697,
+        "quantity": 1,
+        "grainDirection": "libre"
+      }
+    ],
+    "auditPanel": {
+      "width": 2750,
+      "height": 1830
+    }
+  },
+  {
+    "id": "lepton-3",
+    "name": "BENCHMARK: Lepton-3 (7 Piezas)",
+    "parts": [
+      {
+        "name": "3",
+        "width": 860,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "4",
+        "width": 860,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "5",
+        "width": 500,
+        "height": 1100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "6",
+        "width": 500,
+        "height": 1100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "10",
+        "width": 860,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "11",
+        "width": 860,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "12",
+        "width": 900,
+        "height": 500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      }
+    ],
+    "auditPanel": {
+      "width": 2750,
+      "height": 1830
+    }
+  },
+  {
+    "id": "lepton-4",
+    "name": "BENCHMARK: Lepton-4 (81 Piezas)",
+    "parts": [
+      {
+        "name": "4",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "5",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "6",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "7",
+        "width": 70,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "8",
+        "width": 1518,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "9",
+        "width": 1200,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "10",
+        "width": 1554,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "11",
+        "width": 1164,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "15",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "18",
+        "width": 70,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "19",
+        "width": 598,
+        "height": 880,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "20",
+        "width": 598,
+        "height": 880,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "21",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "22",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "23",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "24",
+        "width": 70,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "25",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "26",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "27",
+        "width": 882,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "28",
+        "width": 70,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "37",
+        "width": 900,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "38",
+        "width": 900,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "39",
+        "width": 1550,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "40",
+        "width": 891,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "41",
+        "width": 800,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "42",
+        "width": 891,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "43",
+        "width": 891,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "44",
+        "width": 880,
+        "height": 323,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "45",
+        "width": 880,
+        "height": 323,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "46",
+        "width": 650,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "47",
+        "width": 614,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "48",
+        "width": 430,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "50",
+        "width": 550,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "51",
+        "width": 923,
+        "height": 472,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "53",
+        "width": 426,
+        "height": 880,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "54",
+        "width": 880,
+        "height": 516,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "55",
+        "width": 880,
+        "height": 516,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "62",
+        "width": 900,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "63",
+        "width": 891,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "64",
+        "width": 891,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "65",
+        "width": 1518,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "66",
+        "width": 1164,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "67",
+        "width": 1518,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "68",
+        "width": 1164,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "69",
+        "width": 300,
+        "height": 680,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "70",
+        "width": 300,
+        "height": 680,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "77",
+        "width": 564,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "78",
+        "width": 516,
+        "height": 377,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "79",
+        "width": 516,
+        "height": 377,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "80",
+        "width": 512,
+        "height": 397,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "81",
+        "width": 662,
+        "height": 298,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "82",
+        "width": 662,
+        "height": 298,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "83",
+        "width": 1550,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "85",
+        "width": 70,
+        "height": 900,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "86",
+        "width": 300,
+        "height": 800,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "87",
+        "width": 300,
+        "height": 800,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "88",
+        "width": 300,
+        "height": 800,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "96",
+        "width": 614,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "97",
+        "width": 550,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "98",
+        "width": 600,
+        "height": 394,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "99",
+        "width": 70,
+        "height": 394,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "100",
+        "width": 70,
+        "height": 394,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "101",
+        "width": 782,
+        "height": 298,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "102",
+        "width": 782,
+        "height": 298,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "103",
+        "width": 782,
+        "height": 298,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "104",
+        "width": 782,
+        "height": 298,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "110",
+        "width": 614,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "111",
+        "width": 480,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "112",
+        "width": 480,
+        "height": 70,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "113",
+        "width": 516,
+        "height": 222,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "114",
+        "width": 480,
+        "height": 222,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "115",
+        "width": 480,
+        "height": 222,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "116",
+        "width": 480,
+        "height": 222,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "117",
+        "width": 480,
+        "height": 222,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "118",
+        "width": 564,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "119",
+        "width": 560,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "123",
+        "width": 222,
+        "height": 516,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "124",
+        "width": 222,
+        "height": 516,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "125",
+        "width": 222,
+        "height": 516,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "126",
+        "width": 480,
+        "height": 377,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "131",
+        "width": 300,
+        "height": 490,
+        "quantity": 1,
+        "grainDirection": "libre"
+      }
+    ],
+    "auditPanel": {
+      "width": 2750,
+      "height": 1830
+    }
+  },
+  {
+    "id": "lepton-5",
+    "name": "BENCHMARK: Lepton-5 (11 Piezas)",
+    "parts": [
+      {
+        "name": "3",
+        "width": 780,
+        "height": 600,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "5",
+        "width": 575,
+        "height": 780,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "6",
+        "width": 700,
+        "height": 2110,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "9",
+        "width": 420,
+        "height": 360,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "10",
+        "width": 420,
+        "height": 360,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "11",
+        "width": 1270,
+        "height": 700,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "12",
+        "width": 420,
+        "height": 700,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "15",
+        "width": 780,
+        "height": 1050,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "17",
+        "width": 780,
+        "height": 575,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "18",
+        "width": 1690,
+        "height": 700,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "20",
+        "width": 690,
+        "height": 780,
+        "quantity": 1,
+        "grainDirection": "libre"
+      }
+    ],
+    "auditPanel": {
+      "width": 2750,
+      "height": 1830
+    }
+  },
+  {
+    "id": "lepton-6",
+    "name": "BENCHMARK: Lepton-6 (72 Piezas)",
+    "parts": [
+      {
+        "name": "5",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "6",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "7",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "8",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "9",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "10",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "11",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "12",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "13",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "14",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "15",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "16",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "17",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "18",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "19",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "20",
+        "width": 1050,
+        "height": 1470,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "21",
+        "width": 1050,
+        "height": 1470,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "22",
+        "width": 450,
+        "height": 1470,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "27",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "28",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "29",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "30",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "31",
+        "width": 1470,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "32",
+        "width": 130,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "33",
+        "width": 130,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "34",
+        "width": 1500,
+        "height": 900,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "37",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "38",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "39",
+        "width": 1470,
+        "height": 1050,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "43",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "44",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "45",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "46",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "47",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "48",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "53",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "54",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "55",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "56",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "57",
+        "width": 1470,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "58",
+        "width": 130,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "59",
+        "width": 130,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "60",
+        "width": 1470,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "61",
+        "width": 130,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "62",
+        "width": 100,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "63",
+        "width": 100,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "64",
+        "width": 900,
+        "height": 1500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "65",
+        "width": 900,
+        "height": 1500,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "70",
+        "width": 1470,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "71",
+        "width": 1000,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "72",
+        "width": 100,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "73",
+        "width": 1470,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "74",
+        "width": 1000,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "75",
+        "width": 100,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "76",
+        "width": 1470,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "77",
+        "width": 1000,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "78",
+        "width": 100,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "79",
+        "width": 1470,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "80",
+        "width": 1000,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "81",
+        "width": 100,
+        "height": 450,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "85",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "86",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "87",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "88",
+        "width": 450,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "89",
+        "width": 450,
+        "height": 1000,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "90",
+        "width": 450,
+        "height": 1000,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "92",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "93",
+        "width": 450,
+        "height": 130,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "94",
+        "width": 450,
+        "height": 1470,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "95",
+        "width": 450,
+        "height": 1470,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "96",
+        "width": 450,
+        "height": 1470,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "97",
+        "width": 450,
+        "height": 1470,
+        "quantity": 1,
+        "grainDirection": "libre"
+      }
+    ],
+    "auditPanel": {
+      "width": 2600,
+      "height": 1830
+    }
+  },
+  {
+    "id": "lepton-7",
+    "name": "BENCHMARK: Lepton-7 (25 Piezas)",
+    "parts": [
+      {
+        "name": "12",
+        "width": 500,
+        "height": 64,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "13",
+        "width": 500,
+        "height": 64,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "14",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "16",
+        "width": 118,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "17",
+        "width": 500,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "18",
+        "width": 100,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "19",
+        "width": 100,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "20",
+        "width": 500,
+        "height": 100,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "21",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "22",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "23",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "24",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "25",
+        "width": 300,
+        "height": 364,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "28",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "29",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "30",
+        "width": 300,
+        "height": 400,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "33",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "34",
+        "width": 364,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "35",
+        "width": 300,
+        "height": 400,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "36",
+        "width": 300,
+        "height": 400,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "38",
+        "width": 200,
+        "height": 200,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "39",
+        "width": 300,
+        "height": 564,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "41",
+        "width": 100,
+        "height": 564,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "42",
+        "width": 400,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      },
+      {
+        "name": "43",
+        "width": 118,
+        "height": 300,
+        "quantity": 1,
+        "grainDirection": "libre"
+      }
+    ],
+    "auditPanel": {
+      "width": 2750,
+      "height": 1830
+    }
+  }
+]

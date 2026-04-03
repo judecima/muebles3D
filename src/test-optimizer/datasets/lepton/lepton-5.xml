@@ -1,0 +1,59 @@
+<project>
+<panel1 l="2750" w="1830" material="MDF FAPLAC FONDO BLANCO 5.5MM. LISO" thickness="5.5" saw="4.5" num="1">
+<no.1 l="2750" w="1830" trim="10" x="0" y="0" layer="1" id="0">
+<part cut="2110" num="1" type="2" id="1" code=""/>
+<part cut="600" num="1" type="2" id="2" code=""/>
+</no.1>
+<no.2 l="1830" w="600" trim="10" x="0" y="2114.5" layer="2" id="2">
+<part cut="780" num="1" type="1" id="3" code="7"/>
+<part cut="780" num="1" type="2" id="4" code=""/>
+</no.2>
+<no.3 l="600" w="780" trim="0" x="784.5" y="2114.5" layer="3" id="4">
+<part cut="575" num="1" type="1" id="5" code="9"/>
+</no.3>
+<no.4 l="780" w="575" trim="0" x="784.5" y="2114.5" layer="4" id="5"> </no.4>
+<no.5 l="600" w="780" trim="0" x="0" y="2114.5" layer="3" id="3"> </no.5>
+<no.6 l="1830" w="2110" trim="10" x="0" y="0" layer="2" id="1">
+<part cut="700" num="1" type="1" id="6" code="1"/>
+<part cut="700" num="1" type="2" id="7" code=""/>
+<part cut="360" num="1" type="2" id="8" code=""/>
+</no.6>
+<no.7 l="2110" w="360" trim="0" x="1409" y="0" layer="3" id="8">
+<part cut="420" num="1" type="1" id="9" code="5"/>
+<part cut="420" num="1" type="1" id="10" code="5"/>
+</no.7>
+<no.8 l="360" w="420" trim="0" x="1409" y="424.5" layer="4" id="10"> </no.8>
+<no.9 l="360" w="420" trim="0" x="1409" y="0" layer="4" id="9"> </no.9>
+<no.10 l="2110" w="700" trim="0" x="704.5" y="0" layer="3" id="7">
+<part cut="1270" num="1" type="1" id="11" code="3"/>
+<part cut="420" num="1" type="1" id="12" code="4"/>
+</no.10>
+<no.11 l="700" w="420" trim="0" x="704.5" y="1274.5" layer="4" id="12"> </no.11>
+<no.12 l="700" w="1270" trim="0" x="704.5" y="0" layer="4" id="11"> </no.12>
+<no.13 l="2110" w="700" trim="0" x="0" y="0" layer="3" id="6"> </no.13>
+</panel1>
+<panel2 l="2750" w="1830" material="MDF FAPLAC FONDO BLANCO 5.5MM. LISO" thickness="5.5" saw="4.5" num="1">
+<no.14 l="1830" w="2750" trim="10" x="0" y="0" layer="1" id="0">
+<part cut="700" num="1" type="2" id="13" code=""/>
+<part cut="1050" num="1" type="2" id="14" code=""/>
+</no.14>
+<no.15 l="2750" w="1050" trim="10" x="0" y="704.5" layer="2" id="14">
+<part cut="780" num="1" type="1" id="15" code="8"/>
+<part cut="575" num="1" type="2" id="16" code=""/>
+</no.15>
+<no.16 l="1050" w="575" trim="0" x="784.5" y="704.5" layer="3" id="16">
+<part cut="780" num="1" type="1" id="17" code="9"/>
+</no.16>
+<no.17 l="575" w="780" trim="0" x="784.5" y="704.5" layer="4" id="17"> </no.17>
+<no.18 l="1050" w="780" trim="0" x="0" y="704.5" layer="3" id="15"> </no.18>
+<no.19 l="2750" w="700" trim="10" x="0" y="0" layer="2" id="13">
+<part cut="1690" num="1" type="1" id="18" code="2"/>
+<part cut="780" num="1" type="2" id="19" code=""/>
+</no.19>
+<no.20 l="700" w="780" trim="0" x="1694.5" y="0" layer="3" id="19">
+<part cut="690" num="1" type="1" id="20" code="6"/>
+</no.20>
+<no.21 l="780" w="690" trim="0" x="1694.5" y="0" layer="4" id="20"> </no.21>
+<no.22 l="700" w="1690" trim="0" x="0" y="0" layer="3" id="18"> </no.22>
+</panel2>
+</project>
