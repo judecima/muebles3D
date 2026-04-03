@@ -54,11 +54,14 @@ export function runOptimization(
     features: normalizedFeatures // Para reuso en globalOptimizer
   };
 
+  // v47.1: Cálculo de área total para conciencia de fase
+  const totalRequiredArea = pool.reduce((acc, p) => acc + (p.width * p.height), 0);
+
   const { panels, debugEvents } = runGlobalOptimization(
     pool,
     panelWidth,
     panelHeight,
-    config,
+    { ...config, features: { ...config.features, totalRequiredArea } },
     colors
   );
 
@@ -125,7 +128,7 @@ export function fillSinglePanel(
     },
     maxFreeRects: 150,
     minReusableDim: 60,
-    minWasteBlockDim: 40, // Fase 2: Bloqueo de basura industrial
+    minWasteBlockDim: 60, // Fase 2: Bloqueo de basura industrial (Sincronizado a 60mm)
     eps: 0.5,
     debug: debugOverride
   };
@@ -230,9 +233,14 @@ export function fillSinglePanel(
     if (normalizedFeatures.enableStripBasedSolver) {
         const generator = new StripGenerator(kerf);
         
+        // v47.3: Restaurar Conciencia de Fase - ¿Estamos cerrando el pedido?
+        const totalRequiredArea = normalizedFeatures.totalRequiredArea || 0;
+        const currentRemainingArea = pieces.filter(p => !p.placed).reduce((acc, p) => acc + (p.width * p.height), 0);
+        const isClosingPhase = totalRequiredArea > 0 && (currentRemainingArea < totalRequiredArea * 0.40);
+
         // v46.2.4: Evolución Multimodal - Evaluamos todos los mundos posibles para este espacio
-        const hCandidates = generator.generateStrips(unplacedInPanel, rect.width, rect.height, 'horizontal', normalizedFeatures);
-        const vCandidates = generator.generateStrips(unplacedInPanel, rect.width, rect.height, 'vertical', normalizedFeatures);
+        const hCandidates = generator.generateStrips(unplacedInPanel, rect.width, rect.height, 'horizontal', { ...normalizedFeatures, isClosingPhase });
+        const vCandidates = generator.generateStrips(unplacedInPanel, rect.width, rect.height, 'vertical', { ...normalizedFeatures, isClosingPhase });
         
         const allCandidates = [...hCandidates, ...vCandidates].sort((a, b) => b.finalScore - a.finalScore);
         const bestStrip = allCandidates[0];
@@ -275,6 +283,7 @@ export function fillSinglePanel(
 
             // Generar el Split del resto del rectángulo (Guillotina Pura)
             if (currentStrategy === 'horizontal') {
+                // 1. El espacio SOBRE la franja (Ancho completo)
                 if (rect.height - bestStrip.thickness - kerf > 0) {
                     state.freeRects.push({
                         x: rect.x,
@@ -285,7 +294,19 @@ export function fillSinglePanel(
                         rowY: rect.y + bestStrip.thickness + kerf
                     } as any);
                 }
+                // 2. El espacio a la DERECHA de la franja (Solo la altura de la franja)
+                if (rect.width - bestStrip.length - kerf >= 60) {
+                    state.freeRects.push({
+                        x: rect.x + bestStrip.length + kerf,
+                        y: rect.y,
+                        width: rect.width - bestStrip.length - kerf,
+                        height: bestStrip.thickness,
+                        colX: rect.x + bestStrip.length + kerf,
+                        rowY: rect.y
+                    } as any);
+                }
             } else {
+                // 1. El espacio a la DERECHA de la franja (Alto completo)
                 if (rect.width - bestStrip.thickness - kerf > 0) {
                     state.freeRects.push({
                         x: rect.x + bestStrip.thickness + kerf,
@@ -294,6 +315,17 @@ export function fillSinglePanel(
                         height: rect.height,
                         colX: rect.x + bestStrip.thickness + kerf,
                         rowY: rect.y
+                    } as any);
+                }
+                // 2. El espacio DEBAJO de la franja (Solo el ancho de la franja)
+                if (rect.height - bestStrip.length - kerf >= 60) {
+                    state.freeRects.push({
+                        x: rect.x,
+                        y: rect.y + bestStrip.length + kerf,
+                        width: bestStrip.thickness,
+                        height: rect.height - bestStrip.length - kerf,
+                        colX: rect.x,
+                        rowY: rect.y + bestStrip.length + kerf
                     } as any);
                 }
             }

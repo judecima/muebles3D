@@ -26,12 +26,17 @@ export class RipCutSelector {
 
     for (const p of unplaced) {
       const area = p.width * p.height;
-      if (p.width > containerW * 0.5) horizMass += area;
-      if (p.height > containerH * 0.5) vertMass += area;
+      
+      // v47.2.4: Análisis de Masa Rotable (¿La pieza es 'monstruo' en alguna orientación?)
+      const canBeLongHorizontal = p.width > containerW * 0.5 || p.height > containerW * 0.5;
+      const canBeLongVertical = p.height > containerH * 0.5 || p.width > containerH * 0.5;
+
+      if (canBeLongHorizontal) horizMass += area;
+      if (canBeLongVertical) vertMass += area;
     }
 
     // Sugerencia inicial basada en la masa dominante
-    const suggestedStrategy = horizMass >= vertMass ? 'horizontal' : 'vertical';
+    const suggestedStrategy = vertMass > horizMass ? 'vertical' : 'horizontal';
 
     // 2. EVALUACIÓN DE STRIPS (Simulación de 1 nivel)
     // Generamos los mejores strips para AMBAS orientaciones para validar la intuición

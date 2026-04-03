@@ -1,0 +1,24 @@
+{
+  "name": "Caso Delia Sixto - Grafito 18mm",
+  "config": {
+    "panelWidth": 2750,
+    "panelHeight": 1830,
+    "trim": 10,
+    "kerf": 4.5,
+    "minMachineCut": 60,
+    "goldMeasures": [600, 500, 450, 300, 150]
+  },
+  "items": [
+    { "id": "G1", "w": 1554, "h": 600, "qty": 4, "label": "LATERAL MAYOR", "edge": "1111" },
+    { "id": "G2", "w": 1518, "h": 600, "qty": 2, "label": "LATERAL MEDIO", "edge": "1111" },
+    { "id": "G3", "w": 1200, "h": 600, "qty": 2, "label": "BASE/TECHO", "edge": "1010" },
+    { "id": "G4", "w": 880, "h": 580, "qty": 8, "label": "ESTANTE MOVIL", "edge": "1000" },
+    { "id": "G5", "w": 891, "h": 450, "qty": 6, "label": "DIVISION VERT", "edge": "1100" },
+    { "id": "G6", "w": 1550, "h": 100, "qty": 12, "label": "ZOCALO LARGO", "edge": "0000" },
+    { "id": "G7", "w": 900, "h": 70, "qty": 10, "label": "REFUERZO", "edge": "0000" },
+    { "id": "G8", "w": 564, "h": 450, "qty": 15, "label": "PUERTA CHICA", "edge": "1111" },
+    { "id": "G9", "w": 1180, "h": 564, "qty": 4, "label": "PUERTA ALTA", "edge": "1111" },
+    { "id": "G10", "w": 400, "h": 150, "qty": 20, "label": "FRENTE CAJON", "edge": "1111" },
+    { "id": "G11", "w": 500, "h": 120, "qty": 12, "label": "LATERAL CAJON", "edge": "0000" }
+  ]
+}

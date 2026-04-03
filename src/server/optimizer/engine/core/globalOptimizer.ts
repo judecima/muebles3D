@@ -33,12 +33,16 @@ export function runGlobalOptimization(pool: InternalPart[], panelW: number, pane
 
     if (!container) break;
 
+    const currentTrim = container.isRemnant ? 0 : config.trim;
+    const usableW = container.width - currentTrim;
+    const usableH = container.height - currentTrim;
+
     const result = fillSinglePanel(
       remainingPieces,
-      container.width,
-      container.height,
+      usableW,
+      usableH,
       config.kerf,
-      container.isRemnant ? 0 : config.trim,
+      currentTrim,
       container.width,
       container.height,
       colors,

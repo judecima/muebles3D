@@ -1,51 +1,79 @@
-import { fillSinglePanel } from '../server/optimizer/engine/core/engine';
+import { runGlobalOptimization } from '../server/optimizer/engine/core/globalOptimizer';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const kerf = 4.5;
-const trim = 10;
-const pW = 2750;
-const pH = 1830;
-const usableW = pW - trim;
-const usableH = pH - trim;
+const datasetPath = path.join(__dirname, 'datasets', 'grafito-95-piezas.json');
+const data = JSON.parse(fs.readFileSync(datasetPath, 'utf8'));
 
-const pieces = [
-  { name: 'P-629x570', width: 629, height: 570, count: 4 },
-  { name: 'P-610x570', width: 610, height: 570, count: 4 },
-  { name: 'P-500x582', width: 500, height: 582, count: 2 },
-  { name: 'P-582x150', width: 582, height: 150, count: 4 },
-  { name: 'P-562x150', width: 562, height: 150, count: 2 },
-  { name: 'P-117x177', width: 117, height: 177, count: 1 },
-];
-
-const inputParts = pieces.flatMap(p => Array.from({ length: p.count }, (_, i) => ({
-  id: `${p.name}-${i}`,
-  name: p.name,
-  width: p.width,
-  height: p.height,
-  placed: false,
-  quantity: 1,
-  grainDirection: 'libre',
-  thickness: 18
-})));
-
-const colors = {};
-
-const panel = fillSinglePanel(
-  inputParts,
-  usableW,
-  usableH,
-  kerf,
-  trim,
-  pW,
-  pH,
-  colors,
-  'horizontal',
-  1,
-  false // hasGrain
+const pool = data.items.flatMap((item: any) => 
+  Array.from({ length: item.qty || item.quantity }, (_, i) => ({
+    id: `${item.id}-${i}`,
+    name: item.label || item.name,
+    width: item.w || item.width,
+    height: item.h || item.height,
+    thickness: 18,
+    quantity: 1,
+    grainDirection: 'none' as any,
+    placed: false
+  }))
 );
 
-console.log(`=== Panel 1 Strategy: ${panel.strategy} ===`);
-console.log(`Eficiencia: ${panel.efficiency.toFixed(2)}%`);
-panel.parts.forEach((p: any) => {
-  console.log(`- ${p.name} [${p.isLeftover ? 'SOBRANTE' : 'PIEZA'}] ${p.rotated ? '(Rot)' : ''}: ${p.width}x${p.height} at (${p.x}, ${p.y})`);
-});
+const config = {
+  strategy: 'horizontal',
+  trim: 10,
+  hasGrain: false,
+  features: {
+    enablePrimaryPanelAggression: true,
+    enableP2Aggression: true,
+    enableComplementaryPoolAlignment: true,
+    enableLookahead: true,
+    enableStripBasedSolver: true,
+    deferredMassThreshold: 100000
+  },
+  kerf: data.config.kerf,
+  panelWidth: data.config.panelWidth,
+  panelHeight: data.config.panelHeight
+};
 
+const result = runGlobalOptimization(pool, data.config.panelWidth, data.config.panelHeight, config);
+
+console.log(`\n=== INSPECCIÓN PANEL 1 ===`);
+const p1 = result.panels[0];
+console.log(`Dimensiones Usables: ${p1.width - 10}x${p1.height - 10}`);
+
+let totalArea = 0;
+let overlaps = 0;
+let outOfBounds = 0;
+
+const parts = p1.parts.filter((p: any) => !p.isLeftover);
+
+for (let i = 0; i < parts.length; i++) {
+  const a = parts[i];
+  totalArea += a.width * a.height;
+
+  if (a.x + a.width > p1.width || a.y + a.height > p1.height) {
+    outOfBounds++;
+    console.log(`❌ OUT OF BOUNDS: ${a.name} (${a.id}) at (${a.x}, ${a.y}) size ${a.width}x${a.height}`);
+  }
+
+  for (let j = i + 1; j < parts.length; j++) {
+    const b = parts[j];
+    const hasOverlap = !(
+      a.x + a.width <= b.x ||
+      b.x + b.width <= a.x ||
+      a.y + a.height <= b.y ||
+      b.y + b.height <= a.y
+    );
+    if (hasOverlap) {
+      overlaps++;
+      console.log(`❌ OVERLAP: ${a.name} (${a.id}) and ${b.name} (${b.id})`);
+    }
+  }
+}
+
+console.log(`\nResultados:`);
+console.log(`- Piezas: ${parts.length}`);
+console.log(`- Área Total Piezas: ${totalArea}`);
+console.log(`- Área Panel: ${p1.width * p1.height}`);
+console.log(`- Overlaps detectados: ${overlaps}`);
+console.log(`- Fuera de límites: ${outOfBounds}`);

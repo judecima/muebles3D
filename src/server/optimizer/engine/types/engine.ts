@@ -55,6 +55,8 @@ export interface FeatureFlags {
   enableComplementaryPoolAlignment?: boolean; // v45.1: Evaluate residual compatibility with remaining inventory
   enableP2Aggression?: boolean; // v45.3: Balanced P2 Aggression (0.50x)
   deferredMassThreshold?: number; // v45.3: Umbral de activación para agresión P2 (Default 100000)
+  totalRequiredArea?: number;  // v47.1: Área total del pedido para detectar fin de fase
+  isClosingPhase?: boolean;    // v47.1: Flag activo cuando queda < 25% del área
   maxActiveStrips: number;
   maxFreeRects?: number;
   minReusableDim?: number;
