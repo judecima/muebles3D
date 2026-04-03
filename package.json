@@ -10,7 +10,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "engine:validate": "tsx src/test-optimizer/validate-engine.ts",
+    "engine:benchmark": "tsx src/test-optimizer/benchmark-multi-model.ts",
+    "engine:robustness": "tsx src/test-optimizer/robustness-validation.ts"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.28.0",

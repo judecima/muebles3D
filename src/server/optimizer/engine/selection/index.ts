@@ -33,6 +33,21 @@ export function selectBestPiece(
   let nearPerfectPairClosureFound = false;
   let poolAlignmentApplied = false;
   let poolAlignmentScore = 0;
+  let poolAlignmentSearchCapUsed = 0;
+  let poolAlignmentCandidatesScanned = 0;
+  
+  // v45.3: Balanced P2 Aggression Metadata
+  let panel2AggressionApplied = false;
+  let panel2AggressionReason = "";
+  let bandMatchScalingAppliedP2 = false;
+  let bandMatchScalingFactorP2 = 1.0;
+  let poolAlignmentAppliedP2 = false;
+  let panel2CompatibleMass = 0;
+  let piecesDeferredFromP1 = 0;
+  let panel2WidthCompatibility = 0;
+  let panel2HeightCompatibility = 0;
+  let panel2AbsorptionFailureReason = "";
+  let p2DecisionsFlippedByScaling = 0;
 
   const rectSnapshot = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
 
@@ -307,12 +322,41 @@ export function selectBestPiece(
     !poolContext.isLikelyLastPanel &&
     (poolContext.closureCriticalZone || poolContext.reasonableFitCandidateCount > 0);
 
-  const bandMatchScalingActive = primaryPanelAggressionActive;
-  // Escalating to 0.25x as per user's "next step" instructions
-  const bandMatchScalingFactor = bandMatchScalingActive ? 0.25 : 1.0;
+  // v45.3: Balanced P2 Aggression Gating
+  const deferredMass = activePool.reduce((acc, p) => acc + (p.width * p.height), 0);
+  const piecesDeferred = activePool.length;
   
+  // Purely geometric P2 compatible mass (for diagnostic trigger)
+  const p2CompatibleMass = activePool.reduce((acc, p) => {
+    const fits = (p.width <= config.panelWidth + 0.5 && p.height <= config.panelHeight + 0.5) ||
+                 (!config.hasGrain && p.height <= config.panelWidth + 0.5 && p.width <= config.panelHeight + 0.5);
+    return acc + (fits ? p.width * p.height : 0);
+  }, 0);
+
+  const activeThreshold = config.features.deferredMassThreshold ?? 100000;
+  const panel2AggressionActive = 
+      config.features.enableP2Aggression &&
+      panelNumber === 2 && 
+      !poolContext.isLikelyLastPanel && 
+      deferredMass > activeThreshold && 
+      (piecesDeferred >= 3 || p2CompatibleMass > 200000) &&
+      (poolContext.reasonableFitCandidateCount > 0 || poolContext.dominantUsableBandCount > 0);
+
+  const bandMatchScalingActive = primaryPanelAggressionActive || panel2AggressionActive;
+  let bandMatchScalingFactor = 1.0;
+  
+  if (primaryPanelAggressionActive) {
+    bandMatchScalingFactor = 0.35;
+  } else if (panel2AggressionActive) {
+    bandMatchScalingFactor = 0.50;
+    panel2AggressionApplied = true;
+    bandMatchScalingAppliedP2 = true;
+    bandMatchScalingFactorP2 = 0.50;
+    panel2AggressionReason = `P2 Absorption (Deferred: ${piecesDeferred} pcs / ${Math.round(deferredMass/1000)}k mm2)`;
+  }
+
   poolContext.bandMatchScalingActive = bandMatchScalingActive;
-  poolContext.bandMatchScalingFactor = bandMatchScalingActive ? 0.35 : 1.0;
+  poolContext.bandMatchScalingFactor = bandMatchScalingFactor;
   
   const primaryPanelAggressionBonusValue = primaryPanelAggressionActive ? 20_000_000 : 0;
 
@@ -403,8 +447,6 @@ export function selectBestPiece(
   const poolIsTrivial = poolContext.remainingPoolArea < 200000;
   let forcedConsumptionSuppressedForLastPanel = poolContext.isLikelyLastPanel && poolIsTrivial;
   
-  let topCandidatesForLookahead = [...candidates];
-
   if (config.features.enableForcedConsumptionZone && poolContext.closureCriticalZone && !forcedConsumptionSuppressedForLastPanel && candidates.length > 1) {
     const MIN_BAND = Math.max(30, config.kerf * 2);
     const rectArea = rect.width * rect.height;
@@ -423,23 +465,23 @@ export function selectBestPiece(
         0.15 * microBandPenalty;
       
       cat.closureScore = closureScore;
+      // v45.3.1: closureScore now acts only as metadata and a minor bonus, not a filter.
+      cat.finalScore += (closureScore * 1000); // Minor tie-breaker bonus
       cat.metadata = { ...(cat.metadata || {}), closureConsumptionScore: closureScore };
     });
 
-    candidates.sort((a, b) => (b.closureScore || 0) - (a.closureScore || 0));
     forcedConsumptionOrderingApplied = true;
-
-    const CLOSURE_TOP_N = 6;
-    topCandidatesForLookahead = candidates.slice(0, CLOSURE_TOP_N);
-    
-    // Assign rank metadata
-    topCandidatesForLookahead.forEach((cat, idx) => {
-       cat.metadata = { ...(cat.metadata || {}), closureConsumptionRank: idx };
-    });
   }
+
+  // Industrial Rule: topCandidatesForLookahead must be the top industrial matches (by finalScore), not by closureScore.
+  const LOOKAHEAD_TOP_N = primaryPanelAggressionActive ? 6 : 3;
+  let topCandidatesForLookahead = [...candidates]
+    .sort((a, b) => b.finalScore - a.finalScore)
+    .slice(0, LOOKAHEAD_TOP_N);
 
   let lookaheadWinnerChange = false;
   let originalWinnerId = (bestPiece as any)?.id;
+  let originalBestScore = bestScore;
   const primaryAggressionExpandedLookaheadActive = primaryPanelAggressionActive;
   const lookaheadCandidateCount = primaryAggressionExpandedLookaheadActive ? 6 : 3;
   
@@ -603,12 +645,31 @@ export function selectBestPiece(
       }
     }
 
-    // v45.1 Phase 4: Complementary Pool Alignment
-    // Evaluate how well the residual of the Top-N candidates matches the remaining inventory.
-    if (config.features.enableComplementaryPoolAlignment && primaryPanelAggressionActive && topCandidatesForLookahead.length > 1) {
+    // v45.3: Extend Pool Alignment to P2 under aggression gating
+    if (config.features.enableComplementaryPoolAlignment && 
+       (primaryPanelAggressionActive || panel2AggressionActive) && 
+       topCandidatesForLookahead.length > 1) {
+      
       poolAlignmentApplied = true;
+      if (panel2AggressionActive) poolAlignmentAppliedP2 = true;
       const MIN_USABLE = config.minReusableDim || 60;
       
+      // v45.2.1: Adaptive Pool Search Cap
+      // Sort the pool by a basic relevance (Area * Freq) to ensure the scan is meaningful
+      const sortedSearchPool = [...activePool].sort((a, b) => {
+        const aArea = a.width * a.height;
+        const bArea = b.width * b.height;
+        const aFreq = pieces.filter(p => !p.placed && p.width === a.width && p.height === a.height).length;
+        const bFreq = pieces.filter(p => !p.placed && p.width === b.width && p.height === b.height).length;
+        return (bArea * bFreq) - (aArea * aFreq);
+      });
+
+      const poolSizeForCap = sortedSearchPool.length;
+      const searchCap = poolSizeForCap < 20 ? 10 : (poolSizeForCap < 50 ? 20 : 30);
+      poolAlignmentSearchCapUsed = searchCap;
+      const cappedSearchPool = sortedSearchPool.slice(0, searchCap);
+      poolAlignmentCandidatesScanned = cappedSearchPool.length;
+
       for (const cat of topCandidatesForLookahead.slice(0, 6)) {
         const remW = rect.width - cat.w;
         const remH = rect.height - cat.h;
@@ -617,7 +678,7 @@ export function selectBestPiece(
         let nearCount = 0;
         let compatibleArea = 0;
         
-        for (const p of activePool) {
+        for (const p of cappedSearchPool) {
           if (p.id === cat.pieceId) continue;
           
           const dims = [
@@ -682,8 +743,44 @@ export function selectBestPiece(
 
     topCandidatesForLookahead.sort((a, b) => b.finalScore - a.finalScore);
     const top = topCandidatesForLookahead[0];
-    pairClosureChangedWinner = prePairWinnerId !== "" && top.pieceId !== prePairWinnerId;
-    const p1AggressionBonusFlippedWinner = preBonusTopCandidateId !== "" && top.pieceId !== preBonusTopCandidateId;
+
+    pairClosureChangedWinner = prePairWinnerId !== "" && top?.pieceId !== prePairWinnerId;
+    const p1AggressionBonusFlippedWinner = preBonusTopCandidateId !== "" && top?.pieceId !== preBonusTopCandidateId;
+
+    // v45.2.1: Panel 2 Absorption Audit (Width/Height/Industrial gates)
+    if (panelNumber === 2) {
+      piecesDeferredFromP1 = activePool.length;
+      
+      // Calculate compatible mass (purely geometric)
+      panel2CompatibleMass = activePool.reduce((acc, p) => {
+        const fits = (p.width <= config.panelWidth + 0.5 && p.height <= config.panelHeight + 0.5) ||
+                     (!config.hasGrain && p.height <= config.panelWidth + 0.5 && p.width <= config.panelHeight + 0.5);
+        return acc + (fits ? p.width * p.height : 0);
+      }, 0);
+
+      // Width/Height Matching Counts (How many pieces share dimensions with the top candidate's residual)
+      const topCat = topCandidatesForLookahead[0];
+      const resW = rect.width - topCat.w;
+      const resH = rect.height - topCat.h;
+      activePool.forEach(p => {
+        if (Math.abs(p.width - resW) < 2 || Math.abs(p.height - resW) < 2) panel2WidthCompatibility++;
+        if (Math.abs(p.width - resH) < 2 || Math.abs(p.height - resH) < 2) panel2HeightCompatibility++;
+      });
+
+      // Detect why P2 is failing to absorb
+      const isP2Failing = poolContext.isLikelyLastPanel && activePool.length > 3 && panel2CompatibleMass > 100000;
+      if (isP2Failing) {
+        if (topCat.metadata?.remnant_hard_block) panel2AbsorptionFailureReason = "remnant_hard_block";
+        else if (topCat.finalScore < 50000000) panel2AbsorptionFailureReason = "industrial_beauty_bias";
+        else panel2AbsorptionFailureReason = "geometric_mismatch_inherited_from_p1";
+      }
+
+      // v45.3: Track decisions flipped by P2 scaling
+      const preScalingTopId = (topCandidatesForLookahead.sort((a,b) => (b.finalScore/0.5)-(a.finalScore/0.5))[0]).pieceId; // Pseudo-reversal
+      if (top.pieceId !== preScalingTopId && panel2AggressionActive) {
+        p2DecisionsFlippedByScaling++;
+      }
+    }
 
     if (top.pieceId !== originalWinnerId && top.finalScore > bestScore) {
       lookaheadWinnerChange = true;
@@ -727,13 +824,27 @@ export function selectBestPiece(
         nearPerfectPairClosureFound,
         poolAlignmentApplied,
         poolAlignmentScore,
-        bandMatchScalingApplied: bandMatchScalingActive,
-        bandMatchScalingFactor: bandMatchScalingFactor
+        poolAlignmentSearchCapUsed,
+        poolAlignmentCandidatesScanned,
+        bandMatchScalingApplied: bandMatchScalingActive || bandMatchScalingAppliedP2,
+        bandMatchScalingFactor: bandMatchScalingActive ? bandMatchScalingFactor : bandMatchScalingFactorP2,
+        panel2AggressionApplied,
+        panel2AggressionReason,
+        bandMatchScalingAppliedP2,
+        bandMatchScalingFactorP2,
+        poolAlignmentAppliedP2,
+        panel2CompatibleMass,
+        piecesDeferredFromP1,
+        panel2WidthCompatibility,
+        panel2HeightCompatibility,
+        panel2AbsorptionFailureReason,
+        p2DecisionsFlippedByScaling,
+        deferredMassThresholdUsed: config.features.deferredMassThreshold ?? 100000,
+        engineVersion: "v45.3.1"
       },
       winner: winnerPiece ? { name: winnerPiece.name, score: bestScore, rotated: bestRotated } : null
     });
   }
 
-  if (!bestPiece) return null;
-  return { piece: bestPiece, rotated: bestRotated };
+  return bestPiece ? { piece: bestPiece, rotated: bestRotated } : null;
 }

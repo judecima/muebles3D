@@ -15,6 +15,10 @@ export function runGlobalOptimization(pool: InternalPart[], panelW: number, pane
   const panels = [];
   const globalDebugEvents: any[] = [];
 
+  // v45.3: Parity Audit Log (One-time per execution)
+  const featuresStr = JSON.stringify(config.features || config); 
+  console.log(`[ENGINE v45.3] STARTING OPTIMIZATION | FEATURES: ${featuresStr} | VERSION: v45.3-web-parity`);
+
   let panelIndex = 1;
 
   while (pool.some(p => !p.placed)) {

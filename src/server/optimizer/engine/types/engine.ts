@@ -53,6 +53,8 @@ export interface FeatureFlags {
   enablePrimaryPanelAggression?: boolean; // v44.9.3: Reduce global penalties in early P1 to recover density
   enableStructuralPairClosure?: boolean; // v45.0: Evaluate combined piece area in P1 aggression window
   enableComplementaryPoolAlignment?: boolean; // v45.1: Evaluate residual compatibility with remaining inventory
+  enableP2Aggression?: boolean; // v45.3: Balanced P2 Aggression (0.50x)
+  deferredMassThreshold?: number; // v45.3: Umbral de activación para agresión P2 (Default 100000)
   maxActiveStrips: number;
   maxFreeRects?: number;
   minReusableDim?: number;
