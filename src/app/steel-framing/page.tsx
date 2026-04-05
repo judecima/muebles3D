@@ -66,10 +66,36 @@ const INITIAL_CONFIG: SteelHouseConfig = {
     steelProfiles: true,
     horizontalBlocking: true,
     lintels: true,
-    reinforcements: true,
-    bracing: true
+    structuralDiagrams: false,
+    foundation: true,
+    budget: true
   },
-  structuralMode: false
+  structuralMode: false,
+  foundation: {
+    type: 'slab_with_piles',
+    slabThickness: 120,
+    edgeBeamDepth: 300,
+    pileDepth: 3000,
+    pileDiameter: 200,
+    soil: { type: 'arcilloso', bearingCapacityKPa: 150, frictionKPa: 15 }
+  },
+  prices: {
+    steelKg: 2.5,
+    concreteM3: 150,
+    osbSheet: 25,
+    gypsumSheet: 15,
+    screwT1: 0.05,
+    screwT2: 0.03,
+    laborM2: 45
+  },
+  loads: {
+    roofDeadKpa: 0.5,
+    roofLiveKpa: 1.0,
+    snowKpa: 0.3,
+    windKpa: 0.8,
+    floorDeadKpa: 0.4,
+    floorLiveKpa: 2.0
+  }
 };
 
 export default function SteelFramingPage() {
@@ -96,7 +122,7 @@ export default function SteelFramingPage() {
 
   const [isWalkModeActive, setIsWalkModeActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
-  const viewerRef = useRef<{ enterWalkMode: () => void, exitWalkMode: () => void }>(null);
+  const viewerRef = useRef<{ enterWalkMode: () => void, exitWalkMode: () => void, getScreenshot: () => string | undefined }>(null);
 
   const fetchAnalysis = async (currentConfig: SteelHouseConfig) => {
     setIsLoading(true);
@@ -352,7 +378,13 @@ export default function SteelFramingPage() {
   return (
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-slate-100">
       <aside className={`hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0 z-40 transition-all ${isWalkModeActive ? '-ml-80' : ''}`}>
-        <SteelControlPanel config={config} onConfigChange={setConfig} structuralAlerts={structuralAlerts} />
+        <SteelControlPanel 
+          config={config} 
+          onConfigChange={setConfig} 
+          structuralAlerts={structuralAlerts}
+          structuralResult={structuralResult}
+          viewerRef={viewerRef}
+        />
       </aside>
 
       <main className="flex-1 flex flex-col relative overflow-hidden h-full min-h-0">

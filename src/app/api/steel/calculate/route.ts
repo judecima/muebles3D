@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { StructuralEngine } from '../../../../server/steel/structuralEngine';
 import { calculateSteelMaterials } from '../../../../server/steel/materialCalculator';
+import { FoundationEngine } from '../../../../server/steel/foundationEngine';
 
 export async function POST(req: Request) {
   try {
@@ -36,11 +37,18 @@ export async function POST(req: Request) {
       };
     });
 
+    const lateralStability = StructuralEngine.calculateLateralStability(config);
+    
+    // 3. Cimentación (Nueva Integración)
+    const foundation = FoundationEngine.calculateFoundation(config, { processedWalls });
+
     return NextResponse.json({
       alerts,
       estimate,
       processedWalls,
-      processedInternalWalls
+      processedInternalWalls,
+      lateralStability,
+      foundation
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

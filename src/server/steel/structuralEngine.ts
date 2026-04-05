@@ -1,5 +1,15 @@
+import * as math from 'mathjs';
+import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall, FastenerPoint, StructuralAnalysisResult } from '@/lib/steel/types';
+import { STEEL_PROFILES } from './profilesDB';
+import { analyzeBeamProfessional } from './feaEngine';
 
-import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall } from '@/lib/steel/types';
+export interface StructuralMemberProps {
+  name: string;
+  area: number; // mm2
+  ix: number;   // mm4
+  wx: number;   // mm3
+  weight: number; // kg/m
+}
 
 export interface HeaderAnalysis {
   type: 'single' | 'double' | 'triple' | 'tube' | 'truss';
@@ -13,11 +23,29 @@ export interface HeaderAnalysis {
   trussData?: {
     height: number;
     numDiagonals: number;
-    chordThickness: number;
+    panelWidth: number;
+    diagonalAngle: number;
+    nodeSpacing: number;
+    chordProps: StructuralMemberProps;
+    members?: {
+      id: string;
+      forceN: number;
+      type: 'chord_top' | 'chord_bottom' | 'diagonal' | 'vertical';
+      stressType: 'tension' | 'compression' | 'zero';
+      status: 'ok' | 'fail';
+      ratio: number;
+    }[];
   };
-  supportsRequired?: number;
-  kings?: number;
-  jacks?: number;
+  diagramData?: {
+    moments: { x: number; y: number }[];
+    shears: { x: number; y: number }[];
+    deflection: { x: number; y: number }[];
+  };
+  supports: {
+    kings: number;
+    jacks: number;
+    reactionN: number;
+  };
 }
 
 export interface BlockingData {
@@ -41,15 +69,174 @@ export interface JunctionData {
 }
 
 export class StructuralEngine {
-  private static readonly STEEL_MODULUS = 203000; 
-  private static readonly PGC_IX_SINGLE = 185000; 
-  private static readonly TUBE_IX = 1200000; 
+  private static readonly STEEL_MODULUS = 203000; // MPa (N/mm2)
+  private static readonly STEEL_YIELD = 230; // MPa
+  
+  // Propiedades típicas PGC 100x40x15 x 0.9 / 1.25
+  private static readonly PGC_100_09: StructuralMemberProps = { name: 'PGC 100x0.9', area: 172, ix: 254000, wx: 5080, weight: 1.35 };
+  private static readonly PGC_100_125: StructuralMemberProps = { name: 'PGC 100x1.25', area: 238, ix: 345000, wx: 6900, weight: 1.87 };
+  
+  private static readonly PGC_IX_SINGLE = 254000; 
+  private static readonly TUBE_IX = 1500000; // Valor aproximado para tubo 100x100x2
   
   public static readonly CORNER_FUSION_THRESHOLD = 200; 
-  private static readonly DEAD_LOAD_KPA = 0.5; 
-  private static readonly LIVE_LOAD_ROOF_KPA = 1.0; 
-  private static readonly WIND_PRESSURE_KPA = 0.8; 
   private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; 
+
+
+  /**
+   * 1. CÁLCULO DE DEFLEXIÓN (FLECHA)
+   */
+  static calculateDeflection(spanMm: number, loadKgM: number, profileId: string, config: 'simple' | 'tube' | 'truss') {
+    const p = STEEL_PROFILES[profileId] || STEEL_PROFILES["PGC-100-0.9"];
+    const L = spanMm / 10; // cm
+    const q = loadKgM / 100; // kg/cm
+    const E = 2100000; // kg/cm2
+    
+    let I = p.ix;
+    if (config === 'tube') I = p.ix * 2;
+    if (config === 'truss') {
+        const h_truss = 30; // cm
+        I = 2 * p.area * Math.pow(h_truss / 2, 2);
+    }
+
+    const f_max = (5 * q * Math.pow(L, 4)) / (384 * E * I);
+    const limit = L / 300;
+    return { f_max, limit, ratio: f_max / limit, isSafe: f_max <= limit };
+  }
+
+  /**
+   * 2. CÁLCULO DE WEB CRIPPLING (APLASTAMIENTO)
+   */
+  static checkWebCrippling(profileId: string, reactionKg: number, isEnd: boolean, nWebs: number = 1) {
+    const p = STEEL_PROFILES[profileId] || STEEL_PROFILES["PGC-100-0.9"];
+    const t = p.thickness;
+    const h = p.height - 2*t;
+    const N = 40; // mm
+    const R = 2.0; // Radio de curvatura
+    
+    // 🏛️ AISI S100 / CIRSOC 303 Calibrado para PGC
+    // P_n ~ C * t^2 * Fy * (1 + C_n*sqrt(N/t)) ...
+    const Fy = 2300; // kg/cm2
+    const C = isEnd ? 22.5 : 45.0; // Coeficientes ajustados para unidades kg/cm (C=22.5 para PGC 0.9)
+    const Cr = 0.25;
+    const Cn = 0.15;
+    const Ch = 0.02;
+    
+    // Pn por cada alma
+    const Pn_single = C * Math.pow(t/10, 2) * Fy * (1 - Cr * Math.sqrt(R/t)) * (1 + Cn * Math.sqrt(N/t)) * (1 - Ch * Math.sqrt(h/t));
+    const Pn_total = Pn_single * nWebs;
+    const capacity = Pn_total / 1.7; // Factor de seguridad Omega = 1.7
+    return { 
+        isSafe: reactionKg <= capacity, 
+        capacity, 
+        ratio: reactionKg / capacity, 
+        requiresStiffener: reactionKg > capacity,
+        recommendation: reactionKg > capacity ? "Usar Rigidizador de alma (Stiffener) o aumentar espesor a 1.25mm" : undefined
+    };
+  }
+
+  static analyzeStructuralElement(profileId: string, spanMm: number, loadKgM: number, config: 'simple' | 'double' | 'triple' | 'tube' | 'truss'): StructuralAnalysisResult {
+    const profile = STEEL_PROFILES[profileId] || STEEL_PROFILES["PGC-100-0.9"];
+    let I = profile.ix;
+    let nWebs = 1;
+    if (config === 'double') { I = profile.ix * 2; nWebs = 2; }
+    if (config === 'triple') { I = profile.ix * 3; nWebs = 3; }
+    if (config === 'tube') { I = profile.ix * 2; nWebs = 2; }
+    if (config === 'truss') { I = 2 * profile.area * Math.pow(30 / 2, 2); nWebs = 2; }
+
+
+    // 🏗️ Análisis Profesional (API sugerida)
+    const analysis = analyzeBeamProfessional(spanMm, loadKgM, I);
+    const reactionKg = (loadKgM * (spanMm / 1000)) / 2;
+    const web = this.checkWebCrippling(profileId, reactionKg, true, nWebs);
+
+    const limit = spanMm / 300;
+    const f_max = (analysis.deflectionPoints[Math.floor(analysis.deflectionPoints.length / 2)]?.y || 0);
+
+    return {
+      f_max,
+      limit,
+      isSafe: analysis.isSafe && web.isSafe,
+      stressRatio: f_max / limit,
+      loadKg: loadKgM * (spanMm / 1000),
+      description: web.isSafe 
+        ? `Justificación: Momento Máx: ${analysis.maxMoment.toFixed(2)} kgm` 
+        : `⚠️ FALLA POR APLASTAMIENTO (Web Crippling en apoyo)`,
+      webCrippling: web,
+      deflectionPoints: analysis.deflectionPoints,
+      maxMoment: analysis.maxMoment,
+      maxShear: analysis.maxShear,
+      recommendation: web.isSafe ? undefined : web.recommendation
+    };
+  }
+
+  static calculateVerticalLoadPath(config: SteelHouseConfig) {
+    const loads = config.loads;
+    
+    // 1. Carga de Cubierta (Dead + Live + Snow)
+    const hasRoof = !!config.roof;
+    const roofTributaryArea = (config.width * config.length) / 1000000 / 12; // Asumiendo 12 cerchas
+    const loadPerTruss = hasRoof 
+        ? roofTributaryArea * (loads.roofDeadKpa + loads.roofLiveKpa + loads.snowKpa) * 100 
+        : 0; // kg
+    
+    const reactionPerPoint = loadPerTruss / 2;
+
+    // 2. Carga en Montante Planta Alta (Si existiera, por ahora 1 nivel)
+    // 3. Carga en Entrepiso
+    const floorAreaLoad = (loads.floorDeadKpa + loads.floorLiveKpa) * 100; // kg/m2
+    const tributaryWidthM = (config.width / 1000) / 2;
+    const loadOnBeam = reactionPerPoint + (floorAreaLoad * tributaryWidthM * 0.6); // 60cm trib
+
+    // 4. Fundación
+    const totalLoadAtBase = loadOnBeam + (this.PGC_100_09.weight * (config.globalWallHeight / 1000));
+
+    return {
+      roofReactionKg: reactionPerPoint,
+      floorBeamLoadKg: loadOnBeam,
+      foundationPointLoadKg: totalLoadAtBase,
+      isFoundationSafe: totalLoadAtBase < 2500, // Capacidad estándar pilotón
+      alerts: totalLoadAtBase > 2000 ? "⚠️ Carga elevada en pilotones" : "✅ Cargas balanceadas"
+    };
+  }
+
+  static calculateLateralStability(config: SteelHouseConfig) {
+    const heightM = config.globalWallHeight / 1000;
+    const q = config.loads.windKpa; // kN/m2
+    const Cp = 1.3; // Factor de forma combinado
+
+    // Viento en dirección X (impacta sobre cara de longitud config.width)
+    const forceX = q * (config.width / 1000) * heightM * Cp;
+    // Viento en dirección Z (impacta sobre cara de longitud config.length)
+    const forceZ = q * (config.length / 1000) * heightM * Cp;
+
+    // Identificar muros paralelos a X (Resisten viento en X)
+    const wallsX = config.walls.filter(w => Math.abs(w.rotation % 180) === 0);
+    const totalLenX = wallsX.reduce((sum, w) => sum + w.length, 0) / 1000;
+    
+    // Identificar muros paralelos a Z (Resisten viento en Z)
+    const wallsZ = config.walls.filter(w => Math.abs(w.rotation % 180) === 90);
+    const totalLenZ = wallsZ.reduce((sum, w) => sum + w.length, 0) / 1000;
+
+    const shearWallsX = wallsX.map(w => {
+        const load = (w.length / 1000 / totalLenX) * forceX;
+        const capacity = (w.length / 1000) * this.UNBRACED_SHEAR_CAPACITY_KN_M;
+        return { id: w.id, length: w.length, shearLoad: load, capacity };
+    });
+
+    const shearWallsZ = wallsZ.map(w => {
+        const load = (w.length / 1000 / totalLenZ) * forceZ;
+        const capacity = (w.length / 1000) * this.UNBRACED_SHEAR_CAPACITY_KN_M;
+        return { id: w.id, length: w.length, shearLoad: load, capacity };
+    });
+
+    return {
+        windForceX: forceX,
+        windForceZ: forceZ,
+        shearWallsX,
+        shearWallsZ
+    };
+  }
 
   static analyzeOpeningFusion(op: SteelOpening, wallLen: number): 'none' | 'left' | 'right' {
     if (op.position < this.CORNER_FUSION_THRESHOLD) return 'left';
@@ -91,14 +278,15 @@ export class StructuralEngine {
         const isWallEnd = targetX === wall.length;
 
         const loads = this.calculatePanelLoads(width, wall.height, config);
+        const stability = this.calculateLateralStability(config);
+        const shearWallInfo = [...stability.shearWallsX, ...stability.shearWallsZ].find(sw => sw.id === wall.id);
 
         const isExternal = !('parentWallId' in wall);
 
         const needsBracing =
           isExternal &&
           (
-            (loads.shearForceN / 1000) >
-            (this.UNBRACED_SHEAR_CAPACITY_KN_M * width / 1000) ||
+            (shearWallInfo ? (shearWallInfo.shearLoad > shearWallInfo.capacity) : false) ||
             isWallStart ||
             isWallEnd
           );
@@ -137,8 +325,9 @@ export class StructuralEngine {
           isWallStart,
           isWallEnd,
           needsBracing,
-          reinforcementFactor, // ✅ OK
-          loads
+          reinforcementFactor, 
+          loads,
+          fasteners: this.calculatePanelFasteners(width, wall.height, ('studSpacing' in wall) ? wall.studSpacing : 400)
         });
       }
 
@@ -163,7 +352,8 @@ export class StructuralEngine {
   private static getTributaryWidth(config: SteelHouseConfig): number {
     const baseWidthM = config.width / 1000;
   
-    if (!config.roof) return Math.max(2, baseWidthM / 2);
+    // 🏠 Si no hay techo definido, no hay ancho tributario para cargas de cubierta
+    if (!config.roof) return 0;
   
     const slopeRad = (config.roof.slope * Math.PI) / 180;
   
@@ -185,20 +375,175 @@ export class StructuralEngine {
     const widthM = widthMm / 1000;
     const heightM = heightMm / 1000;
     const tributaryWidthM = this.getTributaryWidth(config); 
-    const roofLoad = (config.roof?.coveringWeightKpa || this.DEAD_LOAD_KPA)
-               + this.LIVE_LOAD_ROOF_KPA;
+    const roofLoad = (config.loads.roofDeadKpa)
+               + config.loads.roofLiveKpa;
     const verticalLoadKN = roofLoad * widthM * tributaryWidthM;
-    const shearForceKN = this.WIND_PRESSURE_KPA * widthM * heightM;
+    const shearForceKN = config.loads.windKpa * widthM * heightM;
     return { verticalLoadN: verticalLoadKN * 1000, shearForceN: shearForceKN * 1000, overturningMomentNm: shearForceKN * heightM };
+  }
+
+  private static calculatePanelFasteners(width: number, height: number, spacing: number): FastenerPoint[] {
+    const fasteners: FastenerPoint[] = [];
+    
+    // Tornillos en soleras (cada montante arriba y abajo)
+    for (let x = 0; x <= width; x += spacing) {
+      const realX = Math.min(x, width);
+      // Inferior (T3)
+      fasteners.push({ x: realX, y: 10, type: 'T3', label: 'U' });
+      fasteners.push({ x: realX + 15, y: 10, type: 'T3', label: 'U' });
+      // Superior (T3)
+      fasteners.push({ x: realX, y: height - 10, type: 'T3', label: 'U' });
+      fasteners.push({ x: realX + 15, y: height - 10, type: 'T3', label: 'U' });
+    }
+
+    return fasteners;
+  }
+
+  private static calculateBeamDiagrams(Lmm: number, loadNmm: number): { moments: { x: number; y: number }[]; shears: { x: number; y: number }[]; deflection: { x: number; y: number }[]; } {
+    const L = Lmm;
+    const w = loadNmm;
+    const numPoints = 20;
+    const moments: { x: number; y: number }[] = [];
+    const shears: { x: number; y: number }[] = [];
+    const deflection: { x: number; y: number }[] = [];
+
+    for (let i = 0; i <= numPoints; i++) {
+      const x = (i / numPoints) * L;
+      // M(x) = (w * x / 2) * (L - x)
+      const m = (w * x / 2) * (L - x);
+      // V(x) = w * (L/2 - x)
+      const v = w * (L / 2 - x);
+      
+      moments.push({ x, y: m });
+      shears.push({ x, y: v });
+      deflection.push({ x, y: 0 }); // Placeholder
+    }
+
+    return { moments, shears, deflection };
+  }
+
+  private static solveStiffnessMatrix(nodes: {x:number, y:number}[], elements: {start:number, end:number, props: StructuralMemberProps}[], loads: {node:number, fx:number, fy:number}[]) {
+    const n = nodes.length;
+    const K = math.zeros(n * 2, n * 2) as math.Matrix;
+    const F = math.zeros(n * 2, 1) as math.Matrix;
+
+    elements.forEach(el => {
+      const n1 = nodes[el.start];
+      const n2 = nodes[el.end];
+      const L = Math.sqrt((n2.x - n1.x)**2 + (n2.y - n1.y)**2);
+      const c = (n2.x - n1.x) / L;
+      const s = (n2.y - n1.y) / L;
+      
+      const AE_L = (this.STEEL_MODULUS * el.props.area) / L;
+      const ke = math.multiply(AE_L, [
+        [c*c, c*s, -c*c, -c*s],
+        [c*s, s*s, -c*s, -s*s],
+        [-c*c, -c*s, c*c, c*s],
+        [-c*s, -s*s, c*s, s*s]
+      ]) as any;
+
+      const idx = [el.start*2, el.start*2+1, el.end*2, el.end*2+1];
+      for(let i=0; i<4; i++) {
+        for(let j=0; j<4; j++) {
+          const currentVal = (K as any).get([idx[i], idx[j]]);
+          (K as any).set([idx[i], idx[j]], currentVal + ke[i][j]);
+        }
+      }
+    });
+
+    loads.forEach(load => {
+      F.set([load.node*2, 0], load.fx);
+      F.set([load.node*2+1, 0], load.fy);
+    });
+
+    // Condiciones de contorno (apoyos fijos en los extremos)
+    // Simplificado: nudo 0 fijo, nudo último fijo en Y
+    const bc = [0, 1, (n-1)*2+1]; 
+    bc.forEach(idx => {
+      for(let j=0; j<n*2; j++) { K.set([idx, j], 0); K.set([j, idx], 0); }
+      K.set([idx, idx], 1);
+      F.set([idx, 0], 0);
+    });
+
+    try {
+      const U = math.lusolve(K, F) as math.Matrix;
+      const results = elements.map(el => {
+        const u1 = [(U as any).get([el.start*2, 0]), (U as any).get([el.start*2+1, 0])];
+        const u2 = [(U as any).get([el.end*2, 0]), (U as any).get([el.end*2+1, 0])];
+        const n1 = nodes[el.start];
+        const n2 = nodes[el.end];
+        const L = Math.sqrt((n2.x - n1.x)**2 + (n2.y - n1.y)**2);
+        const c = (n2.x - n1.x) / L;
+        const s = (n2.y - n1.y) / L;
+        
+        const force = (this.STEEL_MODULUS * el.props.area / L) * ((u2[0]-u1[0])*c + (u2[1]-u1[1])*s);
+        const stress = Math.abs(force) / el.props.area;
+        const ratio = stress / this.STEEL_YIELD;
+
+        return {
+          id: `${el.start}-${el.end}`,
+          forceN: force,
+          stressType: force > 5 ? 'tension' : (force < -5 ? 'compression' : 'zero'),
+          status: ratio > 1.0 ? 'fail' : 'ok',
+          ratio
+        };
+      });
+      return results;
+    } catch(e) {
+      return [];
+    }
+  }
+
+  private static solveTruss(L: number, H: number, n: number, totalLoadN: number, type: 'one_slope' | 'two_slope' = 'two_slope') {
+    const nodes: {x:number, y:number}[] = [];
+    const elements: {start:number, end:number, props: StructuralMemberProps}[] = [];
+    const loads: {node:number, fx:number, fy:number}[] = [];
+    
+    // Generar Nodos
+    const dx = L / n;
+    // Cordón inferior
+    for(let i=0; i<=n; i++) nodes.push({ x: i*dx, y: 0 });
+    // Cordón superior
+    for(let i=0; i<=n; i++) {
+        let y = 0;
+        if (type === 'two_slope') {
+            const mid = L/2;
+            y = i*dx <= mid ? (i*dx * H / mid) : ((L - i*dx) * H / mid);
+        } else {
+            y = i*dx * H / L;
+        }
+        nodes.push({ x: i*dx, y: y + 20 }); // +20 para no solapar con inferior si H=0
+    }
+
+    // Generar Elementos
+    const props = totalLoadN > 10000 ? this.PGC_100_125 : this.PGC_100_09;
+    for(let i=0; i<n; i++) {
+      elements.push({ start: i, end: i + 1, props }); // Inferior
+      elements.push({ start: n+1+i, end: n+1+i+1, props }); // Superior
+      elements.push({ start: i, end: n+1+i, props }); // Vertical
+      elements.push({ start: i, end: n+1+i+1, props }); // Diagonal
+    }
+    elements.push({ start: n, end: n*2+1, props }); // Último vertical
+
+    // Cargas (distribuir en nodos superiores)
+    const loadPerNode = -totalLoadN / (n + 1);
+    for(let i=0; i<=n; i++) loads.push({ node: n + 1 + i, fx: 0, fy: loadPerNode });
+
+    const feaResults = this.solveStiffnessMatrix(nodes, elements, loads);
+    return feaResults;
   }
 
   static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig, wallHeight: number): HeaderAnalysis {
     const L = opening.width;
     const tributaryWidthM = this.getTributaryWidth(config);
-    const roofLoad = (config.roof?.coveringWeightKpa || this.DEAD_LOAD_KPA) 
-               + this.LIVE_LOAD_ROOF_KPA;
-    const windLoad = this.WIND_PRESSURE_KPA * (L / 1000);
-    const loadKNm = roofLoad * tributaryWidthM + windLoad;
+    
+    // Solo aplicar cargas de techo si la estructura existe
+    const hasRoof = !!config.roof;
+    const roofLoad = hasRoof ? (config.loads.roofDeadKpa + config.loads.roofLiveKpa) : 0;
+    const snowLoad = hasRoof ? config.loads.snowKpa : 0;
+    
+    const windLoad = config.loads.windKpa * (L / 1000); // El viento siempre impacta si hay cerramiento
+    const loadKNm = roofLoad * tributaryWidthM + snowLoad * tributaryWidthM + windLoad;
     const loadNmm = (loadKNm * 1000) / 1000;
     const maxAllowableDeflection = L / 360;
     const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
@@ -259,36 +604,77 @@ export class StructuralEngine {
       if (L > 4000 || requiredIx > this.PGC_IX_SINGLE * 3) {
         chordMultiplier = 2; // doble perfil
       }
+    const trussDataMembers = this.solveTruss(L, trussHeight, numPanels, loadNmm * L);
+      
       trussData = { 
         height: trussHeight, 
         numDiagonals: numPanels, 
-        chordThickness: thickness * chordMultiplier,
         panelWidth,
-        diagonalAngle
+        diagonalAngle,
+        nodeSpacing: panelWidth,
+        chordProps: thickness > 1.25 ? this.PGC_100_125 : this.PGC_100_09,
+        members: trussDataMembers.map((m: any, i: number) => ({
+          ...m,
+          id: m.id.includes('top') ? `C-SUP-${i}` : (m.id.includes('bottom') ? `C-INF-${i}` : (m.id.includes('diag') ? `DIAG-${i}` : `VERT-${i}`)),
+          type: m.id.includes('top') ? 'chord_top' : (m.id.includes('bottom') ? 'chord_bottom' : (m.id.includes('diag') ? 'diagonal' : 'vertical'))
+        }))
       };
+      
       actualHeight = trussHeight;
 
       // relación luz / altura (criterio estructural)
       const slenderness = L / trussHeight;
 
-      if (L > 5500 || slenderness > 12) {
+      if (L > 5500 || slenderness > 12 || trussDataMembers.some((m: any) => m.status === 'fail')) {
         status = 'error';
       } else if (L > 4000 || slenderness > 10) {
         status = 'warning';
       }
     }
-    const reactionKN = (loadKNm * L) / 2 / 1000; // kN
 
-    const studCapacityKN = 8; // valor aproximado PGC 100
+    const totalReactionN = (loadNmm * L) / 2;
+    const studCapacityN = 8000; // PGC 100 0.9 ~ 800kg
 
-    const supportsRequired = Math.max(1, Math.ceil(reactionKN / studCapacityKN));
+    // Lógica profesional de Jacks: 1 por cada 1.2m
+    const jacks = Math.max(Math.ceil(L / 1200), Math.ceil(totalReactionN / studCapacityN));
+    const kings = 1; // Siempre al menos 1 rigidizador continuo
 
-    // 🔥 REGLA UNIFICADA
-    const kings = supportsRequired;
-    const jacks = supportsRequired;
     const deflectionMm = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * requiredIx);
-    return { type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx, status, isFusedWithCorner: fusion, actualHeight, trussData, supportsRequired, kings,
-      jacks };
+    
+    // Generar diagramas si es tipo viga o tubo
+    let diagramData: HeaderAnalysis['diagramData'];
+    if (type !== 'truss') {
+      const base = this.calculateBeamDiagrams(L, loadNmm);
+      // Añadir la curva de deflexión (exagerada x10 para visualización) o usar formula real
+      const deflectionArr = base.moments.map((p: any) => {
+        const x = p.x;
+        const d = (loadNmm * x * (Math.pow(L, 3) - 2*L*Math.pow(x, 2) + Math.pow(x, 3))) / (24 * this.STEEL_MODULUS * requiredIx);
+        return { x, y: d * 10 }; // 10x para visibilidad
+      });
+      diagramData = { 
+        moments: base.moments,
+        shears: base.shears,
+        deflection: deflectionArr 
+      };
+    }
+
+    return { 
+      type, 
+      loadNmm, 
+      deflectionMm, 
+      maxAllowableDeflection, 
+      requiredIx, 
+      status, 
+      isFusedWithCorner: fusion, 
+      actualHeight, 
+      trussData, 
+      diagramData,
+      supports: {
+        kings,
+        jacks,
+        reactionN: totalReactionN
+      }
+    };
   }
   
   static calculateCrippleStuds(wall: SteelWall | InternalWall, opening: SteelOpening, config: SteelHouseConfig): CrippleData[] {
@@ -378,28 +764,33 @@ export class StructuralEngine {
 
   static validateStructure(config: SteelHouseConfig): { wallId: string, status: 'ok' | 'warning' | 'error', message: string }[] {
     const alerts: any[] = [];
+    const loadPath = this.calculateVerticalLoadPath(config);
+
+    if (loadPath.foundationPointLoadKg > 2000) {
+      alerts.push({ wallId: 'global', status: 'warning', message: loadPath.alerts });
+    }
     
     // Validar muros perimetrales
     config.walls.forEach(wall => {
       wall.openings.forEach(op => {
         const analysis = this.calculateHeader(op, wall.length, config, wall.height);
-        if (analysis.status !== 'ok') {
-          const msg = analysis.type === 'truss' 
-            ? `Muro Ext. - Vano ${op.width}mm: Requiere Viga Reticulada (Truss)`
-            : `Muro Ext. - Vano ${op.width}mm: ${analysis.status === 'error' ? 'Crítico' : 'Refuerzo Especial'}`;
-          alerts.push({ wallId: wall.id, status: analysis.status, message: msg });
-        }
-      });
-    });
+        
+        // Re-validar con el nuevo motor de deflexión real
+        const profileId = analysis.type === 'truss' ? 'PGC-100-1.25' : 'PGC-100-0.9';
+        
+        // Mapear tipo de viga correctamente
+        let configType: any = 'simple';
+        if (analysis.type === 'double') configType = 'double';
+        if (analysis.type === 'triple') configType = 'triple';
+        if (analysis.type === 'tube') configType = 'tube';
+        if (analysis.type === 'truss') configType = 'truss';
 
-    // Validar muros internos
-    config.internalWalls.forEach(iw => {
-      (iw.openings || []).forEach(op => {
-        const analysis = this.calculateHeader(op, iw.length, config, iw.height);
-        if (analysis.status !== 'ok' || op.width > 1200) {
-          const status = op.width > 2400 ? 'error' : (op.width > 1200 ? 'warning' : analysis.status);
-          const msg = `Tabique Int. - Vano ${op.width}mm: ${status === 'error' ? 'Luz excesiva para tabiquería' : 'Requiere dintel reforzado'}`;
-          alerts.push({ wallId: iw.id, status, message: msg });
+        const mechAnalysis = this.analyzeStructuralElement(profileId, op.width, analysis.loadNmm * 100, configType);
+
+        if (!mechAnalysis.isSafe || analysis.status !== 'ok') {
+          const status = !mechAnalysis.isSafe ? 'error' : analysis.status;
+          const msg = `Muro Ext. - Vano ${op.width}mm: ${mechAnalysis.description}`;
+          alerts.push({ wallId: wall.id, status, message: msg });
         }
       });
     });

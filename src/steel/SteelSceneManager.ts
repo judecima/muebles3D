@@ -1,16 +1,14 @@
-
 'use client';
 
-import * as THREE_LIB from 'three';
+import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility, InternalWall } from '@/lib/steel/types';
+import { SteelHouseConfig, SteelWall, SteelOpening, LayerVisibility, InternalWall, StructuralAnalysisResult } from '@/lib/steel/types';
 import { InputController } from '@/engine/player/InputController';
 import { CollisionSystem } from '@/engine/player/CollisionSystem';
 import { PlayerController } from '@/engine/player/PlayerController';
 import { ThirdPersonCamera } from '@/engine/player/ThirdPersonCamera';
-import { StructuralEngine } from '@/server/steel/structuralEngine';
-
-const THREE = THREE_LIB;
+import { StructuralEngine, HeaderAnalysis } from '@/server/steel/structuralEngine';
+import { FoundationEngine } from '@/server/steel/foundationEngine';
 
 export class SteelSceneManager {
   private scene: THREE.Scene;
@@ -21,6 +19,13 @@ export class SteelSceneManager {
   private openingsGroup: THREE.Group;
   private internalWallsGroup: THREE.Group;
   private floorMesh: THREE.Mesh | null = null;
+  private xRayMode: boolean = false;
+  private explosionFactor: number = 0;
+  private blueprintMode: boolean = false;
+  private showLoadVectors: boolean = false;
+  private initialPositions: Map<string, THREE.Vector3>;
+  private alertsContainer: HTMLDivElement;
+  private alertElements: { el: HTMLElement, pos: THREE.Vector3 }[] = [];
   private container: HTMLElement;
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
@@ -57,8 +62,15 @@ export class SteelSceneManager {
     status_ok: 0x22c55e,
     status_warning: 0xf59e0b,
     status_error: 0xef4444,
-    ladder: 0xec4899 
+    ladder: 0xec4899,
+    tension: 0x3b82f6,      // Azul
+    compression: 0xef4444,  // Rojo
+    neutral: 0x94a3b8,      // Gris azulado
+    concrete: 0x94a3b8,        // Hormigón
+    rebar: 0x475569            // Acero refuerzo
   };
+
+  private showDiagrams = false;
 
   private profileWidth = 100; 
   private drywallProfileWidth = 70;
@@ -92,13 +104,34 @@ export class SteelSceneManager {
     this.houseGroup = new THREE.Group();
     this.scene.add(this.houseGroup);
     this.openingsGroup = new THREE.Group();
+    
+    this.xRayMode = false;
+    this.explosionFactor = 0;
+    this.blueprintMode = false;
+    this.initialPositions = new Map();
     this.scene.add(this.openingsGroup);
     this.internalWallsGroup = new THREE.Group();
     this.scene.add(this.internalWallsGroup);
+    
+    this.initialPositions = new Map();
+    this.alertElements = [];
+
+    this.alertsContainer = document.createElement('div');
+    this.alertsContainer.style.position = 'absolute';
+    this.alertsContainer.style.top = '0';
+    this.alertsContainer.style.left = '0';
+    this.alertsContainer.style.width = '100%';
+    this.alertsContainer.style.height = '100%';
+    this.alertsContainer.style.pointerEvents = 'none';
+    this.container.appendChild(this.alertsContainer);
     this.animate();
     window.addEventListener('resize', this.onWindowResize);
     this.renderer.domElement.addEventListener('dblclick', this.onDoubleClick);
   }
+
+  public getCamera() { return this.camera; }
+  public getControls() { return this.controls; }
+  public getScreenshot() { return this.renderer.domElement.toDataURL('image/png'); }
 
   public updateJoystickMove(x: number, y: number) { this.input.joystickMove.set(x, y); }
   public updateJoystickLook(x: number, y: number) { this.input.joystickLook.set(x, y); }
@@ -183,8 +216,13 @@ export class SteelSceneManager {
       this.controls.update();
     }
     this.prevTime = time;
+    this.updateAlerts();
     this.renderer.render(this.scene, this.camera);
   };
+
+  public setShowDiagrams(show: boolean) {
+    this.showDiagrams = show;
+  }
 
   private createTextLabel(text: string): THREE.Sprite {
     const canvas = document.createElement('canvas');
@@ -215,6 +253,12 @@ export class SteelSceneManager {
     });
     this.collisions.clear();
 
+    if (config.layers.foundation) {
+      if (structuralResult?.foundation) {
+        this.renderFoundation(structuralResult.foundation, config);
+      }
+    }
+
     config.walls.forEach(wall => {
       const processed = structuralResult?.processedWalls?.find((pw: any) => pw.id === wall.id);
       const wallGroup = new THREE.Group();
@@ -228,9 +272,23 @@ export class SteelSceneManager {
         if (config.layers.interiorPanels) wallGroup.add(this.createPanelMesh(wall, 'interior', config));
       }
       
+      this.clearAlerts();
       if (config.layers.steelProfiles && processed) {
         this.renderProcessedStructure(wall, processed, wallGroup, config);
+        if (config.layers.structuralDiagrams && structuralResult.lateralStability) {
+          this.renderLoadPath(wall, processed, wallGroup, config, structuralResult);
+          this.renderWindVectors(wall, structuralResult.lateralStability, wallGroup, config);
+        }
       }
+      if (!this.initialPositions.has(wall.id)) {
+        this.initialPositions.set(wall.id, wallGroup.position.clone());
+      }
+
+      this.updateExplodedPosition(wallGroup, wall.id, config);
+      this.updateXRayMaterials(wallGroup, config);
+      this.updateBlueprintStyle(wallGroup, config);
+      this.updateLoadVectors(wallGroup, wall, config);
+
       this.createOpeningTriggers(wall.id, wall.length, wall.height, wall.rotation, wall.x, wall.z, wall.openings, false, processed?.headers || [], 100);
     });
 
@@ -263,12 +321,11 @@ export class SteelSceneManager {
     const studHeight = wall.height - (this.profileFlange * 2);
 
     processed.panels.forEach((p: any, index: number) => {
-    
-      structuralGroup.add(panelGroup);
       // =========================
       // 🔷 PANEL GROUP (CLAVE)
       // =========================
       const panelGroup = new THREE.Group();
+      structuralGroup.add(panelGroup);
     
       const panelGap = 8; // separación visual entre paneles
       panelGroup.position.x = p.xStart + (index * panelGap);
@@ -324,16 +381,52 @@ export class SteelSceneManager {
       }
     
       // =========================
+      // 📐 MONTANTES (PGC)
+      // =========================
+      for (let x = 0; x <= p.width; x += wall.studSpacing) {
+        const sx = Math.min(x, p.width - this.profileFlange);
+        
+        // 🧪 Análisis de estrés para Mapa de Calor
+        const analysis = StructuralEngine.analyzeStructuralElement("PGC-100-0.9", wall.height, p.loads.verticalLoadN / 12, 'simple');
+        const stressColor = analysis.isSafe 
+          ? (analysis.stressRatio > 0.8 ? 0xf59e0b : this.colors.steel) 
+          : 0xef4444;
+
+        const stud = new THREE.Mesh(
+          new THREE.BoxGeometry(this.profileFlange, studHeight, this.profileWidth),
+          new THREE.MeshStandardMaterial({ color: config.layers.structuralDiagrams ? stressColor : panelColor })
+        );
+        stud.position.set(sx + (this.profileFlange / 2), wall.height / 2, 0);
+        panelGroup.add(stud);
+        
+        // 🧪 Alerta de Montante
+        if (!analysis.isSafe) {
+            const worldPos = new THREE.Vector3(sx + (this.profileFlange / 2), wall.height, 0).applyMatrix4(panelGroup.matrixWorld);
+            this.addStructuralAlert('FAIL', analysis.description, worldPos, { calculated: analysis.f_max, limit: analysis.limit, unit: 'cm' });
+        }
+
+        // 🏹 Flecha de carga
+        if (config.layers.structuralDiagrams) {
+          const dir = new THREE.Vector3(0, -1, 0);
+          const origin = new THREE.Vector3(sx + (this.profileFlange / 2), wall.height + 50, 0);
+          const arrow = new THREE.ArrowHelper(dir, origin, 40, 0xff0000, 10, 10);
+          panelGroup.add(arrow);
+        }
+      }
+
+      // =========================
       // 🔩 STUDS INTERNOS
       // =========================
       for (let x = wall.studSpacing; x < p.width - 10; x += wall.studSpacing) {
     
         const globalX = p.xStart + x;
     
-        const inOpening = wall.openings.some(op =>
-          globalX >= (op.position - 10) &&
-          globalX <= (op.position + op.width + 10)
-        );
+        const inOpening = wall.openings.some(op => {
+          const margin = 20; // Margen de seguridad para evitar solapamientos visuales
+          const opLeft = op.position - margin;
+          const opRight = op.position + op.width + margin;
+          return globalX >= opLeft && globalX <= opRight;
+        });
     
         if (!inOpening) {
     
@@ -471,15 +564,30 @@ export class SteelSceneManager {
           op.width,
           headerHeight,
           this.profileWidth,
-          analysis.trussData // 👈 CLAVE
+          analysis.trussData 
         );
       }
       else {
         const headerColor = analysis.status === 'error' ? this.colors.status_error : (analysis.status === 'warning' ? this.colors.status_warning : this.colors.header);
         structuralGroup.add(this.createProfile(op.width, op.position, headerBottom, 0, 'PGC', headerColor, 0, this.profileWidth, headerHeight));
+        
+        // 🔥 DIAGRAMAS DE INGENIERÍA
+        if (this.showDiagrams && analysis.diagramData) {
+          if (analysis.diagramData.moments) {
+            this.drawMomentDiagram(structuralGroup, op.position, headerBottom + headerHeight, analysis.diagramData.moments);
+          }
+          if (analysis.diagramData.deflection) {
+            this.drawEngineeringPath(structuralGroup, analysis.diagramData.deflection, [op.position, headerBottom, 0], 0, 0x00ffff, 100);
+          }
+        }
       }
       if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
-      headerData.cripples.forEach((c: any) => structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple)));
+      
+      headerData.cripples.forEach((c: any) => {
+        const profile = this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple);
+        profile.userData = { label: 'C-Crippler' };
+        structuralGroup.add(profile);
+      });
     });
   }
 
@@ -544,6 +652,9 @@ export class SteelSceneManager {
           headerData.cripples.forEach((c: any) => {
             structuralGroup.add(this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple, 0, thickness, 30));
           });
+          // Renderizar tornillería si está activo modo ingeniería
+          const parentPanel = processed.panels.find((p: any) => op.position >= p.xStart && op.position <= p.xEnd);
+          if (parentPanel) this.drawScrews(structuralGroup, parentPanel.fasteners);
         });
       }
     }
@@ -557,7 +668,7 @@ export class SteelSceneManager {
           hole.moveTo(op.position, sill); hole.lineTo(op.position + op.width, sill); hole.lineTo(op.position + op.width, sill + op.height); hole.lineTo(op.position, sill + op.height); hole.lineTo(op.position, sill);
           shape.holes.push(hole);
         });
-        const panelGeom = new THREE.ExtrudeGeometry(shape, { depth: 12.5, beveled: false });
+        const panelGeom = new THREE.ExtrudeGeometry(shape, { depth: 12.5, bevelEnabled: false });
         const p1 = new THREE.Mesh(panelGeom, new THREE.MeshStandardMaterial({ color: this.colors.panel_int }));
         p1.position.z = thickness/2; group.add(p1);
         const p2 = new THREE.Mesh(panelGeom, new THREE.MeshStandardMaterial({ color: this.colors.panel_int }));
@@ -603,15 +714,21 @@ export class SteelSceneManager {
     const offset = isDouble ? 10 : 0;
 
     // inferior
-    group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, -offset, thickness));
+    const bottomChord = trussData?.members?.find((m: any) => m.type === 'chord_bottom');
+    const bottomColor = bottomChord ? (bottomChord.stressType === 'tension' ? this.colors.tension : this.colors.compression) : this.colors.header_truss;
+
+    group.add(this.createProfile(w, x, y, 0, 'PGC', bottomColor, -offset, thickness));
     if (isDouble) {
-      group.add(this.createProfile(w, x, y, 0, 'PGC', this.colors.header_truss, offset, thickness));
+      group.add(this.createProfile(w, x, y, 0, 'PGC', bottomColor, offset, thickness));
     }
 
     // superior
-    group.add(this.createProfile(w, x, y + h - chordHeight, 0, 'PGC', this.colors.header_truss, -offset, thickness));
+    const topChord = trussData?.members?.find((m: any) => m.type === 'chord_top');
+    const topColor = topChord ? (topChord.stressType === 'tension' ? this.colors.tension : this.colors.compression) : this.colors.header_truss;
+
+    group.add(this.createProfile(w, x, y + h - chordHeight, 0, 'PGC', topColor, -offset, thickness));
     if (isDouble) {
-      group.add(this.createProfile(w, x, y + h - chordHeight, 0, 'PGC', this.colors.header_truss, offset, thickness));
+      group.add(this.createProfile(w, x, y + h - chordHeight, 0, 'PGC', topColor, offset, thickness));
     }
     if (!trussData) return;
   
@@ -636,13 +753,16 @@ export class SteelSceneManager {
         )
       );
   
-      // 🔥 diagonal real
+      // 🔥 diagonal real con color de esfuerzo
+      const diagMember = trussData.members?.find((m: any) => m.id === `diag_${i}`);
+      const diagColor = diagMember ? (diagMember.stressType === 'tension' ? this.colors.tension : this.colors.compression) : this.colors.header_truss;
+
       const diagLen = Math.sqrt(panelWidth ** 2 + webHeight ** 2);
   
       const diagGeom = new THREE.BoxGeometry(diagLen, 15, thickness - 10);
       const diag = new THREE.Mesh(
         diagGeom,
-        new THREE.MeshStandardMaterial({ color: this.colors.header_truss })
+        new THREE.MeshStandardMaterial({ color: diagColor })
       );
   
       diag.position.set(
@@ -670,6 +790,66 @@ export class SteelSceneManager {
       )
     );
   }
+
+  private drawMomentDiagram(group: THREE.Group, startX: number, baselineY: number, points: { x: number, y: number }[]) {
+    // Escalar momentos para visualización (ej: 1 kNm = 100mm en escena)
+    const scale = 0.0001; 
+    
+    const curvePoints = points.map(p => new THREE.Vector3(startX + p.x, baselineY + (p.y * scale), 50));
+    const geometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
+    const material = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 }); // Verde esmeralda
+    const line = new THREE.Line(geometry, material);
+    group.add(line);
+
+    // Añadir área sombreada (opcional pero estético)
+    const shape = new THREE.Shape();
+    shape.moveTo(startX, baselineY);
+    points.forEach(p => shape.lineTo(startX + p.x, baselineY + (p.y * scale)));
+    shape.lineTo(startX + points[points.length - 1].x, baselineY);
+    shape.closePath();
+
+    const fillGeom = new THREE.ShapeGeometry(shape);
+    const fillMat = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
+    const fillMesh = new THREE.Mesh(fillGeom, fillMat);
+    fillMesh.position.z = 45;
+    group.add(fillMesh);
+  }
+
+
+  private drawEngineeringPath(group: THREE.Group, points: { x: number, y: number }[], offset: [number, number, number], rotation: number, color: number = 0x00ffff, scaleY: number = 100) {
+    if (!points || points.length === 0) return;
+    
+    const vectorPoints = points.map((p: any) => {
+        // p.x está en metros, p.y está en mm en el motor FEA
+        return new THREE.Vector3(p.x * 1000, -p.y * scaleY, 50); 
+    });
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(vectorPoints);
+    const material = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
+    const line = new THREE.Line(geometry, material);
+    
+    line.position.set(offset[0], offset[1], offset[2]);
+    line.rotation.y = rotation;
+    line.name = 'engineeringCurve';
+    
+    group.add(line);
+  }
+
+  private drawScrews(group: THREE.Group, fasteners: any[]) {
+    if (!this.showDiagrams || !fasteners) return;
+    
+    fasteners.forEach(f => {
+      const screwGroup = new THREE.Group();
+      const mat = new THREE.LineBasicMaterial({ color: 0xff0000 });
+      const g = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-2, -2, 0), new THREE.Vector3(2, 2, 0),
+        new THREE.Vector3(2, -2, 0), new THREE.Vector3(-2, 2, 0)
+      ]);
+      const xMark = new THREE.LineSegments(g, mat);
+      xMark.position.set(f.x, f.y, 55);
+      group.add(xMark);
+    });
+  }
   
   private createProfile(len: number, x: number, y: number, rotZ: number, type: 'PGC' | 'PGU', color?: number, zOffset: number = 0, customWidth?: number, customHeight?: number): THREE.Mesh {
     const width = customWidth || this.profileWidth;
@@ -689,7 +869,7 @@ export class SteelSceneManager {
       hole.moveTo(op.position, sill); hole.lineTo(op.position + op.width, sill); hole.lineTo(op.position + op.width, sill + op.height); hole.lineTo(op.position, sill + op.height); hole.lineTo(op.position, sill);
       shape.holes.push(hole);
     });
-    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 12, beveled: false }), new THREE.MeshStandardMaterial({ color: side === 'exterior' ? this.colors.panel_ext : this.colors.panel_int, transparent: true, opacity: side === 'exterior' ? 1 : 0.8 }));
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 12, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: side === 'exterior' ? this.colors.panel_ext : this.colors.panel_int, transparent: true, opacity: side === 'exterior' ? 1 : 0.8 }));
     mesh.position.z = side === 'exterior' ? -62 : 50; mesh.userData = { wallId: wall.id, isWall: true, side: side }; return mesh;
   }
 
@@ -703,8 +883,292 @@ export class SteelSceneManager {
       const matrix = new THREE.Matrix4().makeRotationY((rotation * Math.PI) / 180).setPosition(x, 0, z);
       const pos = new THREE.Vector3(op.position + op.width / 2, sill + op.height / 2, 0).applyMatrix4(matrix);
       mesh.position.copy(pos); mesh.rotation.y = (rotation * Math.PI) / 180; mesh.userData = { wallId, opening: op, isInternal };
+      
+      // 🧪 Agregar Alerta de Dintel si falla (Con tolerancia Epsilon 0.01 cm para evitar 0.42/0.42)
+      const calculatedVal = (headerData.analysis.f_max ?? headerData.analysis.deflectionMm) / 10;
+      const limitVal = (headerData.analysis.limit ?? headerData.analysis.maxAllowableDeflection) / 10;
+      
+      if (headerData?.analysis && (!headerData.analysis.isSafe || calculatedVal > (limitVal + 0.01))) {
+        this.addStructuralAlert('FAIL', `Dintel: Flecha o Aplastamiento fuera de límite`, pos, {
+            calculated: calculatedVal,
+            limit: limitVal,
+            unit: 'cm',
+            recommendation: headerData.analysis.recommendation
+        });
+      }
+
+      // 📈 Visualización de la Deformada (Flecha exagerada)
+      if (headerData?.analysis?.deflectionPoints) {
+        this.drawEngineeringPath(this.openingsGroup, headerData.analysis.deflectionPoints, [pos.x - op.width/2, pos.y + op.height/2, pos.z], rotation, 0x00ffff, 100);
+      }
+
       this.openingsGroup.add(mesh);
     });
+  }
+
+  private renderFoundation(res: any, config: SteelHouseConfig) {
+    const fConfig = config.foundation || { slabThickness: 120, edgeBeamDepth: 300, pileDepth: 3000, pileDiameter: 200, soil: {bearingCapacityKPa: 150} };
+    
+    // 1. Platea (Slab)
+    const slabGeom = new THREE.BoxGeometry(config.width, fConfig.slabThickness, config.length);
+    const slabMat = new THREE.MeshStandardMaterial({ 
+      color: this.colors.concrete, 
+      transparent: true, 
+      opacity: 0.6,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    const slab = new THREE.Mesh(slabGeom, slabMat);
+    slab.position.set(0, -fConfig.slabThickness / 2, 0); // Centrar con los muros
+    slab.receiveShadow = true;
+    this.houseGroup.add(slab);
+
+    // 2. Malla Sima (Rebar visualization)
+    const gridSize = Math.max(config.width, config.length);
+    const gridDivs = Math.ceil(gridSize / 150);
+    const grid = new THREE.GridHelper(gridSize, gridDivs, this.colors.rebar, this.colors.rebar);
+    grid.position.set(0, -20, 0); // Centrar con la platea
+    this.houseGroup.add(grid);
+
+    // 3. Pilotones (Piles)
+    res.piles.forEach((p: any) => {
+      const pileGeom = new THREE.CylinderGeometry(fConfig.pileDiameter/2, fConfig.pileDiameter/2, fConfig.pileDepth, 16);
+      const pileMat = new THREE.MeshStandardMaterial({ 
+        color: this.colors.concrete, 
+        transparent: true, 
+        opacity: 0.4 
+      });
+      const pile = new THREE.Mesh(pileGeom, pileMat);
+      pile.position.set(p.x, -fConfig.pileDepth/2 - fConfig.slabThickness, p.z);
+      this.houseGroup.add(pile);
+
+      // Armadura de pilotón (4 barras longitudinales)
+      for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI * 2) / 4;
+        const r = fConfig.pileDiameter/2 - 25;
+        const barGeom = new THREE.CylinderGeometry(6, 6, fConfig.pileDepth, 8);
+        const bar = new THREE.Mesh(barGeom, new THREE.MeshStandardMaterial({ color: this.colors.rebar }));
+        bar.position.set(p.x + Math.cos(angle) * r, -fConfig.pileDepth/2 - fConfig.slabThickness, p.z + Math.sin(angle) * r);
+        this.houseGroup.add(bar);
+      }
+    });
+
+    // 4. Viga de Borde (Edge Beam)
+    const edgeBeamGeom = new THREE.BoxGeometry(config.width + 40, fConfig.edgeBeamDepth, config.length + 40);
+    const edgeBeamMat = new THREE.MeshStandardMaterial({ color: this.colors.concrete, wireframe: true, transparent: true, opacity: 0.3 });
+    const edgeBeam = new THREE.Mesh(edgeBeamGeom, edgeBeamMat);
+    edgeBeam.position.set(0, -fConfig.edgeBeamDepth / 2, 0); // Centrar con la platea
+    this.houseGroup.add(edgeBeam);
+  }
+
+  private renderLoadPath(wall: SteelWall, processed: any, group: THREE.Group, config: SteelHouseConfig, structuralResult: any) {
+    const loadData = StructuralEngine.calculateVerticalLoadPath(config);
+    
+    // 1. Flecha de Carga de Techo -> Muro
+    processed.panels.forEach((p: any) => {
+      const mag = loadData.roofReactionKg;
+      const length = Math.max(200, (mag / 1000) * 1000); // 1kg = 1mm para escala visual
+      const dir = new THREE.Vector3(0, -1, 0);
+      const origin = new THREE.Vector3(p.xStart + p.width/2, wall.height + 200, 0);
+      
+      const arrow = new THREE.ArrowHelper(dir, origin, length, 0xef4444, 100, 50);
+      group.add(arrow);
+
+      // Etiqueta de Carga
+      const label = this.createTextLabel(`${Math.round(mag)}kg`);
+      label.position.set(p.xStart + p.width/2, wall.height + 400, 0);
+      label.scale.set(300, 150, 1);
+      group.add(label);
+    });
+
+    // 2. Reacción en Pilotones
+    if (config.layers.foundation) {
+        const fRes = FoundationEngine.calculateFoundation(config, structuralResult);
+        fRes.piles.forEach(pile => {
+            const mag = loadData.foundationPointLoadKg;
+            const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(pile.x, -100, pile.z), 500, 0x22c55e, 100, 50);
+            this.houseGroup.add(arrow);
+        });
+    }
+  }
+
+  private renderWindVectors(wall: SteelWall, stability: any, group: THREE.Group, config: SteelHouseConfig) {
+    const isX = Math.abs(wall.rotation % 180) === 0;
+    const isZ = Math.abs(wall.rotation % 180) === 90;
+    
+    const windForce = isX ? stability.windForceX : (isZ ? stability.windForceZ : 0);
+    if (windForce < 1) return;
+
+    // Flechas de viento horizontales impactando el muro
+    const numArrows = Math.ceil(wall.length / 2000);
+    const spacing = wall.length / numArrows;
+
+    for (let i = 0; i < numArrows; i++) {
+        const dir = isX ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+        const origin = new THREE.Vector3(i * spacing + spacing/2, wall.height * 0.7, -500);
+        
+        // La flecha viene de afuera hacia el muro
+        const arrow = new THREE.ArrowHelper(dir, origin, 400, 0x06b6d4, 100, 50);
+        group.add(arrow);
+    }
+
+    // Etiqueta de Presión Total
+    const label = this.createTextLabel(`VIENTO: ${Math.round(windForce)}kN`);
+    label.position.set(wall.length / 2, wall.height + 600, -200);
+    label.scale.set(400, 200, 1);
+    group.add(label);
+  }
+
+  private updateExplodedPosition(group: THREE.Group, id: string, config: SteelHouseConfig) {
+    if (!config.explosionFactor) {
+        group.position.copy(this.initialPositions.get(id) || new THREE.Vector3());
+        return;
+    }
+
+    const initial = this.initialPositions.get(id) || new THREE.Vector3();
+    const center = new THREE.Vector3(0, 0, 0);
+    const dir = new THREE.Vector3().copy(initial).sub(center).normalize();
+    
+    // Si el muro está muy en el centro, usar su orientación
+    if (dir.length() < 0.1) {
+        const rad = (group.rotation.y);
+        dir.set(Math.sin(rad), 0, Math.cos(rad));
+    }
+
+    const offset = dir.multiplyScalar(config.explosionFactor * 2000); // 2 metros de explosión máx
+    group.position.copy(initial).add(offset);
+  }
+
+  private updateXRayMaterials(group: THREE.Group, config: SteelHouseConfig) {
+    group.traverse(obj => {
+        if (obj instanceof THREE.Mesh) {
+            const isStructural = obj.name.includes('stud') || obj.name.includes('header') || obj.name.includes('beam');
+            
+            if (!isStructural && config.xRayMode) {
+                obj.material.transparent = true;
+                obj.material.opacity = 0.15;
+                obj.material.depthWrite = false;
+            } else if (!isStructural) {
+                obj.material.transparent = false;
+                obj.material.opacity = 1.0;
+                obj.material.depthWrite = true;
+            }
+
+            // Heatmap de estrés en modo Rayos X
+            if (isStructural && config.xRayMode && obj.userData.stressRatio > 0.9) {
+                obj.material.emissive = new THREE.Color(0xff0000);
+                obj.material.emissiveIntensity = 0.5;
+            } else if (isStructural) {
+                obj.material.emissive = new THREE.Color(0x000000);
+            }
+        }
+    });
+  }
+
+  private clearAlerts() {
+    this.alertsContainer.innerHTML = '';
+    this.alertElements = [];
+  }
+
+  private addStructuralAlert(status: 'FAIL' | 'WARN', message: string, pos: THREE.Vector3, data: any) {
+    const el = document.createElement('div');
+    el.className = `absolute px-2 py-1 rounded text-[10px] font-bold text-white shadow-xl border border-white/30 backdrop-blur-sm pointer-events-auto transition-transform hover:scale-110 ${status === 'FAIL' ? 'bg-red-600' : 'bg-amber-500'}`;
+    
+    const recHtml = data?.recommendation ? `<div class="mt-2 pt-1 border-t border-white/20 text-[7px] italic text-yellow-200">💡 Sugerencia: ${data.recommendation}</div>` : '';
+    
+    el.innerHTML = `
+      <div class="flex items-center gap-1 border-b border-white/20 mb-1 pb-1">
+        <span>${status === 'FAIL' ? '🚫' : '⚠️'}</span>
+        <span class="uppercase">${status}</span>
+      </div>
+      <div>${message}</div>
+      <div class="mt-1 text-[8px] bg-black/20 p-1 rounded flex justify-between">
+        <span>CALC: ${(data?.calculated ?? 0).toFixed(2)}</span>
+        <span>LIM: ${(data?.limit ?? 0).toFixed(2)}</span>
+      </div>
+      ${recHtml}
+    `;
+    this.alertsContainer.appendChild(el);
+    this.alertElements.push({ el, pos });
+  }
+
+  private updateAlerts() {
+    this.alertElements.forEach(({ el, pos }) => {
+        const v = pos.clone().project(this.camera);
+        const x = (v.x * 0.5 + 0.5) * this.container.clientWidth;
+        const y = (-(v.y * 0.5 - 0.5)) * this.container.clientHeight;
+        
+        // Ocultar si está detrás de la cámara
+        if (v.z > 1) {
+            el.style.display = 'none';
+        } else {
+            el.style.display = 'block';
+            el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+        }
+    });
+  }
+
+  private updateBlueprintStyle(group: THREE.Group, config: SteelHouseConfig) {
+    if (!config.blueprintMode) {
+        this.scene.background = new THREE.Color(this.colors.background);
+        return;
+    }
+
+    this.scene.background = new THREE.Color(0x001a33); // Azul profundo
+
+    group.traverse(obj => {
+        if (obj instanceof THREE.Mesh) {
+            const isStructural = obj.name.includes('stud') || obj.name.includes('header') || obj.name.includes('beam');
+            
+            if (isStructural) {
+                obj.material.color = new THREE.Color(0x00ffff); // Neón
+                obj.material.emissive = new THREE.Color(0x00ffff);
+                obj.material.emissiveIntensity = 0.5;
+                obj.material.wireframe = true;
+            } else {
+                obj.material.transparent = true;
+                obj.material.opacity = 0.05;
+                obj.material.color = new THREE.Color(0xffffff);
+            }
+        }
+    });
+
+    // Grilla técnica
+    const grid = new THREE.GridHelper(20000, 20, 0x00ffff, 0x0a2a4a);
+    grid.position.y = -10;
+    grid.name = 'blueprintGrid';
+    if (!this.scene.getObjectByName('blueprintGrid')) this.scene.add(grid);
+  }
+
+
+
+
+  private updateLoadVectors(group: THREE.Group, wall: SteelWall, config: SteelHouseConfig) {
+    // Limpiar vectores previos en este grupo
+    const existing = group.getObjectByName('loadVectors');
+    if (existing) group.remove(existing);
+    
+    if (!config.layers.structuralDiagrams) return;
+
+    const vectorGroup = new THREE.Group();
+    vectorGroup.name = 'loadVectors';
+
+    // Para cada montante calculado (simplificado aquí por longitud)
+    const numStuds = Math.ceil(wall.length / wall.studSpacing) + 1;
+    for (let i = 0; i < numStuds; i++) {
+        const x = i * wall.studSpacing;
+        const load = 500; // Valor de carga acumulada (en un sistema real vendría del structuralEngine.traceLoads)
+        
+        const dir = new THREE.Vector3(0, -1, 0);
+        const origin = new THREE.Vector3(x, wall.height, 0);
+        const length = load / 50; // Escala visual
+        const color = load > 800 ? 0xff0000 : 0x00ff00;
+        
+        const arrowHelper = new THREE.ArrowHelper(dir, origin, length, color, length * 0.2, length * 0.1);
+        vectorGroup.add(arrowHelper);
+    }
+
+    group.add(vectorGroup);
   }
 
   private disposeObject(obj: THREE.Object3D) {

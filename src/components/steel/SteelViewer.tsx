@@ -1,15 +1,20 @@
 'use client';
 
 import * as React from 'react';
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle, useState, memo } from 'react';
 import { SteelSceneManager } from '@/steel/SteelSceneManager';
 import { SteelHouseConfig, SteelOpening, InternalWall } from '@/lib/steel/types';
 import { SteelJoystick } from './SteelJoystick';
 import { exportWallPDF } from '@/steel/export/PlanPDFGenerator';
+import { SteelBudgetPanel } from './SteelBudgetPanel';
+import { calculateSteelMaterials } from '@/server/steel/materialCalculator';
+import { startPresentation } from '@/steel/PresentationEngine';
+import { StructuralNarrator } from '@/components/steel/StructuralNarrator';
 
 interface SteelViewerProps {
   config: SteelHouseConfig;
   structuralResult?: any;
+  onConfigChange?: (config: SteelHouseConfig) => void;
   onOpeningDoubleClick?: (wallId: string, opening: SteelOpening, isInternal?: boolean) => void;
   onInternalWallDoubleClick?: (iw: InternalWall, x: number) => void;
   onWallDoubleClick?: (wallId: string, x: number, side: 'exterior' | 'interior') => void;
@@ -24,11 +29,13 @@ export const SteelViewer = forwardRef(({
   onInternalWallDoubleClick,
   onWallDoubleClick, 
   onFloorDoubleClick,
-  onWalkModeLock 
+  onWalkModeLock,
+  onConfigChange
 }: SteelViewerProps, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SteelSceneManager | null>(null);
   const [isWalkMode, setIsWalkMode] = React.useState(false);
+  const [presentationStep, setPresentationStep] = React.useState<string | null>(null);
 
   useImperativeHandle(ref, () => ({
     enterWalkMode: () => {
@@ -42,7 +49,10 @@ export const SteelViewer = forwardRef(({
         managerRef.current.exitWalkMode();
         setIsWalkMode(false);
       }
-    } */
+    }, */
+    getScreenshot: () => {
+      return managerRef.current?.getScreenshot();
+    }
   }));
 
   const prevConfigRef = useRef<SteelHouseConfig | null>(null);
@@ -51,6 +61,7 @@ export const SteelViewer = forwardRef(({
     if (!managerRef.current || !structuralResult) return;
 
     if (prevConfigRef.current !== config) {
+      managerRef.current.setShowDiagrams(config.layers.structuralDiagrams);
       managerRef.current.buildHouse(config, structuralResult);
       prevConfigRef.current = config;
     }
@@ -111,7 +122,7 @@ export const SteelViewer = forwardRef(({
     );
 
     if (processed) {
-      exportWallPDF(wall, processed.panels);
+      exportWallPDF(wall, processed.panels, config);
     }
   }}
   className="absolute top-4 left-4 z-50 bg-black text-white px-4 py-2 rounded"
@@ -127,6 +138,40 @@ export const SteelViewer = forwardRef(({
             <SteelJoystick label="CÁMARA" onMove={(v) => managerRef.current?.updateJoystickLook(v.x, v.y)} />
           </div>
         </>
+      )}
+
+      {config.layers.budget && (
+        <div className="absolute top-4 right-4 z-50">
+          <SteelBudgetPanel 
+            config={config} 
+            materials={calculateSteelMaterials(config)} 
+            onClose={() => {}} 
+          />
+        </div>
+      )}
+
+      {presentationStep && (
+        <StructuralNarrator 
+          currentStep={presentationStep}            data={{ 
+            pileCapacity: 2500, 
+            maxDeflection: 1.2, 
+            totalWeight: calculateSteelMaterials(config).items.reduce((acc: number, m: any) => acc + (m.weightKg || 0), 0)
+          }} 
+        />
+      )}
+
+      {/* Botón de Lanzamiento de Presentación (Solo si no está activa) */}
+      {!presentationStep && (
+        <button 
+          onClick={() => {
+            if (managerRef.current && onConfigChange) {
+                startPresentation(managerRef.current, config, setPresentationStep, onConfigChange);
+            }
+          }}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-full shadow-2xl font-bold uppercase text-xs tracking-widest transition-all hover:scale-105 active:scale-95 z-50"
+        >
+          🎬 Iniciar Presentación Estructural
+        </button>
       )}
     </div>
   );

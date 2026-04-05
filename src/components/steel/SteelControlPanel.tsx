@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -20,14 +20,24 @@ import {
 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
+import { exportFullProject } from '@/server/steel/exportPackager';
 
 interface SteelControlPanelProps {
   config: SteelHouseConfig;
   onConfigChange: (config: SteelHouseConfig) => void;
   structuralAlerts: { status: 'ok' | 'warning' | 'error', message: string }[];
+  structuralResult?: any;
+  viewerRef?: any;
 }
 
-export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: SteelControlPanelProps) {
+export const SteelControlPanel = ({ 
+  config, 
+  onConfigChange, 
+  structuralAlerts = [], 
+  structuralResult,
+  viewerRef
+}: SteelControlPanelProps) => {
+  const [activeTab, setActiveTab] = useState('settings');
   
   const toggleLayer = (layer: keyof LayerVisibility) => {
     onConfigChange({
@@ -120,28 +130,130 @@ export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: 
                 <span className="text-xs font-black uppercase tracking-tighter">Capas de Ingeniería</span>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="space-y-3 pb-4">
-              <div className="flex items-center justify-between p-2 bg-slate-900 text-white rounded-lg mb-2">
-                <span className="text-[9px] font-black uppercase tracking-widest">Ver Estructura Pura</span>
-                <Switch 
-                  checked={config.structuralMode} 
-                  onCheckedChange={(val) => onConfigChange({ ...config, structuralMode: val })} 
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                {[
-                  { id: 'ext-pan', label: 'Placas Exteriores (OSB)', key: 'exteriorPanels' },
-                  { id: 'int-pan', label: 'Placas Interiores (Yeso)', key: 'interiorPanels' },
-                  { id: 'profiles', label: 'Perfilería PGC/PGU', key: 'steelProfiles' },
-                  { id: 'blocking', label: 'Blocking Estructural', key: 'horizontalBlocking', color: 'text-emerald-600' },
-                  { id: 'bracing', label: 'Cruces de San Andrés', key: 'bracing', color: 'text-amber-600' },
-                  { id: 'junctions', label: 'Uniones y Refuerzos', key: 'reinforcements', color: 'text-blue-600' }
-                ].map(layer => (
-                  <div key={layer.id} className="flex items-center gap-2">
-                    <Checkbox id={layer.id} checked={config.layers[layer.key as keyof LayerVisibility]} onCheckedChange={() => toggleLayer(layer.key as keyof LayerVisibility)} />
-                    <Label htmlFor={layer.id} className={`text-[10px] font-bold uppercase cursor-pointer ${layer.color || ''}`}>{layer.label}</Label>
+            <AccordionContent className="p-4 space-y-4">
+              <div className="p-4 bg-gradient-to-br from-blue-700 to-indigo-900 rounded-2xl shadow-2xl border border-white/20">
+                <p className="text-[10px] font-black uppercase text-blue-200 tracking-widest mb-2">Finalizar Proyecto</p>
+                <button 
+                  onClick={() => {
+                    const screenshot = viewerRef?.current?.getScreenshot();
+                    if (screenshot) {
+                        exportFullProject(config, structuralResult, screenshot);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-3 bg-white hover:bg-blue-50 text-blue-900 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:scale-[1.02] active:scale-95"
+                >
+                  <span className="text-xl">📦</span>
+                  <div className="text-left">
+                    <p className="text-[11px] font-black uppercase leading-none">Exportación Total</p>
+                    <p className="text-[9px] font-medium opacity-70">PDF + ZIP + BLUEPRINTS</p>
                   </div>
-                ))}
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span>Herramientas de Auditoría</span>
+                  </div>
+                  <div className="space-y-4 p-3 bg-slate-900 text-white rounded-xl border border-slate-700 shadow-xl">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-black uppercase">
+                        <span className="text-cyan-400">Modo Rayos X (Transparencia)</span>
+                        <span>{Math.round((config.xRayMode ? 0.8 : 0) * 100)}%</span>
+                      </div>
+                      <Switch 
+                        checked={config.xRayMode || false} 
+                        onCheckedChange={(val) => onConfigChange({ ...config, xRayMode: val })} 
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-2 border-t border-slate-800">
+                      <div className="flex justify-between text-[10px] font-black uppercase">
+                        <span className="text-amber-400">Despiece Técnico (Explosión)</span>
+                        <span>{Math.round((config.explosionFactor || 0) * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.01" 
+                        value={config.explosionFactor || 0} 
+                        onChange={(e) => onConfigChange({ ...config, explosionFactor: parseFloat(e.target.value) })}
+                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span>Configuración de Cargas (kN/m²)</span>
+                  </div>
+                  <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[9px] font-bold">
+                        <span>Nieve: {config.loads.snowKpa}</span>
+                        <input 
+                          type="range" min="0" max="2" step="0.1" 
+                          value={config.loads.snowKpa} 
+                          onChange={(e) => onConfigChange({ ...config, loads: { ...config.loads, snowKpa: parseFloat(e.target.value) } })}
+                          className="w-20 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[9px] font-bold">
+                        <span>Viento: {config.loads.windKpa}</span>
+                        <input 
+                          type="range" min="0" max="3" step="0.1" 
+                          value={config.loads.windKpa} 
+                          onChange={(e) => onConfigChange({ ...config, loads: { ...config.loads, windKpa: parseFloat(e.target.value) } })}
+                          className="w-20 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[9px] font-bold">
+                        <span>Vibración/Uso: {config.loads.floorLiveKpa}</span>
+                        <input 
+                          type="range" min="1" max="5" step="0.5" 
+                          value={config.loads.floorLiveKpa} 
+                          onChange={(e) => onConfigChange({ ...config, loads: { ...config.loads, floorLiveKpa: parseFloat(e.target.value) } })}
+                          className="w-20 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span>Visualización Técnica</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between p-2 bg-slate-900 text-white rounded-lg mb-1">
+                      <span className="text-[9px] font-black uppercase">Modo Estructural</span>
+                      <Switch 
+                        checked={config.structuralMode} 
+                        onCheckedChange={(val) => onConfigChange({ ...config, structuralMode: val })} 
+                      />
+                    </div>
+                    {[
+                      { id: 'ext-pan', label: 'Placas OSB', key: 'exteriorPanels' },
+                      { id: 'int-pan', label: 'Placas Yeso', key: 'interiorPanels' },
+                      { id: 'profiles', label: 'Perfilería', key: 'steelProfiles' },
+                      { id: 'diagrams', label: 'Vectores de Carga', key: 'structuralDiagrams', color: 'text-emerald-600' },
+                      { id: 'foundation', label: 'Cimentación', key: 'foundation', color: 'text-blue-600' },
+                      { id: 'budget', label: 'Presupuesto', key: 'budget', color: 'text-amber-600' }
+                    ].map(layer => (
+                      <div key={layer.id} className="flex items-center gap-2 px-1">
+                        <Checkbox 
+                          id={layer.id} 
+                          checked={config.layers[layer.key as keyof LayerVisibility]} 
+                          onCheckedChange={() => toggleLayer(layer.key as keyof LayerVisibility)} 
+                        />
+                        <Label htmlFor={layer.id} className={`text-[9px] font-black uppercase cursor-pointer ${layer.color || ''}`}>{layer.label}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -175,6 +287,46 @@ export function SteelControlPanel({ config, onConfigChange, structuralAlerts }: 
                     </div>
                   </div>
                 ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="foundation" className="border-b px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2">
+                <Home className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-black uppercase tracking-tighter">Cimentación y Suelo</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="space-y-2">
+                <Label className="text-[9px] font-black uppercase text-slate-500">Tipo de Suelo (Capacidad Portante)</Label>
+                <Select 
+                  value={config.foundation?.soil.type || 'arcilloso'} 
+                  onValueChange={(val) => onConfigChange({ 
+                    ...config, 
+                    foundation: { ...config.foundation!, soil: { ...config.foundation!.soil, type: val as any } } 
+                  })}>
+                  <SelectTrigger className="h-8 text-[10px] font-bold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="arcilloso">Suelo Arcilloso (150 kPa)</SelectItem>
+                    <SelectItem value="limoso">Suelo Limoso (100 kPa)</SelectItem>
+                    <SelectItem value="arenoso">Suelo Arenoso (200 kPa)</SelectItem>
+                    <SelectItem value="rocoso">Suelo Rocoso (500 kPa)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[8px] font-bold uppercase text-slate-400">Espesor Plata (mm)</Label>
+                  <Input type="number" value={config.foundation?.slabThickness || 120} onChange={(e) => onConfigChange({...config, foundation: {...config.foundation!, slabThickness: parseInt(e.target.value) || 0}})} className="h-7 text-[10px] font-bold" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[8px] font-bold uppercase text-slate-400">Prof. Pilote (mm)</Label>
+                  <Input type="number" value={config.foundation?.pileDepth || 3000} onChange={(e) => onConfigChange({...config, foundation: {...config.foundation!, pileDepth: parseInt(e.target.value) || 0}})} className="h-7 text-[10px] font-bold" />
+                </div>
               </div>
             </AccordionContent>
           </AccordionItem>

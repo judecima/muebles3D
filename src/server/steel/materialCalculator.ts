@@ -1,10 +1,10 @@
 
 import { SteelHouseConfig, MaterialEstimate, MaterialItem } from '@/lib/steel/types';
 import { StructuralEngine } from './structuralEngine';
+import { FoundationEngine } from './foundationEngine';
 
 export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstimate {
   const items: MaterialItem[] = [];
-  const studCuts: number[] = [];
   let pgc100_090 = 0;
   let pgc100_125 = 0;
   let pgc100_160 = 0;
@@ -37,35 +37,9 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
 
     panels.forEach(p => {
       const studsInPanel = Math.ceil(p.width / wall.studSpacing) + 1;
-    
-      const structuralStuds =
-        p.isWallStart || p.isWallEnd
-          ? studsInPanel + 2
-          : studsInPanel;
-    
-      // 🔥 detectar carga real del panel
-      const loadRatio = p.loads.verticalLoadN / 20000; // normalización
-    
-      // 🔥 detectar cercanía a opening
-      const nearOpening = wall.openings.some(op =>
-        p.xStart < op.position + op.width + 300 &&
-        p.xEnd > op.position - 300
-      );
-    
-      // 🔥 % dinámico
-      let reinforcementFactor = 0;
-    
-      if (p.doubleStuds) reinforcementFactor += 0.2;
-      if (nearOpening) reinforcementFactor += 0.2;
-      if (loadRatio > 1) reinforcementFactor += 0.2;
-      if (loadRatio > 1.5) reinforcementFactor += 0.2;
-    
-      const extraStuds = Math.floor(structuralStuds * reinforcementFactor);
-    
-      const totalStuds = structuralStuds + extraStuds;
-    
+      const reinforcementFactor = p.reinforcementFactor || 0;
+      const totalStuds = Math.ceil(studsInPanel * (1 + reinforcementFactor));
       pgc100_090 += totalStuds * studHeight;
-    
       totalConnections += totalStuds * 4;
     });
 
@@ -75,10 +49,9 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       totalConnections += 2;
     });
 
-    // Refuerzos de uniones (Ladders) contra muros externos
     const junctions = StructuralEngine.findJunctions(wall, config);
     junctions.forEach(() => {
-      pgc100_090 += studHeight; // Montante extra de respaldo
+      pgc100_090 += studHeight;
       const ladders = StructuralEngine.calculateLadderBacking(wall.height);
       ladders.forEach(l => {
         pgu100Len += (l.xEnd - l.xStart);
@@ -89,22 +62,16 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     wall.openings.forEach(op => {
       const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
-      const headerBottom = sill + op.height;
-      const fusion = StructuralEngine.analyzeOpeningFusion(op, wall.length);
-      const numKings = analysis.kings || 1;
-      const numJacks = analysis.jacks || 1;
-      if (fusion === 'none') {
-        pgc100_090 += (numKings + numJacks) * 2 * studHeight;
-      } else {
-        pgc100_090 += (numKings + numJacks) * studHeight;
-      }
+      const numKings = analysis.supports.kings || 1;
+      const numJacks = analysis.supports.jacks || 1;
       
+      pgc100_090 += (numKings + numJacks) * 2 * studHeight;
       pgc100_090 += 2 * (sill + op.height - 40);
 
-      if (analysis.type === 'truss') {
-        const trussHeight = analysis.trussData?.height || 400;
-        const numDiagonals = analysis.trussData?.numDiagonals || Math.ceil(op.width / 500);
-        const thickness = analysis.trussData?.chordThickness || 1.25;
+      if (analysis.type === 'truss' && analysis.trussData) {
+        const trussHeight = analysis.trussData.height;
+        const numDiagonals = analysis.trussData.numDiagonals;
+        const thickness = (analysis.trussData.chordProps as any).thickness || 0.9;
         const trussLen = op.width * 2 + numDiagonals * trussHeight * 1.5;
         if (thickness <= 1.25) pgc100_125 += trussLen;
         else if (thickness <= 1.6) pgc100_160 += trussLen;
@@ -112,6 +79,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       } else {
         pgc100_090 += op.width;
       }
+
       if (op.type === 'window') pgu100Len += op.width;
       const cripples = StructuralEngine.calculateCrippleStuds(wall, op, config);
       cripples.forEach(c => { pgc100_090 += (c.yEnd - c.yStart); totalConnections += 4; });
@@ -134,26 +102,11 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     pgc70Len += baseStudCount * studHeight;
     totalConnections += baseStudCount * 4;
 
-    // Refuerzos de uniones (Ladders) entre muros internos
-    const junctions = StructuralEngine.findJunctions(iw, config);
-    junctions.forEach(() => {
-      pgc70Len += studHeight; // Montante extra
-      const ladders = StructuralEngine.calculateLadderBacking(iw.height);
-      ladders.forEach(l => {
-        pgu70Len += (l.xEnd - l.xStart);
-        totalConnections += 2;
-      });
-    });
-
     (iw.openings || []).forEach(op => {
       pgc70Len += 4 * studHeight; 
       pgc70Len += op.width; 
-      
       const cripples = StructuralEngine.calculateCrippleStuds(iw, op, config);
-      cripples.forEach(c => { 
-        pgc70Len += (c.yEnd - c.yStart); 
-        totalConnections += 4; 
-      });
+      cripples.forEach(c => { pgc70Len += (c.yEnd - c.yStart); totalConnections += 4; });
       totalConnections += 16;
       areaInternalWallsNet -= (op.width * op.height) / 1000000;
     });
@@ -172,11 +125,15 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   pushIfPositive({ name: 'Perfiles PGU 70x0.50mm (6m)', category: 'perfileria', unit: 'un', quantity: Math.ceil((pgu70Len / BAR_LEN) * WASTE_STEEL), description: 'Soleras interiores' });
   pushIfPositive({ name: 'Placas OSB 12mm (2.44x1.22m)', category: 'paneles', unit: 'un', quantity: Math.ceil((areaExteriorGross / BOARD_AREA) * WASTE_BOARDS), description: 'Diafragma estructural' });
   pushIfPositive({ name: 'Placas de Yeso 12.5mm', category: 'paneles', unit: 'un', quantity: Math.ceil((areaInteriorTotal / BOARD_AREA) * WASTE_BOARDS), description: 'Revestimiento interior' });
-  pushIfPositive({ name: 'Lana de Vidrio 50mm', category: 'aislacion', unit: 'm²', quantity: Math.ceil((areaExteriorNet + areaInternalWallsNet) * 1.05), description: 'Aislación termoacústica' });
-  pushIfPositive({ name: 'Membrana WRB', category: 'aislacion', unit: 'm²', quantity: Math.ceil(areaExteriorGross * 1.15), description: 'Barrera de agua y viento' });
   pushIfPositive({ name: 'Tornillos T1 Punta Mecha', category: 'fijaciones', unit: 'un', quantity: Math.ceil(totalConnections * 1.1), description: 'Unión metal-metal' });
   pushIfPositive({ name: 'Tornillos T2 Punta Aguja', category: 'fijaciones', unit: 'un', quantity: Math.ceil(areaInteriorTotal * 25 + areaExteriorGross * 20), description: 'Fijación placas' });
-  pushIfPositive({ name: 'Anclajes Expansivos 3/8 x 3 3/4', category: 'fijaciones', unit: 'un', quantity: totalAnchors, description: 'Anclaje a platea' });
 
-  return { items, totalSteelWeightKg: Math.round((pgc100_090 + pgc100_125 + pgc100_160 + pgc100_200 + pgu100Len) * 1.25 / 1000 + (pgc70Len + pgu70Len) * 0.6 / 1000) };
+  if (config.foundation) {
+    const foundRes = FoundationEngine.calculateFoundation(config, { processedWalls: config.walls.map(w => ({ id: w.id, panels: StructuralEngine.calculateWallPanels(w, config) })) });
+    pushIfPositive({ name: 'Hormigón Elaborado H-21', category: 'paneles', unit: 'm³', quantity: Math.ceil(foundRes.concreteVolumeM3 * 1.05), description: 'Platea y pilotones' });
+    pushIfPositive({ name: 'Acero ADN-420 (Barras 10/12mm)', category: 'perfileria', unit: 'kg', quantity: Math.ceil(foundRes.steelWeightKg), description: 'Armadura de cimentación' });
+  }
+
+  const totalSteelWeight = Math.round((pgc100_090 + pgc100_125 + pgc100_160 + pgc100_200 + pgu100Len) * 1.25 / 1000 + (pgc70Len + pgu70Len) * 0.6 / 1000);
+  return { items, totalSteelWeightKg: totalSteelWeight };
 }
