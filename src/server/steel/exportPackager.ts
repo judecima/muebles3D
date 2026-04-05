@@ -38,9 +38,13 @@ VALORES MÁXIMOS POR ELEMENTO:
   }
   
   if (structuralResult.foundation) {
-      engineeringReport += `\nCIMENTACIÓN:\n`;
+      engineeringReport += `\nCIMENTACIÓN Y GEOTECNIA:\n`;
       engineeringReport += `  - Tipo: Platea con Pilotones (H-21)\n`;
+      engineeringReport += `  - Estado: ${structuralResult.foundation.isSafe ? 'VALIDADO (PASS)' : 'FALLA (FAIL)'}\n`;
       engineeringReport += `  - Cantidad de Pilotones: ${structuralResult.foundation.pileCount}\n`;
+      engineeringReport += `  - Carga Total Acumulada: ${structuralResult.foundation.totalLoadKg?.toFixed(0)} kg\n`;
+      engineeringReport += `  - Capacidad Admisible Suelo: ${structuralResult.foundation.totalCapacityKg?.toFixed(0)} kg\n`;
+      engineeringReport += `  - Justificación: ${structuralResult.foundation.globalJustification}\n`;
       engineeringReport += `  - Volumen Total Hormigón: ${structuralResult.foundation.concreteVolumeM3?.toFixed(2)} m3\n`;
       engineeringReport += `  - Acero ADN-420: ${structuralResult.foundation.steelWeightKg?.toFixed(2)} kg\n`;
   }

@@ -51,6 +51,10 @@ export interface SoilProperties {
   type: 'arcilloso' | 'limoso' | 'arenoso' | 'rocoso';
   bearingCapacityKPa: number; 
   frictionKPa: number;
+  frictionCoefficient?: number; // kg/m2 (alternativo para cálculo profesional)
+  bearingCapacity?: number;      // kg/cm2 (alternativo para cálculo profesional)
+  tipResistanceKPa?: number;
+  skinFrictionKPa?: number;
 }
 
 export interface PriceConfig {
@@ -61,6 +65,21 @@ export interface PriceConfig {
   screwT1: number;
   screwT2: number;
   laborM2: number;
+}
+
+export interface FoundationResult {
+  pileCount: number;
+  pileSpacing: number;
+  pileDepth: number;
+  pileDiameter: number;
+  slabVolumeM3: number;
+  concreteVolumeM3: number;
+  steelWeightKg: number;
+  piles: { x: number; z: number; isSafe: boolean; load: number; capacity: number; justification: string }[];
+  isSafe: boolean;
+  totalLoadKg: number;
+  totalCapacityKg: number;
+  globalJustification: string;
 }
 
 export interface FoundationConfig {
@@ -105,6 +124,7 @@ export interface StructuralAnalysisResult {
   stressRatio: number; // 0 a 1+
   f_max: number; // deflexión real cm
   limit: number; // límite admisible cm
+  justification?: string;
   description: string;
   loadKg: number; // carga total en el elemento
   webCrippling?: {

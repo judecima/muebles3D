@@ -254,9 +254,7 @@ export class SteelSceneManager {
     this.collisions.clear();
 
     if (config.layers.foundation) {
-      if (structuralResult?.foundation) {
-        this.renderFoundation(structuralResult.foundation, config);
-      }
+      this.renderFoundation(structuralResult?.foundation, config);
     }
 
     config.walls.forEach(wall => {
@@ -381,82 +379,38 @@ export class SteelSceneManager {
       }
     
       // =========================
-      // 📐 MONTANTES (PGC)
+      // 📐 MONTANTES (PGC) - Lógica In-Line con Recorte de Vanos
       // =========================
-      for (let x = 0; x <= p.width; x += wall.studSpacing) {
-        const sx = Math.min(x, p.width - this.profileFlange);
-        
-        // 🧪 Análisis de estrés para Mapa de Calor
-        const analysis = StructuralEngine.analyzeStructuralElement("PGC-100-0.9", wall.height, p.loads.verticalLoadN / 12, 'simple');
-        const stressColor = analysis.isSafe 
-          ? (analysis.stressRatio > 0.8 ? 0xf59e0b : this.colors.steel) 
-          : 0xef4444;
-
-        const stud = new THREE.Mesh(
-          new THREE.BoxGeometry(this.profileFlange, studHeight, this.profileWidth),
-          new THREE.MeshStandardMaterial({ color: config.layers.structuralDiagrams ? stressColor : panelColor })
-        );
-        stud.position.set(sx + (this.profileFlange / 2), wall.height / 2, 0);
-        panelGroup.add(stud);
-        
-        // 🧪 Alerta de Montante
-        if (!analysis.isSafe) {
-            const worldPos = new THREE.Vector3(sx + (this.profileFlange / 2), wall.height, 0).applyMatrix4(panelGroup.matrixWorld);
-            this.addStructuralAlert('FAIL', analysis.description, worldPos, { calculated: analysis.f_max, limit: analysis.limit, unit: 'cm' });
-        }
-
-        // 🏹 Flecha de carga
-        if (config.layers.structuralDiagrams) {
-          const dir = new THREE.Vector3(0, -1, 0);
-          const origin = new THREE.Vector3(sx + (this.profileFlange / 2), wall.height + 50, 0);
-          const arrow = new THREE.ArrowHelper(dir, origin, 40, 0xff0000, 10, 10);
-          panelGroup.add(arrow);
-        }
-      }
-
-      // =========================
-      // 🔩 STUDS INTERNOS
-      // =========================
-      for (let x = wall.studSpacing; x < p.width - 10; x += wall.studSpacing) {
-    
+      for (let x = 0; x < p.width; x += wall.studSpacing) {
         const globalX = p.xStart + x;
-    
-        const inOpening = wall.openings.some(op => {
-          const margin = 20; // Margen de seguridad para evitar solapamientos visuales
-          const opLeft = op.position - margin;
-          const opRight = op.position + op.width + margin;
-          return globalX >= opLeft && globalX <= opRight;
+        
+        const opening = wall.openings.find(op => {
+          const margin = 5; 
+          return globalX >= (op.position + margin) && globalX <= (op.position + op.width - margin);
         });
-    
-        if (!inOpening) {
-    
-          // stud principal
-          panelGroup.add(
-            this.createProfile(
-              studHeight,
-              x,
-              this.profileFlange,
-              90,
-              'PGC',
-              panelColor
-            )
-          );
-    
-          // 🔥 refuerzo real si el panel lo requiere
-          if (p.doubleStuds) {
-            panelGroup.add(
-              this.createProfile(
-                studHeight,
-                x + 15,
-                this.profileFlange,
-                90,
-                'PGC',
-                this.colors.junction
-              )
-            );
-          }
 
+        if (opening) {
+          // 🧱 MODULO IN-LINE: Generar Cripples
+          const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
+          const headerBottom = sill + opening.height;
           
+          // Cripple Superior
+          panelGroup.add(this.createProfile(wall.height - headerBottom - this.profileFlange, x, headerBottom, 90, 'PGC', this.colors.cripple));
+          
+          // Cripple Inferior (Solo ventanas)
+          if (opening.type === 'window') {
+            panelGroup.add(this.createProfile(sill - this.profileFlange, x, this.profileFlange, 90, 'PGC', this.colors.cripple));
+          }
+        } else {
+          // Montante Cuerpo Completo
+          const analysis = StructuralEngine.analyzeStructuralElement("PGC-100-0.9", wall.height, p.loads.verticalLoadN / 12, 'simple');
+          const stressColor = analysis.isSafe ? (analysis.stressRatio > 0.8 ? 0xf59e0b : panelColor) : 0xef4444;
+
+          panelGroup.add(this.createProfile(studHeight, x, this.profileFlange, 90, 'PGC', config.layers.structuralDiagrams ? stressColor : panelColor));
+          
+          if (p.doubleStuds && x > 10) {
+             panelGroup.add(this.createProfile(studHeight, x + 15, this.profileFlange, 90, 'PGC', this.colors.junction));
+          }
         }
       }
     
@@ -583,10 +537,14 @@ export class SteelSceneManager {
       }
       if (op.type === 'window') structuralGroup.add(this.createProfile(op.width, op.position, sill - this.profileFlange, 0, 'PGU', this.colors.steel));
       
-      headerData.cripples.forEach((c: any) => {
-        const profile = this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple);
-        profile.userData = { label: 'C-Crippler' };
-        structuralGroup.add(profile);
+      headerData.cripples?.forEach((c: any) => {
+        // Solo renderizar si el cripple NO coincide con la modulación In-Line (para evitar doble renderizado)
+        const isInline = c.x % wall.studSpacing === 0;
+        if (!isInline) {
+            const profile = this.createProfile(c.yEnd - c.yStart, c.x, c.yStart, 90, 'PGC', this.colors.cripple);
+            profile.userData = { label: 'C-Crippler' };
+            structuralGroup.add(profile);
+        }
       });
     });
   }
@@ -612,8 +570,20 @@ export class SteelSceneManager {
           structuralGroup.add(this.createProfile(p.width, p.xStart, iw.height - 30, 0, 'PGU', this.colors.steelDrywall, 0, thickness, 30));
           
           for (let x = p.xStart; x <= p.xEnd; x += 400) {
-            const inOpening = (iw.openings || []).some(op => x >= (op.position - 10) && x <= (op.position + op.width + 10));
-            if (!inOpening) {
+            const opening = (iw.openings || []).find(op => x >= (op.position + 5) && x <= (op.position + op.width - 5));
+            
+            if (opening) {
+              // Cripples en muros internos
+              const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
+              const headerBottom = sill + opening.height;
+              
+              // Superior
+              structuralGroup.add(this.createProfile(iw.height - headerBottom - 30, x, headerBottom, 90, 'PGC', this.colors.cripple, 0, thickness, 30));
+              // Inferior (Solo ventanas)
+              if (opening.type === 'window') {
+                structuralGroup.add(this.createProfile(sill - 30, x, 30, 90, 'PGC', this.colors.cripple, 0, thickness, 30));
+              }
+            } else {
               structuralGroup.add(this.createProfile(studHeight, x, 30, 90, 'PGC', this.colors.steelDrywall, 0, thickness, 30));
             }
           }
@@ -893,7 +863,8 @@ export class SteelSceneManager {
             calculated: calculatedVal,
             limit: limitVal,
             unit: 'cm',
-            recommendation: headerData.analysis.recommendation
+            recommendation: headerData.analysis.recommendation,
+            justification: headerData.analysis.justification
         });
       }
 
@@ -909,7 +880,7 @@ export class SteelSceneManager {
   private renderFoundation(res: any, config: SteelHouseConfig) {
     const fConfig = config.foundation || { slabThickness: 120, edgeBeamDepth: 300, pileDepth: 3000, pileDiameter: 200, soil: {bearingCapacityKPa: 150} };
     
-    // 1. Platea (Slab)
+    // 1. Platea (Slab) - SIEMPRE basada en config.width/length
     const slabGeom = new THREE.BoxGeometry(config.width, fConfig.slabThickness, config.length);
     const slabMat = new THREE.MeshStandardMaterial({ 
       color: this.colors.concrete, 
@@ -919,48 +890,46 @@ export class SteelSceneManager {
       metalness: 0.2
     });
     const slab = new THREE.Mesh(slabGeom, slabMat);
-    slab.position.set(0, -fConfig.slabThickness / 2, 0); // Centrar con los muros
+    slab.position.set(0, -fConfig.slabThickness / 2, 0);
     slab.receiveShadow = true;
     this.houseGroup.add(slab);
 
-    // 2. Malla Sima (Rebar visualization)
+    // 2. Malla Sima (Visual)
     const gridSize = Math.max(config.width, config.length);
     const gridDivs = Math.ceil(gridSize / 150);
     const grid = new THREE.GridHelper(gridSize, gridDivs, this.colors.rebar, this.colors.rebar);
-    grid.position.set(0, -20, 0); // Centrar con la platea
+    grid.position.set(0, -20, 0);
     this.houseGroup.add(grid);
 
-    // 3. Pilotones (Piles)
-    res.piles.forEach((p: any) => {
-      const pileGeom = new THREE.CylinderGeometry(fConfig.pileDiameter/2, fConfig.pileDiameter/2, fConfig.pileDepth, 16);
-      const pileMat = new THREE.MeshStandardMaterial({ 
-        color: this.colors.concrete, 
-        transparent: true, 
-        opacity: 0.4 
-      });
-      const pile = new THREE.Mesh(pileGeom, pileMat);
-      pile.position.set(p.x, -fConfig.pileDepth/2 - fConfig.slabThickness, p.z);
-      this.houseGroup.add(pile);
+    // 3. Pilotones (Piles) - Solo si hay resultado de ingeniería
+    if (res?.piles) {
+        res.piles.forEach((p: any) => {
+          const pileGeom = new THREE.CylinderGeometry(fConfig.pileDiameter/2, fConfig.pileDiameter/2, fConfig.pileDepth, 16);
+          const pileMat = new THREE.MeshStandardMaterial({ color: this.colors.concrete, transparent: true, opacity: 0.4 });
+          const pile = new THREE.Mesh(pileGeom, pileMat);
+          pile.position.set(p.x, -fConfig.pileDepth/2 - fConfig.slabThickness, p.z);
+          this.houseGroup.add(pile);
+    
+          // Armadura X-Ray
+          if (config.xRayMode) {
+            for (let i = 0; i < 4; i++) {
+              const angle = (i * Math.PI * 2) / 4;
+              const r = fConfig.pileDiameter/2 - 25;
+              const bar = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, fConfig.pileDepth - 100, 8), new THREE.MeshStandardMaterial({ color: this.colors.rebar }));
+              bar.position.set(p.x + Math.cos(angle) * r, -fConfig.pileDepth/2 - fConfig.slabThickness, p.z + Math.sin(angle) * r);
+              this.houseGroup.add(bar);
+            }
+          }
+        });
+    }
 
-      // Armadura de pilotón (4 barras longitudinales)
-      for (let i = 0; i < 4; i++) {
-        const angle = (i * Math.PI * 2) / 4;
-        const r = fConfig.pileDiameter/2 - 25;
-        const barGeom = new THREE.CylinderGeometry(6, 6, fConfig.pileDepth, 8);
-        const bar = new THREE.Mesh(barGeom, new THREE.MeshStandardMaterial({ color: this.colors.rebar }));
-        bar.position.set(p.x + Math.cos(angle) * r, -fConfig.pileDepth/2 - fConfig.slabThickness, p.z + Math.sin(angle) * r);
-        this.houseGroup.add(bar);
-      }
-    });
-
-    // 4. Viga de Borde (Edge Beam)
+    // 4. Viga de Borde (Edge Beam) - Basada en config
     const edgeBeamGeom = new THREE.BoxGeometry(config.width + 40, fConfig.edgeBeamDepth, config.length + 40);
     const edgeBeamMat = new THREE.MeshStandardMaterial({ color: this.colors.concrete, wireframe: true, transparent: true, opacity: 0.3 });
     const edgeBeam = new THREE.Mesh(edgeBeamGeom, edgeBeamMat);
-    edgeBeam.position.set(0, -fConfig.edgeBeamDepth / 2, 0); // Centrar con la platea
+    edgeBeam.position.set(0, -fConfig.edgeBeamDepth / 2, 0);
     this.houseGroup.add(edgeBeam);
   }
-
   private renderLoadPath(wall: SteelWall, processed: any, group: THREE.Group, config: SteelHouseConfig, structuralResult: any) {
     const loadData = StructuralEngine.calculateVerticalLoadPath(config);
     
@@ -981,13 +950,24 @@ export class SteelSceneManager {
       group.add(label);
     });
 
-    // 2. Reacción en Pilotones
-    if (config.layers.foundation) {
-        const fRes = FoundationEngine.calculateFoundation(config, structuralResult);
-        fRes.piles.forEach(pile => {
-            const mag = loadData.foundationPointLoadKg;
-            const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(pile.x, -100, pile.z), 500, 0x22c55e, 100, 50);
+    // 2. Reacción en Pilotones (Basado en Auditoría Geotécnica)
+    if (config.layers.foundation && structuralResult.foundation) {
+        structuralResult.foundation.piles.forEach((pile: any) => {
+            const mag = pile.load;
+            const arrowLen = Math.min(600, Math.max(200, (mag / 500) * 100)); // Escala visual 500kg = 100mm
+            const color = pile.isSafe ? 0x22c55e : 0xef4444; // Verde si es seguro, Rojo si falla
+            
+            const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(pile.x, -50, pile.z), arrowLen, color, 100, 50);
             this.houseGroup.add(arrow);
+
+            // Etiqueta de Carga de Suelo (Opcional en modo estructural)
+            if (config.structuralMode) {
+                const fConfig = config.foundation || { slabThickness: 120 };
+                const label = this.createTextLabel(`${Math.round(mag)}kg / ${Math.round(pile.capacity)}kg`);
+                label.position.set(pile.x, -fConfig.slabThickness - 200, pile.z);
+                label.scale.set(400, 200, 1);
+                this.houseGroup.add(label);
+            }
         });
     }
   }
@@ -1075,7 +1055,8 @@ export class SteelSceneManager {
     el.className = `absolute px-2 py-1 rounded text-[10px] font-bold text-white shadow-xl border border-white/30 backdrop-blur-sm pointer-events-auto transition-transform hover:scale-110 ${status === 'FAIL' ? 'bg-red-600' : 'bg-amber-500'}`;
     
     const recHtml = data?.recommendation ? `<div class="mt-2 pt-1 border-t border-white/20 text-[7px] italic text-yellow-200">💡 Sugerencia: ${data.recommendation}</div>` : '';
-    
+    const justifyHtml = data?.justification ? `<div class="mt-1 text-[7px] text-cyan-200 opacity-80">⚖️ ${data.justification}</div>` : '';
+
     el.innerHTML = `
       <div class="flex items-center gap-1 border-b border-white/20 mb-1 pb-1">
         <span>${status === 'FAIL' ? '🚫' : '⚠️'}</span>
@@ -1083,9 +1064,10 @@ export class SteelSceneManager {
       </div>
       <div>${message}</div>
       <div class="mt-1 text-[8px] bg-black/20 p-1 rounded flex justify-between">
-        <span>CALC: ${(data?.calculated ?? 0).toFixed(2)}</span>
-        <span>LIM: ${(data?.limit ?? 0).toFixed(2)}</span>
+        <span>CALC: ${(data?.calculated ?? 0).toFixed(3)}</span>
+        <span>LIM: ${(data?.limit ?? 0).toFixed(3)}</span>
       </div>
+      ${justifyHtml}
       ${recHtml}
     `;
     this.alertsContainer.appendChild(el);

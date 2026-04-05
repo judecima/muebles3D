@@ -65,8 +65,13 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       const numKings = analysis.supports.kings || 1;
       const numJacks = analysis.supports.jacks || 1;
       
-      pgc100_090 += (numKings + numJacks) * 2 * studHeight;
-      pgc100_090 += 2 * (sill + op.height - 40);
+      // Sumar Refuerzos (Jacks y Kings perimetrales al vano)
+      pgc100_090 += (numKings * 2) * studHeight; // Kings (altura completa)
+      pgc100_090 += (numJacks * 2) * (sill + op.height - 40); // Jacks (hasta el dintel)
+
+      // Restar montantes que han sido reemplazados por el vano (In-Line)
+      const studsToRemove = Math.floor(op.width / wall.studSpacing);
+      pgc100_090 -= studsToRemove * studHeight;
 
       if (analysis.type === 'truss' && analysis.trussData) {
         const trussHeight = analysis.trussData.height;
@@ -77,13 +82,16 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
         else if (thickness <= 1.6) pgc100_160 += trussLen;
         else pgc100_200 += trussLen;
       } else {
-        pgc100_090 += op.width;
+        pgc100_090 += op.width; // Dintel simple
       }
 
       if (op.type === 'window') pgu100Len += op.width;
+      
+      // Sumar Cripples (Mochetas In-Line)
       const cripples = StructuralEngine.calculateCrippleStuds(wall, op, config);
       cripples.forEach(c => { pgc100_090 += (c.yEnd - c.yStart); totalConnections += 4; });
-      totalConnections += 20;
+      
+      totalConnections += 24; // Conexiones extra por refuerzos de vano
       areaExteriorNet -= (op.width * op.height) / 1000000;
     });
 

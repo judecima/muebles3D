@@ -124,6 +124,33 @@ export default function SteelFramingPage() {
   const [activeTab, setActiveTab] = useState<'3d' | 'materials'>('3d');
   const viewerRef = useRef<{ enterWalkMode: () => void, exitWalkMode: () => void, getScreenshot: () => string | undefined }>(null);
 
+  const syncWallsAndFoundation = (updatedConfig: SteelHouseConfig): SteelHouseConfig => {
+    const { width, length, walls } = updatedConfig;
+    const newWalls = walls.map(w => {
+      // Reposicionar muros perimetrales según ancho y largo global de forma atómica
+      if (w.id === 'w1') return { ...w, length: width, x: -width/2, z: -length/2 };
+      if (w.id === 'w2') return { ...w, length: length, x: width/2, z: -length/2 };
+      if (w.id === 'w3') return { ...w, length: width, x: width/2, z: length/2 };
+      if (w.id === 'w4') return { ...w, length: length, x: -width/2, z: length/2 };
+      return w;
+    });
+    return { ...updatedConfig, walls: newWalls };
+  };
+
+  const handleConfigChange = (newConfig: SteelHouseConfig) => {
+    const syncedConfig = syncWallsAndFoundation(newConfig);
+    setConfig(syncedConfig);
+    
+    // Solo disparar análisis si hubo cambios estructurales significativos
+    const hasStructureChanged = JSON.stringify(syncedConfig.walls) !== JSON.stringify(config.walls) || 
+                                syncedConfig.width !== config.width || 
+                                syncedConfig.length !== config.length;
+    
+    if (hasStructureChanged) {
+      fetchAnalysis(syncedConfig);
+    }
+  };
+
   const fetchAnalysis = async (currentConfig: SteelHouseConfig) => {
     setIsLoading(true);
     try {
@@ -143,18 +170,6 @@ export default function SteelFramingPage() {
     }
   };
 
-  useEffect(() => {
-    const newWalls = config.walls.map(w => {
-      if (w.id === 'w1') return { ...w, length: config.width, x: -config.width/2, z: -config.length/2 };
-      if (w.id === 'w2') return { ...w, length: config.length, x: config.width/2, z: -config.length/2 };
-      if (w.id === 'w3') return { ...w, length: config.width, x: config.width/2, z: config.length/2 };
-      if (w.id === 'w4') return { ...w, length: config.length, x: -config.width/2, z: config.length/2 };
-      return w;
-    });
-    const updatedConfig = { ...config, walls: newWalls };
-    setConfig(updatedConfig);
-    fetchAnalysis(updatedConfig);
-  }, [config.width, config.length]);
 
   const getWallSegments = (wallId: string, clickX: number, totalLength: number, isInternalWall: boolean) => {
     const baseMargin = isInternalWall ? EDGE_MARGIN_INTERNAL : EDGE_MARGIN_EXTERIOR;
@@ -380,7 +395,7 @@ export default function SteelFramingPage() {
       <aside className={`hidden md:block w-80 h-full border-r bg-white shadow-xl overflow-y-auto shrink-0 z-40 transition-all ${isWalkModeActive ? '-ml-80' : ''}`}>
         <SteelControlPanel 
           config={config} 
-          onConfigChange={setConfig} 
+          onConfigChange={handleConfigChange} 
           structuralAlerts={structuralAlerts}
           structuralResult={structuralResult}
           viewerRef={viewerRef}

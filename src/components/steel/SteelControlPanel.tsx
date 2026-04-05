@@ -47,8 +47,15 @@ export const SteelControlPanel = ({
   };
 
   const updateWall = (id: string, field: keyof SteelWall, value: any) => {
-    const newWalls = config.walls.map(w => w.id === id ? { ...w, [field]: value } : w);
-    onConfigChange({ ...config, walls: newWalls });
+    let updatedConfig = { ...config };
+    
+    if (field === 'length') {
+      if (id === 'w1' || id === 'w3') updatedConfig.width = value;
+      if (id === 'w2' || id === 'w4') updatedConfig.length = value;
+    }
+
+    const newWalls = updatedConfig.walls.map(w => w.id === id ? { ...w, [field]: value } : w);
+    onConfigChange({ ...updatedConfig, walls: newWalls });
   };
 
   return (

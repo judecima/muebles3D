@@ -20,6 +20,10 @@ export interface HeaderAnalysis {
   status: 'ok' | 'warning' | 'error';
   isFusedWithCorner: 'none' | 'left' | 'right';
   actualHeight: number;
+  isSafe: boolean;
+  f_max: number;
+  limit: number;
+  justification?: string;
   trussData?: {
     height: number;
     numDiagonals: number;
@@ -107,31 +111,44 @@ export class StructuralEngine {
   /**
    * 2. CÁLCULO DE WEB CRIPPLING (APLASTAMIENTO)
    */
-  static checkWebCrippling(profileId: string, reactionKg: number, isEnd: boolean, nWebs: number = 1) {
+  static checkWebCrippling(profileId: string, reactionKg: number, isEnd: boolean, isAttached: boolean = true, nWebs: number = 1) {
     const p = STEEL_PROFILES[profileId] || STEEL_PROFILES["PGC-100-0.9"];
     const t = p.thickness;
-    const h = p.height - 2*t;
-    const N = 40; // mm
-    const R = 2.0; // Radio de curvatura
-    
-    // 🏛️ AISI S100 / CIRSOC 303 Calibrado para PGC
-    // P_n ~ C * t^2 * Fy * (1 + C_n*sqrt(N/t)) ...
+    const h = p.height - (2 * t);
+    const N = 40; // mm (Apoyo solera)
     const Fy = 2300; // kg/cm2
-    const C = isEnd ? 22.5 : 45.0; // Coeficientes ajustados para unidades kg/cm (C=22.5 para PGC 0.9)
-    const Cr = 0.25;
-    const Cn = 0.15;
-    const Ch = 0.02;
     
-    // Pn por cada alma
-    const Pn_single = C * Math.pow(t/10, 2) * Fy * (1 - Cr * Math.sqrt(R/t)) * (1 + Cn * Math.sqrt(N/t)) * (1 - Ch * Math.sqrt(h/t));
+    /**
+     * ⚖️ COEFICIENTES AISI S100 - SECCIÓN C3.4.1
+     * Ajustados para apoyos fijados mecánicamente (Attached)
+     */
+    const C = isEnd 
+      ? (isAttached ? 6.0 : 4.0) 
+      : (isAttached ? 13.0 : 10.0);
+    const Cr = isEnd ? 0.16 : 0.14;
+    const Ch = 0.01;
+
+    // Unidades: cm para Fy
+    const t_cm = t / 10;
+    const h_cm = h / 10;
+    
+    const Pn_single = C * Math.pow(t_cm, 2) * Fy * (1 + Cr * Math.sqrt(N/t)) * (1 - Ch * Math.sqrt(h/t));
     const Pn_total = Pn_single * nWebs;
-    const capacity = Pn_total / 1.7; // Factor de seguridad Omega = 1.7
+    const capacity = Pn_total / 1.7; // ASD Factor Omega = 1.7
+    
+    const EPSILON = 0.005; // 0.5% margen de error numérico
+    const ratio = reactionKg / capacity;
+    const isSafe = ratio <= (1.0 + EPSILON);
+
     return { 
-        isSafe: reactionKg <= capacity, 
+        isSafe, 
         capacity, 
-        ratio: reactionKg / capacity, 
-        requiresStiffener: reactionKg > capacity,
-        recommendation: reactionKg > capacity ? "Usar Rigidizador de alma (Stiffener) o aumentar espesor a 1.25mm" : undefined
+        ratio, 
+        requiresStiffener: !isSafe,
+        justification: isAttached 
+          ? "Cálculo ajustado por fijación mecánica (AISI C3.4.1: C=6)." 
+          : "Cálculo basado en apoyo simple sin restricción.",
+        recommendation: !isSafe ? "Usar Rigidizador de alma (Stiffener) o aumentar espesor a 1.25mm" : undefined
     };
   }
 
@@ -148,25 +165,28 @@ export class StructuralEngine {
     // 🏗️ Análisis Profesional (API sugerida)
     const analysis = analyzeBeamProfessional(spanMm, loadKgM, I);
     const reactionKg = (loadKgM * (spanMm / 1000)) / 2;
-    const web = this.checkWebCrippling(profileId, reactionKg, true, nWebs);
+    const webCheck = this.checkWebCrippling(profileId, reactionKg, true, true, nWebs);
+    
+    const EPSILON = 0.005;
+    const f_max_cm = Math.max(...analysis.deflectionPoints.map(p => p.y)) / 10;
+    const limit_cm = spanMm / 300 / 10;
+    const isDeflectionSafe = f_max_cm <= (limit_cm + EPSILON);
 
-    const limit = spanMm / 300;
-    const f_max = (analysis.deflectionPoints[Math.floor(analysis.deflectionPoints.length / 2)]?.y || 0);
+    const isSafe = isDeflectionSafe && webCheck.isSafe;
 
     return {
-      f_max,
-      limit,
-      isSafe: analysis.isSafe && web.isSafe,
-      stressRatio: f_max / limit,
+      isSafe,
+      stressRatio: Math.max(analysis.maxMoment / 1000, webCheck.ratio),
+      f_max: f_max_cm,
+      limit: limit_cm,
+      description: isSafe ? "Estructura Verificada" : "Falla Estructural Detectada",
+      justification: webCheck.justification,
       loadKg: loadKgM * (spanMm / 1000),
-      description: web.isSafe 
-        ? `Justificación: Momento Máx: ${analysis.maxMoment.toFixed(2)} kgm` 
-        : `⚠️ FALLA POR APLASTAMIENTO (Web Crippling en apoyo)`,
-      webCrippling: web,
+      webCrippling: webCheck,
       deflectionPoints: analysis.deflectionPoints,
       maxMoment: analysis.maxMoment,
       maxShear: analysis.maxShear,
-      recommendation: web.isSafe ? undefined : web.recommendation
+      recommendation: webCheck.isSafe ? undefined : webCheck.recommendation
     };
   }
 
@@ -645,7 +665,6 @@ export class StructuralEngine {
     let diagramData: HeaderAnalysis['diagramData'];
     if (type !== 'truss') {
       const base = this.calculateBeamDiagrams(L, loadNmm);
-      // Añadir la curva de deflexión (exagerada x10 para visualización) o usar formula real
       const deflectionArr = base.moments.map((p: any) => {
         const x = p.x;
         const d = (loadNmm * x * (Math.pow(L, 3) - 2*L*Math.pow(x, 2) + Math.pow(x, 3))) / (24 * this.STEEL_MODULUS * requiredIx);
@@ -658,21 +677,35 @@ export class StructuralEngine {
       };
     }
 
+    // 🧪 VALIDACIÓN FÍSICA DETALLADA (Web Crippling + Deflection)
+    const EPSILON = 0.005; // 0.5% tolerancia de redondeo
+    const reactionKg = (loadNmm * L) / 2 / 9.81; // Reacción en kg
+    const webCheck = this.checkWebCrippling(this.PGC_100_09.name, reactionKg, true, true, type === 'single' ? 1 : (type === 'double' ? 2 : 3));
+    const defSafe = deflectionMm <= (maxAllowableDeflection + (L * EPSILON / 300));
+    
+    const isSafe = defSafe && webCheck.isSafe;
+    if (!isSafe) status = 'error';
+    else if (deflectionMm > maxAllowableDeflection * 0.85) status = 'warning';
+
     return { 
       type, 
       loadNmm, 
       deflectionMm, 
       maxAllowableDeflection, 
       requiredIx, 
-      status, 
-      isFusedWithCorner: fusion, 
-      actualHeight, 
-      trussData, 
+      status,
+      isSafe,
+      f_max: deflectionMm / 10,
+      limit: maxAllowableDeflection / 10,
+      justification: webCheck.justification,
+      isFusedWithCorner: fusion,
+      actualHeight,
+      trussData,
       diagramData,
       supports: {
-        kings,
-        jacks,
-        reactionN: totalReactionN
+        kings: 1, // Siempre al menos 1 King Stud por lado
+        jacks: L > 1200 ? 2 : 1, // 2 Jacks si el vano es mayor a 1.20 metros
+        reactionN: loadNmm * L / 2
       }
     };
   }
