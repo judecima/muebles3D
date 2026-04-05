@@ -28,39 +28,35 @@ export class PlayerController {
   }
 
   private initModel() {
-    const loader = new GLTFLoader();
-    loader.load('/models/character.glb', 
-      (glb) => {
-        this.model = glb.scene;
-        // Escalar modelo si es necesario (asumimos que el modelo viene en metros y trabajamos en mm)
-        // Muchos modelos de internet miden ~2 unidades de alto
-        this.model.scale.set(1000, 1000, 1000); 
-        this.mesh.add(this.model);
+    // 1. Cuerpo (Cilindro de 1.50m)
+    const bodyGeom = new THREE.CylinderGeometry(150, 150, 1500, 12);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.7 });
+    const body = new THREE.Mesh(bodyGeom, bodyMat);
+    body.position.y = 750;
+    body.castShadow = true;
+    this.mesh.add(body);
 
-        // Configurar animaciones
-        this.mixer = new THREE.AnimationMixer(this.model);
-        glb.animations.forEach((clip) => {
-          const name = clip.name.toLowerCase();
-          const action = this.mixer!.clipAction(clip);
-          if (name.includes('idle')) this.animations.set('idle', action);
-          else if (name.includes('walk')) this.animations.set('walk', action);
-          else if (name.includes('run')) this.animations.set('run', action);
-        });
+    // 2. Cabeza (Esfera)
+    const headGeom = new THREE.SphereGeometry(120, 12, 12);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24 });
+    const head = new THREE.Mesh(headGeom, headMat);
+    head.position.y = 1650;
+    head.castShadow = true;
+    this.mesh.add(head);
 
-        // Play idle by default
-        this.playAnimation('idle');
-      },
-      undefined,
-      () => {
-        // Fallback: Cápsula Estilizada
-        const geometry = new THREE.CapsuleGeometry(this.radius, this.height - this.radius * 2, 4, 8);
-        const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
-        const capsule = new THREE.Mesh(geometry, material);
-        capsule.position.y = this.height / 2;
-        capsule.castShadow = true;
-        this.mesh.add(capsule);
-      }
-    );
+    // 3. Brazos (Cilindros simplificados)
+    const armGeom = new THREE.CylinderGeometry(40, 40, 600, 8);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+    
+    const leftArm = new THREE.Mesh(armGeom, armMat);
+    leftArm.position.set(-200, 1100, 0);
+    leftArm.rotation.z = Math.PI / 8;
+    this.mesh.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeom, armMat);
+    rightArm.position.set(200, 1100, 0);
+    rightArm.rotation.z = -Math.PI / 8;
+    this.mesh.add(rightArm);
   }
 
   private playAnimation(name: string) {

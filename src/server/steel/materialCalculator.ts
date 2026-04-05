@@ -31,15 +31,27 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
   // Procesar muros perimetrales (Estructurales)
   config.walls.forEach(wall => {
     const panels = StructuralEngine.calculateWallPanels(wall, config);
-    const studHeight = wall.height - 80;
-    pgu100Len += wall.length * 2;
+    const hStart = wall.heightStart || wall.height;
+    const hEnd = wall.heightEnd || wall.height;
+    const avgHeight = (hStart + hEnd) / 2;
+    const studHeightAvg = avgHeight - 80;
+
+    pgu100Len += wall.length; // Solera inferior
+    pgu100Len += Math.hypot(wall.length, hEnd - hStart); // Solera superior inclinada
+    
     totalConnections += (wall.length / wall.studSpacing) * 4;
 
     panels.forEach(p => {
       const studsInPanel = Math.ceil(p.width / wall.studSpacing) + 1;
       const reinforcementFactor = p.reinforcementFactor || 0;
       const totalStuds = Math.ceil(studsInPanel * (1 + reinforcementFactor));
-      pgc100_090 += totalStuds * studHeight;
+      
+      // Interpolación lineal de la suma de alturas: n * h_promedio
+      const pHStart = hStart + (p.xStart / wall.length) * (hEnd - hStart);
+      const pHEnd = hStart + (p.xEnd / wall.length) * (hEnd - hStart);
+      const pAvgH = (pHStart + pHEnd) / 2;
+      
+      pgc100_090 += totalStuds * (pAvgH - 80);
       totalConnections += totalStuds * 4;
     });
 
@@ -50,9 +62,10 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     });
 
     const junctions = StructuralEngine.findJunctions(wall, config);
-    junctions.forEach(() => {
-      pgc100_090 += studHeight;
-      const ladders = StructuralEngine.calculateLadderBacking(wall.height);
+    junctions.forEach((j) => {
+      const currentH = hStart + (j.x / wall.length) * (hEnd - hStart);
+      pgc100_090 += (currentH - 80);
+      const ladders = StructuralEngine.calculateLadderBacking(currentH);
       ladders.forEach(l => {
         pgu100Len += (l.xEnd - l.xStart);
         totalConnections += 2;
@@ -60,29 +73,47 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     });
 
     wall.openings.forEach(op => {
-      const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
+      const currentWallHeight = hStart + (op.position / wall.length) * (hEnd - hStart);
+      const analysis = StructuralEngine.calculateHeader(op, wall.length, config, currentWallHeight, wall.studSpacing);
       const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
       const numKings = analysis.supports.kings || 1;
       const numJacks = analysis.supports.jacks || 1;
       
+      // Interpolación de altura en el centro del vano para los King studs (simplificado)
+      const hCenter = hStart + ((op.position + op.width/2) / wall.length) * (hEnd - hStart);
+      
       // Sumar Refuerzos (Jacks y Kings perimetrales al vano)
-      pgc100_090 += (numKings * 2) * studHeight; // Kings (altura completa)
-      pgc100_090 += (numJacks * 2) * (sill + op.height - 40); // Jacks (hasta el dintel)
+      pgc100_090 += (numKings * 2) * (hCenter - 80); 
+      
+      const jackLen = (numJacks * 2) * (sill + op.height - 40); 
+      const jackT = analysis.supports.jackThickness || 0.9;
+      if (jackT > 1.2) pgc100_125 += jackLen;
+      else pgc100_090 += jackLen;
 
-      // Restar montantes que han sido reemplazados por el vano (In-Line)
+      // Restar montantes reemplazados
       const studsToRemove = Math.floor(op.width / wall.studSpacing);
-      pgc100_090 -= studsToRemove * studHeight;
+      pgc100_090 -= studsToRemove * (hCenter - 80);
 
       if (analysis.type === 'truss' && analysis.trussData) {
         const trussHeight = analysis.trussData.height;
         const numDiagonals = analysis.trussData.numDiagonals;
         const thickness = (analysis.trussData.chordProps as any).thickness || 0.9;
-        const trussLen = op.width * 2 + numDiagonals * trussHeight * 1.5;
-        if (thickness <= 1.25) pgc100_125 += trussLen;
+        const trussLen = (op.width * 2 + numDiagonals * trussHeight * 1.5) * 1.1; // Cordones + Diagonales + Desperdicio
+        if (thickness <= 0.9) pgc100_090 += trussLen;
+        else if (thickness <= 1.25) pgc100_125 += trussLen;
         else if (thickness <= 1.6) pgc100_160 += trussLen;
         else pgc100_200 += trussLen;
       } else {
-        pgc100_090 += op.width; // Dintel simple
+        // Multiplicador según configuración (Single=1, Double=2, etc.)
+        const levelMult = analysis.type === 'double' ? 2 : (analysis.type === 'triple' ? 3 : (analysis.type === 'tube' ? 4 : 1));
+        const len = op.width * levelMult;
+        
+        // Asumir espesor 1.25 para refuerzos pesados si no se especifica
+        if (analysis.type !== 'single') {
+            pgc100_125 += len;
+        } else {
+            pgc100_090 += len;
+        }
       }
 
       if (op.type === 'window') pgu100Len += op.width;
@@ -96,7 +127,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     });
 
     totalAnchors += Math.ceil(wall.length / 600) + (panels.length * 2);
-    const wallArea = (wall.length * wall.height) / 1000000;
+    const wallArea = (wall.length * avgHeight) / 1000000;
     areaExteriorGross += wallArea;
     areaExteriorNet += wallArea;
     areaInteriorTotal += wallArea;
@@ -104,14 +135,19 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
 
   // Procesar muros internos (Tabiquería)
   config.internalWalls.forEach(iw => {
-    const studHeight = iw.height - 60;
-    pgu70Len += iw.length * 2;
+    const hStart = iw.heightStart || iw.height;
+    const hEnd = iw.heightEnd || iw.height;
+    const avgHeight = (hStart + hEnd) / 2;
+
+    pgu70Len += iw.length;
+    pgu70Len += Math.hypot(iw.length, hEnd - hStart);
+
     const baseStudCount = Math.ceil(iw.length / 400) + 1;
-    pgc70Len += baseStudCount * studHeight;
+    pgc70Len += baseStudCount * (avgHeight - 60);
     totalConnections += baseStudCount * 4;
 
     (iw.openings || []).forEach(op => {
-      pgc70Len += 4 * studHeight; 
+      pgc70Len += 4 * (avgHeight - 60); 
       pgc70Len += op.width; 
       const cripples = StructuralEngine.calculateCrippleStuds(iw, op, config);
       cripples.forEach(c => { pgc70Len += (c.yEnd - c.yStart); totalConnections += 4; });
@@ -119,7 +155,7 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
       areaInternalWallsNet -= (op.width * op.height) / 1000000;
     });
 
-    const wallArea = (iw.length * iw.height) / 1000000;
+    const wallArea = (iw.length * avgHeight) / 1000000;
     areaInternalWallsNet += wallArea;
     areaInteriorTotal += wallArea * 2;
   });

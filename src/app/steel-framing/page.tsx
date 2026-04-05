@@ -39,6 +39,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { PlanGenerator } from '@/modules/plan-generator/engine/PlanGenerator';
 import { PdfRenderer } from '@/modules/plan-generator/render/PdfRenderer';
+import { HeightEngine } from '@/server/steel/heightEngine';
 
 const EDGE_MARGIN_EXTERIOR = 400; 
 const EDGE_MARGIN_INTERNAL = 50; 
@@ -139,19 +140,22 @@ export default function SteelFramingPage() {
 
   const handleConfigChange = (newConfig: SteelHouseConfig) => {
     const syncedConfig = syncWallsAndFoundation(newConfig);
-    setConfig(syncedConfig);
+    const resolvedConfig = HeightEngine.resolveWallHeights(syncedConfig);
+    setConfig(resolvedConfig);
     
     // Solo disparar análisis si hubo cambios estructurales significativos
-    const hasStructureChanged = JSON.stringify(syncedConfig.walls) !== JSON.stringify(config.walls) || 
-                                syncedConfig.width !== config.width || 
-                                syncedConfig.length !== config.length;
+    const hasStructureChanged = JSON.stringify(resolvedConfig.walls) !== JSON.stringify(config.walls) || 
+                                JSON.stringify(resolvedConfig.internalWalls) !== JSON.stringify(config.internalWalls) ||
+                                resolvedConfig.width !== config.width || 
+                                resolvedConfig.length !== config.length;
     
     if (hasStructureChanged) {
-      fetchAnalysis(syncedConfig);
+      fetchAnalysis(resolvedConfig);
     }
   };
 
   const fetchAnalysis = async (currentConfig: SteelHouseConfig) => {
+    setStructuralResult(null); // 🛠️ Purga inmediata de estado para evitar ghosting
     setIsLoading(true);
     try {
       const res = await fetch('/api/steel/calculate', {
@@ -169,6 +173,10 @@ export default function SteelFramingPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchAnalysis(config);
+  }, []); // Carga inicial
 
 
   const getWallSegments = (wallId: string, clickX: number, totalLength: number, isInternalWall: boolean) => {
@@ -441,7 +449,17 @@ export default function SteelFramingPage() {
         <div className="flex-1 relative overflow-hidden">
           <Tabs value={activeTab} className="w-full h-full">
             <TabsContent value="3d" className="w-full h-full m-0 p-0 relative">
-              <SteelViewer ref={viewerRef} config={config} structuralResult={structuralResult} onOpeningDoubleClick={handleOpeningDoubleClick} onInternalWallDoubleClick={handleInternalWallDoubleClick} onWallDoubleClick={handleWallDoubleClick} onFloorDoubleClick={handleFloorDoubleClick} onWalkModeLock={(locked) => setIsWalkModeActive(locked)} />
+              <SteelViewer 
+                key={`viewer-${config.width}-${config.length}`}
+                ref={viewerRef} 
+                config={config} 
+                structuralResult={structuralResult} 
+                onOpeningDoubleClick={handleOpeningDoubleClick} 
+                onInternalWallDoubleClick={handleInternalWallDoubleClick} 
+                onWallDoubleClick={handleWallDoubleClick} 
+                onFloorDoubleClick={handleFloorDoubleClick} 
+                onWalkModeLock={(locked) => setIsWalkModeActive(locked)} 
+              />
               {isLoading && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border shadow-xl flex items-center gap-2 z-50">
                   <Loader2 className="w-4 h-4 animate-spin text-primary" />

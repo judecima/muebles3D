@@ -107,7 +107,7 @@ export const SteelControlPanel = ({
               </div>
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pb-4">
-              <div className="grid grid-cols-2 gap-3 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+              <div className="grid grid-cols-3 gap-3 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
                 <div className="space-y-1">
                   <Label className="text-[9px] font-black uppercase text-blue-600">Ancho (X)</Label>
                   <Input 
@@ -123,6 +123,15 @@ export const SteelControlPanel = ({
                     type="number" 
                     value={config.length} 
                     onChange={(e) => onConfigChange({ ...config, length: parseInt(e.target.value) || 0 })}
+                    className="h-8 text-xs font-bold border-blue-200 bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black uppercase text-blue-600">Altura (Y)</Label>
+                  <Input 
+                    type="number" 
+                    value={config.globalWallHeight} 
+                    onChange={(e) => onConfigChange({ ...config, globalWallHeight: parseInt(e.target.value) || 0 })}
                     className="h-8 text-xs font-bold border-blue-200 bg-white"
                   />
                 </div>
@@ -290,6 +299,14 @@ export const SteelControlPanel = ({
                           <SelectTrigger className="h-7 text-[9px]"><SelectValue /></SelectTrigger>
                           <SelectContent><SelectItem value="400">400mm</SelectItem><SelectItem value="600">600mm</SelectItem></SelectContent>
                         </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[8px] font-bold uppercase text-slate-400">Alto Inicio (mm)</Label>
+                        <Input type="number" value={Math.round(wall.heightStart || wall.height)} onChange={(e) => updateWall(wall.id, 'heightStart', parseInt(e.target.value) || 0)} className="h-7 text-[10px] font-bold" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[8px] font-bold uppercase text-slate-400">Alto Fin (mm)</Label>
+                        <Input type="number" value={Math.round(wall.heightEnd || wall.height)} onChange={(e) => updateWall(wall.id, 'heightEnd', parseInt(e.target.value) || 0)} className="h-7 text-[10px] font-bold" />
                       </div>
                     </div>
                   </div>

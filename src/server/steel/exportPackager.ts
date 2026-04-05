@@ -1,81 +1,112 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { SteelHouseConfig, StructuralAnalysisResult } from '@/lib/steel/types';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { SteelHouseConfig } from '@/lib/steel/types';
 import { calculateSteelMaterials } from './materialCalculator';
 
 export const exportFullProject = async (
   config: SteelHouseConfig, 
   structuralResult: any,
-  screenshot: string // Base64 de la captura actual
+  screenshot: string 
 ) => {
   const zip = new JSZip();
   const folder = zip.folder(`Proyecto_Steel_${config.width}x${config.length}`);
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
 
-  // 1. Datos del Proyecto (JSON)
-  folder?.file("00_Data_Proyecto.json", JSON.stringify({ config, structuralResult }, null, 2));
+  // --- 1. CARÁTULA Y ENCABEZADO ---
+  doc.setFontSize(22);
+  doc.setTextColor(59, 130, 246); // Blue-500
+  doc.text("MEMORIA DE CÁLCULO ESTRUCTURAL", pageWidth / 2, 20, { align: 'center' });
+  
+  doc.setFontSize(12);
+  doc.setTextColor(100);
+  doc.text(`Proyecto: Steel Frame Industrial - ${config.width}mm x ${config.length}mm`, 14, 30);
+  doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString()}`, 14, 36);
+  doc.text(`Normativa Aplicada: AISI S100-2016 / ASCE 7-22`, 14, 42);
 
-  // 2. Informe Técnico Detallado (Momentos y Cortes)
-  let engineeringReport = `
-INFORME DE INGENIERÍA - VALORES DE CÁLCULO
-------------------------------------------
-Proyecto: Steel Frame ${config.width}x${config.length}
-Fecha: ${new Date().toLocaleDateString()}
+  // --- 2. CAPTURA DEL MODELO (BLUEPRINT) ---
+  if (screenshot) {
+    try {
+      doc.addImage(screenshot, 'PNG', 14, 50, 180, 100);
+    } catch (e) { console.error("PDF: Error al añadir captura", e); }
+  }
 
-VALORES MÁXIMOS POR ELEMENTO:
-`;
+  // --- 3. AUDITORÍA DE VANOS Y REFUERZOS ---
+  doc.setFontSize(14);
+  doc.setTextColor(0);
+  doc.text("1. Auditoría de Aperturas y Cabezales", 14, 160);
 
+  const headerRows: any[] = [];
   if (structuralResult.processedWalls) {
     structuralResult.processedWalls.forEach((wall: any) => {
-        engineeringReport += `\nESTRUCTURA MURO: ${wall.id}\n`;
-        wall.headers?.forEach((h: any) => {
-            if (h.analysis) {
-                const def = (h.analysis.f_max ?? h.analysis.deflectionMm) / 10;
-                const lim = (h.analysis.limit ?? h.analysis.maxAllowableDeflection) / 10;
-                engineeringReport += `  - Dintel ${h.openingId}: M_max: ${h.analysis.maxMoment?.toFixed(2)} kgm, V_max: ${h.analysis.maxShear?.toFixed(2)} kg, Flecha: ${def.toFixed(3)}cm (Límite: ${lim.toFixed(3)}cm)\n`;
-            }
-        });
+      wall.headers?.forEach((h: any) => {
+        if (h.analysis) {
+          const def = (h.analysis.f_max ?? h.analysis.deflectionMm / 10).toFixed(3);
+          const lim = (h.analysis.limit ?? h.analysis.maxAllowableDeflection / 10).toFixed(3);
+          headerRows.push([
+            `Muro ${wall.id} - ${h.openingId}`,
+            h.analysis.type.toUpperCase(),
+            `${h.analysis.actualHeight}mm`,
+            `${h.analysis.supports.jacks} x ${h.analysis.supports.jackThickness}mm`,
+            h.analysis.isSafe ? 'PASA (PASS)' : 'FALLA (FAIL)',
+            h.analysis.alertBanner ? 'Refuerzo Automático' : 'Estándar'
+          ]);
+        }
+      });
     });
   }
-  
+
+  autoTable(doc, {
+    startY: 165,
+    head: [['Elemento', 'Configuración', 'Peralte', 'Jack/Apoyo', 'Estado', 'Nota']],
+    body: headerRows,
+    headStyles: { fillStyle: 'F', fillColor: [59, 130, 246] },
+    alternateRowStyles: { fillColor: [245, 247, 250] }
+  });
+
+  // --- 4. CIMENTACIÓN ---
+  doc.addPage();
+  doc.text("2. Análisis de Cimentación y Suelo", 14, 20);
   if (structuralResult.foundation) {
-      engineeringReport += `\nCIMENTACIÓN Y GEOTECNIA:\n`;
-      engineeringReport += `  - Tipo: Platea con Pilotones (H-21)\n`;
-      engineeringReport += `  - Estado: ${structuralResult.foundation.isSafe ? 'VALIDADO (PASS)' : 'FALLA (FAIL)'}\n`;
-      engineeringReport += `  - Cantidad de Pilotones: ${structuralResult.foundation.pileCount}\n`;
-      engineeringReport += `  - Carga Total Acumulada: ${structuralResult.foundation.totalLoadKg?.toFixed(0)} kg\n`;
-      engineeringReport += `  - Capacidad Admisible Suelo: ${structuralResult.foundation.totalCapacityKg?.toFixed(0)} kg\n`;
-      engineeringReport += `  - Justificación: ${structuralResult.foundation.globalJustification}\n`;
-      engineeringReport += `  - Volumen Total Hormigón: ${structuralResult.foundation.concreteVolumeM3?.toFixed(2)} m3\n`;
-      engineeringReport += `  - Acero ADN-420: ${structuralResult.foundation.steelWeightKg?.toFixed(2)} kg\n`;
+    const f = structuralResult.foundation;
+    autoTable(doc, {
+      startY: 25,
+      head: [['Parámetro', 'Valor Calculado', 'Criterio']],
+      body: [
+        ['Tipo de Estructura', 'Platea de HºAº con Pilotones', 'H-21'],
+        ['Cantidad de Pilotones', f.pileCount, 'Perimetral cada ~2m'],
+        ['Carga Total (kN)', (f.totalLoadKg / 100).toFixed(2), 'Gravitatoria + Viento'],
+        ['Capacidad Admisible', (f.totalCapacityKg / 100).toFixed(2) + ' kN', f.globalJustification],
+        ['Volumen Hormigón', f.concreteVolumeM3.toFixed(2) + ' m³', 'Cómputo Directo'],
+        ['Peso Acero (ADN-420)', f.steelWeightKg.toFixed(2) + ' kg', 'Refuerzo estructural']
+      ]
+    });
   }
 
-  folder?.file("01_Informe_Ingenieria.txt", engineeringReport);
-
-  // 3. Cómputo de Materiales (Consolidado Oficial)
+  // --- 5. CÓMPUTO MÉTRICO CONSOLIDADO ---
+  doc.text("3. Cómputo Métrico de Materiales", 14, doc.lastAutoTable.finalY + 20);
   const estimate = calculateSteelMaterials(config);
-  let csv = "Material,Unidad,Cantidad,Categoría,Descripción\n";
-  estimate.items.forEach(item => {
-      csv += `"${item.name}",${item.unit},${item.quantity},${item.category},"${item.description}"\n`;
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY + 25,
+    head: [['Material / Perfil', 'Cant.', 'Unid.', 'Uso Sugerido']],
+    body: estimate.items.map(i => [i.name, i.quantity, i.unit, i.description]),
+    headStyles: { fillColor: [45, 55, 72] }
   });
-  folder?.file("02_Computo_Materiales.csv", csv);
 
-  // 4. Captura Blueprint (Isometría Técnica)
+  doc.setFontSize(10);
+  doc.setTextColor(150);
+  doc.text("Nota: Este documento ha sido generado por el Sistema de Ingeniería SteelAI. Los cálculos deben ser visados por un profesional local.", 14, doc.internal.pageSize.getHeight() - 10);
+
+  // GUARDAR EN ZIP
+  folder?.file("01_Memoria_Calculo_LOD400.pdf", doc.output('blob'));
+  folder?.file("02_Data_Proyecto.json", JSON.stringify({ config, structuralResult }, null, 2));
+  
+  // Captura original para seguridad
   const imgData = screenshot.split(',')[1];
-  folder?.file("03_Isometria_Blueprint.png", imgData, { base64: true });
+  folder?.file("03_Isometria_Original.png", imgData, { base64: true });
 
-  // 5. Checklist de Seguridad
-  const checklist = `
-AUDITORÍA ESTRUCTURAL - CHECKLIST DE SEGURIDAD
----------------------------------------------
-- Deflexión de Entrepsio: VALIDADO (L/300)
-- Estabilidad Lateral (Viento): VALIDADO
-- Aplastamiento (Web Crippling): VALIDADO
-- In-line Framing: ALINEACIÓN 100%
-- Software de Validación: Beam-C Engine (mathjs)
-  `;
-  folder?.file("04_Checklist_Seguridad.txt", checklist);
-
-  // Generar y descargar el ZIP
   const content = await zip.generateAsync({ type: "blob" });
-  saveAs(content, `Entrega_LOD400_SteelFrame.zip`);
+  saveAs(content, `Entrega_LOD400_Steel_${config.width}x${config.length}.zip`);
 };

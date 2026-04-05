@@ -126,7 +126,8 @@ export function exportWallPDF(wall: SteelWall | InternalWall, panels: WallPanelD
   curY += 10;
   
   wall.openings.forEach((op, i) => {
-    const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
+    const studSpacing = ('studSpacing' in wall) ? (wall as SteelWall).studSpacing : 400;
+    const analysis = StructuralEngine.calculateHeader(op, wall.length, config, wall.height, studSpacing);
     const mech = StructuralEngine.analyzeStructuralElement(analysis.type === 'truss' ? 'PGC-100-1.25' : 'PGC-100-0.9', op.width, analysis.loadNmm * 100, analysis.type === 'tube' ? 'tube' : (analysis.type === 'truss' ? 'truss' : 'simple'));
 
     doc.setFont('helvetica', 'bold');
@@ -135,6 +136,9 @@ export function exportWallPDF(wall: SteelWall | InternalWall, panels: WallPanelD
     doc.setFont('helvetica', 'normal');
     
     doc.text(`- Solución: ${analysis.type.toUpperCase()} | Perfil: ${mech.isSafe ? 'VERIFICA' : 'REFORZAR'}`, mMargin + 10, curY);
+    curY += 5;
+    const jackP = analysis.supports.jackProfileId ? analysis.supports.jackProfileId.replace("PGC-100-", "") : "0.9";
+    doc.text(`- Apoyos (Jacks): ${analysis.supports.jacks} de espesor ${jackP}mm por lado.`, mMargin + 10, curY);
     curY += 5;
     doc.text(`- ${mech.description}`, mMargin + 10, curY);
     curY += 8;
@@ -174,9 +178,11 @@ export function exportWallPDF(wall: SteelWall | InternalWall, panels: WallPanelD
   
   const issues: any[] = [];
   wall.openings.forEach(op => {
-      const h = StructuralEngine.calculateHeader(op, wall.length, config, wall.height);
+      const studSpacing = ('studSpacing' in wall) ? (wall as SteelWall).studSpacing : 400;
+      const h = StructuralEngine.calculateHeader(op, wall.length, config, wall.height, studSpacing);
       if (h.status !== 'ok') {
-          issues.push([`Vano ${op.id}`, h.status.toUpperCase(), 'Deflexión/Aplastamiento', 'Sustituir por Viga Tubo o aumentar Jacks']);
+          const jackType = h.supports.jackThickness > 0.9 ? 'Reforzado' : 'Estándar';
+          issues.push([`Vano ${op.id}`, h.status.toUpperCase(), `Deflexión / Apoyos ${jackType}`, `Usar ${h.supports.jacks} Jacks de ${h.supports.jackThickness}mm`]);
       }
   });
 

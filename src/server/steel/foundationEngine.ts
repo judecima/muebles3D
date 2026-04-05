@@ -1,3 +1,4 @@
+import * as math from 'mathjs';
 import { SteelHouseConfig, FoundationConfig, SoilProperties } from '@/lib/steel/types';
 
 export interface FoundationResult {
@@ -8,7 +9,11 @@ export interface FoundationResult {
   slabVolumeM3: number;
   concreteVolumeM3: number;
   steelWeightKg: number;
-  piles: { x: number; z: number }[];
+  piles: { x: number; z: number; isSafe: boolean; load: number; capacity: number; justification: string }[];
+  isSafe: boolean;
+  totalLoadKg: number;
+  totalCapacityKg: number;
+  globalJustification: string;
 }
 
 export class FoundationEngine {
@@ -22,7 +27,7 @@ export class FoundationEngine {
 
     const fConfig = config.foundation || {
       type: 'slab_with_piles',
-      slabThickness: 120,
+      slabThickness: 150,
       edgeBeamDepth: 300,
       pileDepth: 3000,
       pileDiameter: 200,
@@ -30,114 +35,96 @@ export class FoundationEngine {
     } as FoundationConfig;
 
     const soil = fConfig.soil.type ? soilConfigs[fConfig.soil.type] : soilConfigs['arcilloso'];
-
-    // 1. Carga Total (Estimación)
-    // Peso Perfiles + Placas + Sobrecargas
-    let totalLoadN = 0;
     
-    // Sumar reacciones de muros
+    // 1. Constantes y Scope
+    const SPACING_MAX = 2000; 
+    const halfW = config.width / 2;
+    const halfL = config.length / 2;
+    const houseArea = math.number(math.divide(math.multiply(config.width, config.length), 1000000)) as number;
+
+    // 2. Carga Total (Estimación)
+    let totalLoadN = 0;
     if (structuralResult?.processedWalls) {
       structuralResult.processedWalls.forEach((w: any) => {
         w.panels.forEach((p: any) => {
-          totalLoadN += p.loads.verticalLoadN;
+          totalLoadN += (p.loads?.verticalLoadN || 0);
         });
       });
     }
 
-    // Carga de Techo (si existe)
-    const houseArea = config.width * config.length / 1000000;
     if (config.roof) {
-        const roofLoadKpa = (config.roof.coveringWeightKpa || 0.5) + 0.3; // + peso propio correas
-        totalLoadN += roofLoadKpa * 1000 * houseArea;
+        const roofLoadKpa = (config.roof.coveringWeightKpa || 0.5) + 0.3;
+        totalLoadN += math.number(math.multiply(roofLoadKpa, math.multiply(1000, houseArea))) as number;
     }
-    
-    // Sobrecarga de Uso (200kg/m2 estándar residencial)
-    totalLoadN += 2.0 * 1000 * houseArea;
+    totalLoadN += math.number(math.multiply(2000, houseArea)) as number; // 200kg/m2 use load
 
-    // 2. Diseño de Pilotones
-    // Capacidad por pilotón = Capacidad Punta + Capacidad Fuste
-    // P_adm = (Area_Punta * q_adm) + (Perimetro * Profundidad * f_friccion)
-    const areaPunta = Math.PI * Math.pow(fConfig.pileDiameter/2 / 1000, 2);
-    const perim = Math.PI * (fConfig.pileDiameter / 1000);
-    const depthM = fConfig.pileDepth / 1000;
-    
-    const capPuntaN = areaPunta * soil.bearingCapacityKPa * 1000;
-
-    const pileCount = Math.max(12, 12); 
-
-    // Ubicación de los pilotones (Perimetral + Esquinas + T-junctions)
-    const piles: any[] = [];
-    
-    const halfW = config.width / 2;
-    const halfL = config.length / 2;
-    
-    // Esquinas
-    const cornerPositions = [
-        { x: -halfW, z: -halfL }, { x: halfW, z: -halfL },
-        { x: halfW, z: halfL }, { x: -halfW, z: halfL }
-    ];
-
-    // Carga por pilotón (distribuida aprox + 20% factor de carga puntual)
-    const loadPerPileKg = totalLoadN / 9.81 / pileCount;
+    // 3. Distribución de Pilotones
+    const perimeterLen = math.multiply(math.add(config.width, config.length), 2);
+    const estPileCount = math.ceil(math.divide(perimeterLen, SPACING_MAX)) + 4;
+    const loadPerPileKg = math.divide(math.divide(totalLoadN, 9.81), estPileCount);
 
     const analyzePile = (x: number, z: number) => {
         const D = fConfig.pileDiameter / 1000;
         const L = fConfig.pileDepth / 1000;
-        const AreaPunta = Math.PI * Math.pow(D/2, 2) * 10000; // cm2
+        const AreaPunta = math.multiply(math.pi, math.square(math.divide(D, 2))) as number; // m2
         
         const f_coef = soil.frictionCoefficient || 800; // kg/m2
-        const b_cap = soil.bearingCapacity || 1.5;      // kg/cm2
+        const b_cap = math.multiply(soil.bearingCapacity || 1.5, 10000) as number; // kg/m2
         
-        const perimeter = Math.PI * D;
-        const frictionResistance = perimeter * L * f_coef;
-        const tipResistance = AreaPunta * b_cap;
+        const perimeter = math.multiply(math.pi, D) as number;
+        const frictionResistance = math.multiply(perimeter, math.multiply(L, f_coef)) as number;
+        const tipResistance = math.multiply(AreaPunta, b_cap) as number;
         
-        const capacity = (frictionResistance + tipResistance) / 3; // FS = 3
-        const isSafe = loadPerPileKg <= capacity;
+        const capacity = math.divide(math.add(frictionResistance, tipResistance), 3) as number; // FS = 3
+        const isSafe = math.smallerEq(loadPerPileKg, capacity);
         
         return {
-            x, z, isSafe, load: loadPerPileKg, capacity,
-            justification: `Ø${fConfig.pileDiameter}mm x ${L}m. Fricción: ${Math.round(frictionResistance/3)}kg + Punta: ${Math.round(tipResistance/3)}kg.`
+            x, z, isSafe, 
+            load: math.number(loadPerPileKg) as number, 
+            capacity: math.number(capacity) as number,
+            justification: `Ø${fConfig.pileDiameter}mm. FS=3.`
         };
     };
 
-    cornerPositions.forEach(p => piles.push(analyzePile(p.x, p.z)));
+    const piles: any[] = [];
+    const addPilesOnEdge = (start: number, end: number, fixed: number, isV: boolean) => {
+        const dist = Math.abs(end - start);
+        const count = Math.max(1, Math.ceil(dist / SPACING_MAX));
+        const step = dist / count;
+        for (let i = 0; i <= count; i++) {
+            const curr = start + (i * step);
+            const px = isV ? fixed : curr;
+            const pz = isV ? curr : fixed;
+            if (!piles.some(p => Math.abs(p.x - px) < 10 && Math.abs(p.z - pz) < 10)) {
+                piles.push(analyzePile(px, pz));
+            }
+        }
+    };
 
-    // Distribuir el resto en el perímetro
-    const perimeterLen = (config.width + config.length) * 2;
-    const spacing = perimeterLen / (pileCount - 4);
+    addPilesOnEdge(-halfW, halfW, -halfL, false); // N
+    addPilesOnEdge(-halfW, halfW, halfL, false);  // S
+    addPilesOnEdge(-halfL, halfL, -halfW, true);   // W
+    addPilesOnEdge(-halfL, halfL, halfW, true);    // E
 
-    for (let x = -halfW + spacing; x < halfW; x += spacing) {
-        piles.push(analyzePile(x, -halfL));
-        piles.push(analyzePile(x, halfL));
-    }
-    for (let z = -halfL + spacing; z < halfL; z += spacing) {
-        piles.push(analyzePile(-halfW, z));
-        piles.push(analyzePile(halfW, z));
-    }
+    // 4. Resultados finales
+    const slabVol = math.number(math.divide(math.multiply(houseArea, fConfig.slabThickness), 1000)) as number;
+    const edgeBeamVol = math.number(math.multiply(math.divide(perimeterLen, 1000), math.multiply(0.20, math.divide(fConfig.edgeBeamDepth, 1000)))) as number;
+    const pilesVol = math.multiply(piles.length, math.multiply(math.multiply(math.pi, math.square(math.divide(fConfig.pileDiameter, 2000))), math.divide(fConfig.pileDepth, 1000))) as number;
+    const totalConcrete = (math.add(math.add(slabVol, edgeBeamVol), pilesVol) as unknown as number);
 
-    // 3. Volúmenes y Resultados finales
-    const slabVol = (houseArea * fConfig.slabThickness / 1000);
-    const edgeBeamVol = (perimeterLen / 1000) * (0.20 * fConfig.edgeBeamDepth / 1000);
-    const pilesVol = piles.length * (Math.PI * Math.pow(fConfig.pileDiameter/2 / 1000, 2) * depthM);
-    const totalConcrete = slabVol + edgeBeamVol + pilesVol;
-    const steelWeightKg = totalConcrete * 80;
-
-    const allPilesSafe = piles.every(p => p.isSafe);
-    
     return {
       pileCount: piles.length,
-      pileSpacing: spacing,
+      pileSpacing: SPACING_MAX,
       pileDepth: fConfig.pileDepth,
       pileDiameter: fConfig.pileDiameter,
       slabVolumeM3: slabVol,
       concreteVolumeM3: totalConcrete,
-      steelWeightKg: steelWeightKg,
+      steelWeightKg: (math.multiply(totalConcrete, 80) as unknown as number),
       piles,
-      isSafe: allPilesSafe,
-      totalLoadKg: totalLoadN / 9.81,
-      totalCapacityKg: piles.length * (piles[0].capacity),
-      globalJustification: `Fundación validada para suelo ${soil.type}. FS=3 aplicado.`
-    } as any;
+      isSafe: piles.every(p => p.isSafe),
+      totalLoadKg: math.number(math.divide(totalLoadN, 9.81)) as number,
+      totalCapacityKg: (math.multiply(piles.length, piles[0]?.capacity || 0) as unknown as number),
+      globalJustification: `Fundación validada para suelo ${soil.type}.`
+    };
   }
 }

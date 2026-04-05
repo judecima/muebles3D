@@ -16,10 +16,12 @@ export interface InternalWall {
   xPosition: number;
   length: number;
   height: number;
-  rotation: number;
   x: number;
   z: number;
+  rotation: number;
   openings: SteelOpening[];
+  heightStart?: number;
+  heightEnd?: number;
   status?: 'ok' | 'warning' | 'error';
 }
 
@@ -27,6 +29,8 @@ export interface SteelWall {
   id: string;
   length: number;
   height: number;
+  heightStart?: number;
+  heightEnd?: number;
   thickness: number;
   x: number;
   z: number;
@@ -195,14 +199,26 @@ export interface HeaderAnalysis {
   status: 'ok' | 'warning' | 'error';
   isFusedWithCorner: 'none' | 'left' | 'right';
   actualHeight: number;
+  alertBanner?: string;
+  isSafe: boolean;
+  f_max: number;
+  limit: number;
+  justification?: string;
   trussData?: {
     height: number;
     numDiagonals: number;
-    chordThickness: number;
     panelWidth: number;
     diagonalAngle: number;
+    nodeSpacing: number;
+    chordProps?: any;
+    members?: any[];
   };
-  supportsRequired?: number;
-  kings?: number;
-  jacks?: number;
+  diagramData?: any;
+  supports: {
+    kings: number;
+    jacks: number;
+    reactionN: number;
+    jackProfileId?: string;
+    jackThickness?: number;
+  };
 }

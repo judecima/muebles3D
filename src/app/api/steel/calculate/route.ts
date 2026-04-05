@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         blockings: StructuralEngine.calculateBlocking(wall),
         headers: wall.openings.map((op: any) => ({
           openingId: op.id,
-          analysis: StructuralEngine.calculateHeader(op, wall.length, config, wall.height),
+          analysis: StructuralEngine.calculateHeader(op, wall.length, config, wall.height, wall.studSpacing),
           cripples: StructuralEngine.calculateCrippleStuds(wall, op, config)
         }))
       };

@@ -1,5 +1,6 @@
 import * as math from 'mathjs';
-import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall, FastenerPoint, StructuralAnalysisResult } from '@/lib/steel/types';
+import { Beam, DistributedLoad } from '@/lib/steel/beamEngine';
+import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall, FastenerPoint, StructuralAnalysisResult, HeaderAnalysis } from '@/lib/steel/types';
 import { STEEL_PROFILES } from './profilesDB';
 import { analyzeBeamProfessional } from './feaEngine';
 
@@ -9,47 +10,6 @@ export interface StructuralMemberProps {
   ix: number;   // mm4
   wx: number;   // mm3
   weight: number; // kg/m
-}
-
-export interface HeaderAnalysis {
-  type: 'single' | 'double' | 'triple' | 'tube' | 'truss';
-  loadNmm: number;
-  deflectionMm: number;
-  maxAllowableDeflection: number;
-  requiredIx: number;
-  status: 'ok' | 'warning' | 'error';
-  isFusedWithCorner: 'none' | 'left' | 'right';
-  actualHeight: number;
-  isSafe: boolean;
-  f_max: number;
-  limit: number;
-  justification?: string;
-  trussData?: {
-    height: number;
-    numDiagonals: number;
-    panelWidth: number;
-    diagonalAngle: number;
-    nodeSpacing: number;
-    chordProps: StructuralMemberProps;
-    members?: {
-      id: string;
-      forceN: number;
-      type: 'chord_top' | 'chord_bottom' | 'diagonal' | 'vertical';
-      stressType: 'tension' | 'compression' | 'zero';
-      status: 'ok' | 'fail';
-      ratio: number;
-    }[];
-  };
-  diagramData?: {
-    moments: { x: number; y: number }[];
-    shears: { x: number; y: number }[];
-    deflection: { x: number; y: number }[];
-  };
-  supports: {
-    kings: number;
-    jacks: number;
-    reactionN: number;
-  };
 }
 
 export interface BlockingData {
@@ -268,92 +228,106 @@ export class StructuralEngine {
     const panels: WallPanelData[] = [];
     const maxPanelWidth = 4000; 
     const minPanelWidth = 600;
-    const openings = wall.openings || [];
+    const sortedOpenings = [...(wall.openings || [])].sort((a, b) => a.position - b.position);
     
     let currentX = 0;
     let panelIndex = 0;
 
-    while (currentX < wall.length) {
-      let targetX = Math.min(currentX + maxPanelWidth, wall.length);
+    const pushPanel = (startX: number, endX: number) => {
+      const width = endX - startX;
+      if (width <= 0) return;
+      const isWallStart = startX === 0;
+      const isWallEnd = endX === wall.length;
+
+      const loads = this.calculatePanelLoads(width, wall.height, config);
+      const stability = this.calculateLateralStability(config);
+      const shearWallInfo = [...stability.shearWallsX, ...stability.shearWallsZ].find(sw => sw.id === wall.id);
+      const isExternal = !('parentWallId' in wall);
+
+      const needsBracing = isExternal && ((shearWallInfo ? (shearWallInfo.shearLoad > shearWallInfo.capacity) : false) || isWallStart || isWallEnd);
+      const highLoad = loads.verticalLoadN > (width * 10);
+      let reinforcementFactor = 1;
       
-      if (targetX < wall.length) {
-        for (const op of openings) {
-          const opStart = op.position;
-          const opEnd = op.position + op.width;
-          if (targetX > opStart && targetX < opEnd) {
-            targetX = opStart - 10; 
-            if (targetX - currentX < minPanelWidth) {
-              targetX = opEnd + 10;
-            }
-            break;
-          }
-        }
-      }
+      if (isWallStart || isWallEnd) reinforcementFactor = 2;
+      if (needsBracing) reinforcementFactor = Math.max(reinforcementFactor, 1.5);
+      if (highLoad) reinforcementFactor = Math.max(reinforcementFactor, 2);
+      if (loads.verticalLoadN > width * 20) reinforcementFactor = 2.5;
 
-      targetX = Math.min(targetX, wall.length);
-      const width = targetX - currentX;
-
-      if (width > 0) {
-        const isWallStart = currentX === 0;
-        const isWallEnd = targetX === wall.length;
-
-        const loads = this.calculatePanelLoads(width, wall.height, config);
-        const stability = this.calculateLateralStability(config);
-        const shearWallInfo = [...stability.shearWallsX, ...stability.shearWallsZ].find(sw => sw.id === wall.id);
-
-        const isExternal = !('parentWallId' in wall);
-
-        const needsBracing =
-          isExternal &&
-          (
-            (shearWallInfo ? (shearWallInfo.shearLoad > shearWallInfo.capacity) : false) ||
-            isWallStart ||
-            isWallEnd
-          );
-
-        // 🔥 ahora sí correcto
-        const highLoad = loads.verticalLoadN > (width * 10);
-
-        let reinforcementFactor = 1;
-
-        // extremos → muy rígidos
-        if (isWallStart || isWallEnd) {
-          reinforcementFactor = 2;
-        }
-
-        // cargas medias
-        if (needsBracing) {
-          reinforcementFactor = Math.max(reinforcementFactor, 1.5);
-        }
-
-        // cargas altas reales
-        if (highLoad) {
-          reinforcementFactor = Math.max(reinforcementFactor, 2);
-        }
-
-        // 🔥 opcional PRO: súper carga
-        if (loads.verticalLoadN > width * 20) {
-          reinforcementFactor = 2.5;
-        }
-
-        panels.push({
-          id: `${wall.id}-P${panelIndex + 1}`,
-          index: panelIndex + 1,
-          xStart: currentX,
-          xEnd: targetX,
-          width: width,
-          isWallStart,
-          isWallEnd,
-          needsBracing,
-          reinforcementFactor, 
-          loads,
-          fasteners: this.calculatePanelFasteners(width, wall.height, ('studSpacing' in wall) ? wall.studSpacing : 400)
-        });
-      }
-
-      currentX = targetX;
+      panels.push({
+        id: `${wall.id}-P${panelIndex + 1}`,
+        index: panelIndex + 1,
+        xStart: startX,
+        xEnd: endX,
+        width: width,
+        isWallStart,
+        isWallEnd,
+        needsBracing,
+        reinforcementFactor, 
+        loads,
+        fasteners: this.calculatePanelFasteners(width, wall.height, ('studSpacing' in wall) ? wall.studSpacing : 400)
+      });
       panelIndex++;
-      if (panelIndex > 50) break;
+    };
+
+    while (currentX < wall.length) {
+      let nextOp = null;
+      for (const op of sortedOpenings) {
+          if (op.position + op.width > currentX) {
+              nextOp = op;
+              break;
+          }
+      }
+
+      let chunkEnd = wall.length;
+      let consumeOpening = false;
+      
+      if (nextOp) {
+          const distanceToOp = nextOp.position - 10 - currentX;
+          if (distanceToOp < minPanelWidth) {
+              consumeOpening = true;
+          } else {
+              chunkEnd = nextOp.position - 10;
+          }
+      }
+
+      // 1) Si entramos a la zona de una abertura, la convertimos en UN SOLO PANEL
+      if (consumeOpening && nextOp) {
+          let finalX = nextOp.position + nextOp.width + 10;
+          for (const op of sortedOpenings) {
+              if (op.position < finalX && op.position + op.width > nextOp.position) {
+                  finalX = Math.max(finalX, op.position + op.width + 10);
+              }
+          }
+          if (wall.length - finalX < minPanelWidth) {
+              finalX = wall.length;
+          }
+          const targetX = Math.min(wall.length, finalX);
+          pushPanel(currentX, targetX);
+          currentX = targetX;
+          continue;
+      }
+
+      // 2) Si estamos en muro solido, lo dividimos equitativamente (Even distribution)
+      const sectionLength = chunkEnd - currentX;
+      if (sectionLength > 0) {
+          let numPanels = Math.ceil(sectionLength / maxPanelWidth);
+          if (numPanels > 1 && (sectionLength / numPanels) < minPanelWidth) {
+              numPanels--; // Evitar paneles enanos, forzar consolidacion
+          }
+          if (numPanels <= 0) numPanels = 1;
+          const nominalWidth = sectionLength / numPanels;
+
+          for (let i = 0; i < numPanels; i++) {
+              const startX = currentX + i * nominalWidth;
+              let endX = currentX + (i + 1) * nominalWidth;
+              // Ajuste de precision flotante en el ultimo panel del segmento
+              if (i === numPanels - 1) endX = chunkEnd; 
+              pushPanel(startX, endX);
+          }
+      }
+
+      currentX = chunkEnd;
+      if (panelIndex > 50) break; // salvaguarda contra loops infinitos
     }
 
     return panels;
@@ -553,86 +527,92 @@ export class StructuralEngine {
     return feaResults;
   }
 
-  static calculateHeader(opening: SteelOpening, wallLen: number, config: SteelHouseConfig, wallHeight: number): HeaderAnalysis {
+  static calculateHeader(opening: SteelOpening, wallLength: number, config: SteelHouseConfig, availableHeight: number, studSpacing: number = 400): HeaderAnalysis {
     const L = opening.width;
+    const maxAllowableDeflection = L / 360; 
     const tributaryWidthM = this.getTributaryWidth(config);
     
-    // Solo aplicar cargas de techo si la estructura existe
-    const hasRoof = !!config.roof;
-    const roofLoad = hasRoof ? (config.loads.roofDeadKpa + config.loads.roofLiveKpa) : 0;
-    const snowLoad = hasRoof ? config.loads.snowKpa : 0;
+    // 🧪 PARÁMETROS DE INGENIERÍA
+    const roofLoad = config.roof ? (config.loads.roofDeadKpa + config.loads.roofLiveKpa) : 0;
+    const snowLoad = config.roof ? config.loads.snowKpa : 0;
+    const windLoad = config.loads.windKpa * (L / 1000); 
     
-    const windLoad = config.loads.windKpa * (L / 1000); // El viento siempre impacta si hay cerramiento
     const loadKNm = roofLoad * tributaryWidthM + snowLoad * tributaryWidthM + windLoad;
     const loadNmm = (loadKNm * 1000) / 1000;
-    const maxAllowableDeflection = L / 360;
-    const requiredIx = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * maxAllowableDeflection);
-    const fusion = this.analyzeOpeningFusion(opening, wallLen);
+    const fusion = this.analyzeOpeningFusion(opening, wallLength);
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-    const availableHeight = Math.max(120, wallHeight - headerBottom - 40);
+    const remainingHeight = Math.max(120, availableHeight - headerBottom - 40);
 
-    let type: HeaderAnalysis['type'] = 'single';
-    let status: HeaderAnalysis['status'] = 'ok';
+    // 🚀 BUCLE DE REFUERZO ITERATIVO (SOLVER ÓPTIMO)
+    // Orden de prioridad: Espesor -> Altura -> Configuración
+    const configsToTry = [
+      { id: "PGC-100-0.9", level: 'single', multiplier: 1, name: "PGC 100x0.9" },
+      { id: "PGC-100-1.25", level: 'single', multiplier: 1, name: "PGC 100x1.25" },
+      { id: "PGC-100-1.25", level: 'double', multiplier: 2, name: "Doble PGC 100x1.25" },
+      { id: "PGC-150-1.25", level: 'single', multiplier: 1, name: "PGC 150x1.25" },
+      { id: "PGC-150-1.25", level: 'double', multiplier: 2, name: "Doble PGC 150x1.25" },
+      { id: "PGC-200-1.6", level: 'single', multiplier: 1, name: "PGC 200x1.6" },
+      { id: "PGC-200-1.6", level: 'double', multiplier: 2, name: "Doble PGC 200x1.6" },
+      { id: "PGC-200-1.6", level: 'tube', multiplier: 3, name: "Viga Tubo 200x1.6" },
+    ];
+
+    let foundConfig: any = null;
     let actualHeight = 100;
+    let type: HeaderAnalysis['type'] = 'single';
+    let alertBanner = "";
+    let finalIx = 185200; // default PGC 100x0.9 mm4
+    const EPSILON_COURTESY = 0.001; // 0.1% de tolerancia técnica
+
+    // 1. Intentar configuraciones estándar
+    if (L <= 3000) {
+      for (const c of configsToTry) {
+        const profile = STEEL_PROFILES[c.id];
+        const ixMm4 = profile.ix * 10000 * c.multiplier;
+        const defMM = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * ixMm4);
+        
+        // Normalización para evitar falsos negativos decimales
+        const ratio = defMM / maxAllowableDeflection;
+        if (ratio <= 1.0 + EPSILON_COURTESY) {
+          foundConfig = c;
+          finalIx = ixMm4;
+          actualHeight = profile.height;
+          type = c.level as any;
+          if (c.multiplier > 1 || profile.thickness > 0.9 || profile.height > 100) {
+            alertBanner = `📐 Refuerzo: ${c.name} requerido por luz y carga.`;
+          }
+          break;
+        }
+      }
+    }
+
+    // 2. Si fallan o luz > 3m, usar Truss
+    if (!foundConfig || L > 3000) {
+      type = 'truss';
+      alertBanner = L > 3000 ? `⚠️ Luz Crítica (${L}mm): Escalado automático a Viga Reticulada.` : `⚠️ Carga Extrema: Escalado a Viga Reticulada por deflexión.`;
+      finalIx = 10000000; // Gran inercia ficticia para validación inicial (se resuelve en el solver FEA)
+    }
+
     let trussData: HeaderAnalysis['trussData'] | undefined;
 
-    if (requiredIx <= this.PGC_IX_SINGLE) {
-      type = 'single';
-      actualHeight = 100;
-    } else if (requiredIx <= this.PGC_IX_SINGLE * 2) {
-      type = 'double';
-      actualHeight = 100;
-    } else if (requiredIx <= this.PGC_IX_SINGLE * 3) {
-      type = 'triple';
-      actualHeight = 100;
-    } else if (requiredIx <= this.TUBE_IX) {
-      type = 'tube';
-      actualHeight = 120;
-    } else {
-      type = 'truss';
-      // NUEVA REGLA: altura basada en luz (L/10), no L/8
-      const calculatedHeight = L / 10;
-
-      // límites constructivos
+    // 🏗️ RESOLUCIÓN SI ES TRUSS
+    if (type === 'truss') {
+      const calculatedHeight = L / 15; 
       const clampedHeight = Math.min(Math.max(calculatedHeight, 200), 600);
-
-      // respetar altura disponible en muro
-      const trussHeight = Math.min(clampedHeight, availableHeight);
-      // NUEVO: panel basado en proporción estructural (cuasi cuadrado)
-      const targetPanelWidth = trussHeight;
-
-      // cantidad de paneles según geometría real
-      const numPanels = Math.max(2, Math.round(L / targetPanelWidth));
-      // 🔥 GEOMETRÍA REAL
+      const trussHeight = Math.min(clampedHeight, remainingHeight);
+      const numPanels = Math.max(2, Math.round(L / trussHeight));
       const panelWidth = L / numPanels;
-
-      // ángulo real (radianes)
       const diagonalAngle = Math.atan(trussHeight / panelWidth);
-      // espesor base
-      let thickness = 1.25;
+      let thickness = L > 4500 ? 2 : (L > 3000 ? 1.6 : 1.25);
 
-      // refuerzo progresivo
-      if (L > 3000) thickness = 1.6;
-      if (L > 4500) thickness = 2;
-
-      // NUEVO: refuerzo de cordones (doble perfil)
-      // 🔥 PERFIL DOBLE SEGÚN ESFUERZO REAL (no solo L)
-      let chordMultiplier = 1;
-
-      // criterio combinado: luz + esbeltez + carga
-      if (L > 4000 || requiredIx > this.PGC_IX_SINGLE * 3) {
-        chordMultiplier = 2; // doble perfil
-      }
-    const trussDataMembers = this.solveTruss(L, trussHeight, numPanels, loadNmm * L);
-      
+      const trussDataMembers = this.solveTruss(L, trussHeight, numPanels, loadNmm * L);
       trussData = { 
         height: trussHeight, 
         numDiagonals: numPanels, 
         panelWidth,
         diagonalAngle,
         nodeSpacing: panelWidth,
-        chordProps: thickness > 1.25 ? this.PGC_100_125 : this.PGC_100_09,
+        chordProps: thickness > 1.25 ? (thickness > 1.6 ? STEEL_PROFILES["PGC-200-1.6"] : STEEL_PROFILES["PGC-200-1.25"]) : STEEL_PROFILES["PGC-100-1.25"],
         members: trussDataMembers.map((m: any, i: number) => ({
           ...m,
           id: m.id.includes('top') ? `C-SUP-${i}` : (m.id.includes('bottom') ? `C-INF-${i}` : (m.id.includes('diag') ? `DIAG-${i}` : `VERT-${i}`)),
@@ -641,71 +621,73 @@ export class StructuralEngine {
       };
       
       actualHeight = trussHeight;
-
-      // relación luz / altura (criterio estructural)
-      const slenderness = L / trussHeight;
-
-      if (L > 5500 || slenderness > 12 || trussDataMembers.some((m: any) => m.status === 'fail')) {
-        status = 'error';
-      } else if (L > 4000 || slenderness > 10) {
-        status = 'warning';
-      }
     }
 
-    const totalReactionN = (loadNmm * L) / 2;
-    const studCapacityN = 8000; // PGC 100 0.9 ~ 800kg
-
-    // Lógica profesional de Jacks: 1 por cada 1.2m
-    const jacks = Math.max(Math.ceil(L / 1200), Math.ceil(totalReactionN / studCapacityN));
-    const kings = 1; // Siempre al menos 1 rigidizador continuo
-
-    const deflectionMm = (5 * loadNmm * Math.pow(L, 4)) / (384 * this.STEEL_MODULUS * requiredIx);
+    // 🔬 VALIDACIÓN FINAL CON BEAM ENGINE
+    const beam = new Beam(L / 1000);
+    beam.addSupport(0);
+    beam.addSupport(L / 1000);
+    beam.addLoad(new DistributedLoad(loadNmm, 0, L / 1000)); 
+    beam.setProperties(this.STEEL_MODULUS, finalIx); 
     
-    // Generar diagramas si es tipo viga o tubo
-    let diagramData: HeaderAnalysis['diagramData'];
-    if (type !== 'truss') {
-      const base = this.calculateBeamDiagrams(L, loadNmm);
-      const deflectionArr = base.moments.map((p: any) => {
-        const x = p.x;
-        const d = (loadNmm * x * (Math.pow(L, 3) - 2*L*Math.pow(x, 2) + Math.pow(x, 3))) / (24 * this.STEEL_MODULUS * requiredIx);
-        return { x, y: d * 10 }; // 10x para visibilidad
-      });
-      diagramData = { 
-        moments: base.moments,
-        shears: base.shears,
-        deflection: deflectionArr 
-      };
+    const deflectionMm = Math.abs(beam.getMaxDeflection() * 1000); 
+    const deflectionRatio = deflectionMm / maxAllowableDeflection;
+    const reactionKg = math.divide(math.divide(math.multiply(loadNmm, L), 2), 9.81) as unknown as number;
+    
+    // 🗜️ REFUERZO DE APOYOS (JACKS) - Inteligente por Espesor
+    // Límite normativo de 4 Jacks. Si falla, escalar espesor.
+    const nCut = Math.floor((L - 10) / studSpacing);
+    let numJacks = Math.max(1, Math.ceil(nCut / 2));
+    let jackProfileId = "PGC-100-0.9";
+    let jackThickness = 0.9;
+    
+    let webCheck = this.checkWebCrippling(jackProfileId, reactionKg, true, true, numJacks);
+    
+    // Bucle de Escalado de Apoyo
+    if (!webCheck.isSafe) {
+        // Intentar sumar Jacks hasta 4 (perfil estándar)
+        while (!webCheck.isSafe && numJacks < 4) {
+            numJacks++;
+            webCheck = this.checkWebCrippling(jackProfileId, reactionKg, true, true, numJacks);
+        }
+        
+        // Si aun así falla, subir espesor y REINICIAR cuenta de Jacks (más eficiente)
+        if (!webCheck.isSafe) {
+            jackProfileId = "PGC-100-1.25";
+            jackThickness = 1.25;
+            numJacks = Math.max(2, Math.ceil(nCut / 2)); // Empezar con 2 robustos
+            webCheck = this.checkWebCrippling(jackProfileId, reactionKg, true, true, numJacks);
+            
+            while (!webCheck.isSafe && numJacks < 4) {
+                numJacks++;
+                webCheck = this.checkWebCrippling(jackProfileId, reactionKg, true, true, numJacks);
+            }
+        }
+        
+        if (webCheck.isSafe) {
+            alertBanner = `Refuerzo: Se requieren ${numJacks} Jacks (${jackProfileId}) para soportar reacción crítica`;
+        }
     }
 
-    // 🧪 VALIDACIÓN FÍSICA DETALLADA (Web Crippling + Deflection)
-    const EPSILON = 0.005; // 0.5% tolerancia de redondeo
-    const reactionKg = (loadNmm * L) / 2 / 9.81; // Reacción en kg
-    const webCheck = this.checkWebCrippling(this.PGC_100_09.name, reactionKg, true, true, type === 'single' ? 1 : (type === 'double' ? 2 : 3));
-    const defSafe = deflectionMm <= (maxAllowableDeflection + (L * EPSILON / 300));
+    // Normalización 4 decimales para el "isSafe"
+    const normalizedRatio = Math.round(deflectionRatio * 10000) / 10000;
     
-    const isSafe = defSafe && webCheck.isSafe;
-    if (!isSafe) status = 'error';
-    else if (deflectionMm > maxAllowableDeflection * 0.85) status = 'warning';
+    // 🧪 VALIDACIÓN INTEGRAL (Flecha + Apoyos + Miembros Truss)
+    const membersSafe = trussData ? !(trussData.members || []).some((m: any) => m.status === 'fail') : true;
+    const isSafe = normalizedRatio <= 1.0 + EPSILON_COURTESY && webCheck.isSafe && membersSafe;
+    let status: HeaderAnalysis['status'] = isSafe ? (normalizedRatio > 0.85 || numJacks > 2 ? 'warning' : 'ok') : 'error';
 
     return { 
-      type, 
-      loadNmm, 
-      deflectionMm, 
-      maxAllowableDeflection, 
-      requiredIx, 
-      status,
-      isSafe,
-      f_max: deflectionMm / 10,
-      limit: maxAllowableDeflection / 10,
-      justification: webCheck.justification,
-      isFusedWithCorner: fusion,
-      actualHeight,
-      trussData,
-      diagramData,
-      supports: {
-        kings: 1, // Siempre al menos 1 King Stud por lado
-        jacks: L > 1200 ? 2 : 1, // 2 Jacks si el vano es mayor a 1.20 metros
-        reactionN: loadNmm * L / 2
+      type, loadNmm, deflectionMm, maxAllowableDeflection, requiredIx: finalIx, 
+      status, isSafe, f_max: deflectionMm / 10, limit: maxAllowableDeflection / 10,
+      justification: webCheck.justification, isFusedWithCorner: fusion,
+      actualHeight, alertBanner, trussData,
+      supports: { 
+        kings: L > 3000 ? 2 : 1, 
+        jacks: numJacks, 
+        reactionN: loadNmm * L / 2,
+        jackProfileId,
+        jackThickness
       }
     };
   }
@@ -716,7 +698,7 @@ export class StructuralEngine {
     const wallH = wall.height;
     const sill = opening.type === 'door' ? 0 : (opening.sillHeight || 900);
     const headerBottom = sill + opening.height;
-    const analysis = this.calculateHeader(opening, wall.length, config, wallH);
+    const analysis = this.calculateHeader(opening, wall.length, config, wallH, spacing);
     const headerTop = headerBottom + analysis.actualHeight;
     const spaceAbove = (wallH - 40) - headerTop;
 
