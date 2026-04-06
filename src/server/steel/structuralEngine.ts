@@ -3,6 +3,13 @@ import { Beam, DistributedLoad } from '@/lib/steel/beamEngine';
 import { SteelOpening, SteelHouseConfig, SteelWall, WallPanelData, PanelLoads, InternalWall, FastenerPoint, StructuralAnalysisResult, HeaderAnalysis } from '@/lib/steel/types';
 import { STEEL_PROFILES } from './profilesDB';
 import { analyzeBeamProfessional } from './feaEngine';
+import { GlobalAssembler } from './assembler/GlobalAssembler';
+import { Truss2DSolver } from './solver/Truss2DSolver';
+import { Beam2DSolver } from './solver/Beam2DSolver';
+import { MemberCheckerPRO } from './checks/MemberChecker';
+import { HouseStructuralViewModel } from '@/lib/steel/structuralDTO';
+import { Reaction, MemberResult } from './analysis/AnalysisResult';
+import { MemberCheckSummary } from './checks/types';
 
 export interface StructuralMemberProps {
   name: string;
@@ -33,6 +40,9 @@ export interface JunctionData {
 }
 
 export class StructuralEngine {
+  // Feature flag técnico:
+  public static STEEL_CORE_VERSION: 'legacy' | 'fem_v1' = 'fem_v1';
+
   private static readonly STEEL_MODULUS = 203000; // MPa (N/mm2)
   private static readonly STEEL_YIELD = 230; // MPa
   
@@ -46,6 +56,172 @@ export class StructuralEngine {
   public static readonly CORNER_FUSION_THRESHOLD = 200; 
   private static readonly UNBRACED_SHEAR_CAPACITY_KN_M = 1.5; 
 
+  /**
+   * ORQUESTADOR PRINCIPAL DEL NUEVO FEM CORE (PHASE 3)
+   * Devuelve un DTO estable puro de renderizado.
+   */
+  public static getStructuralViewModel(config: SteelHouseConfig): HouseStructuralViewModel | null {
+      if (this.STEEL_CORE_VERSION !== 'fem_v1') return null;
+
+      const warnings: string[] = [];
+      const reactions: Reaction[] = [];
+      const checks: MemberCheckSummary[] = [];
+
+      try {
+          // 1. Ensamblado Numérico Global (Matemática pura sin GUI)
+          const model = GlobalAssembler.assembleGlobalModel(config);
+          
+          // 2. Ejecutar Solvers y Almacenar Internal Forces
+          const memberForceResults: Record<string, MemberResult> = {};
+          
+          // Filtrar miembros para solver de cercha (TRUSS_2D)
+          const trussMembers = Object.values(model.members).filter(m => m.analysisModel === 'TRUSS_2D');
+          if (trussMembers.length > 0) {
+              const trussSolver = new Truss2DSolver();
+              // Identificar apoyos (heurística baseline): Usaremos los extremos de la cercha.
+              // Asumimos que los miembros inferiores o el primer/último miembro nos dan los extremos.
+              const startNodes = new Set(trussMembers.map(m => m.startNodeId));
+              const endNodes = new Set(trussMembers.map(m => m.endNodeId));
+              // Nodos que solo aparecen como start o end (extremos)
+              const extNodes = Object.keys(model.nodes).filter(nid => 
+                  (startNodes.has(nid) && !endNodes.has(nid)) || 
+                  (!startNodes.has(nid) && endNodes.has(nid))
+              );
+              const trussSupports = extNodes.length >= 2 ? extNodes : [trussMembers[0].startNodeId, trussMembers[trussMembers.length-1].endNodeId];
+
+              const tRes = trussSolver.solveTruss(trussMembers, Object.values(model.nodes), model.loads, trussSupports);
+              
+              reactions.push(...tRes.reactions);
+              warnings.push(...tRes.warnings);
+              if (tRes.error) warnings.push(`Truss Solver Error: ${tRes.error}`);
+              
+              Object.assign(memberForceResults, tRes.memberResults);
+
+              // INYECTAR REACCIONES DE CERCHA COMO CARGAS HACIA ABAJO PARA EL RESTO DEL DOMINIO
+              tRes.reactions.forEach((r, idx) => {
+                   if (Math.abs(r.rY_N) > 0.1 || Math.abs(r.rX_N) > 0.1) {
+                       model.loads.push({
+                           id: `L_REAC_${idx}`,
+                           type: 'POINT',
+                           loadCase: 'L',
+                           source: 'reaction',
+                           nodeId: r.nodeId,
+                           fX: -r.rX_N, // Acción es opuesta a reacción
+                           fY: -r.rY_N,
+                           fZ: -r.rZ_N
+                       });
+                   }
+              });
+          }
+
+          // Vigas 2D (Dinteles)
+          const beamMembers = Object.values(model.members).filter(m => m.analysisModel === 'BEAM_2D');
+          beamMembers.forEach(beam => {
+              const bSolver = new Beam2DSolver();
+              // Recolectar cargas activas sobre este dintel
+              // Por ahora asumimos Loads que caigan sobre el dintel:
+              const bLoads = model.loads.filter(l => 
+                  l.nodeId && model.nodes[l.nodeId] &&
+                  // Chequear si el nodo l cae DENTRO del bounding box 3D del dintel
+                  (model.nodes[l.nodeId].x >= Math.min(model.nodes[beam.startNodeId].x, model.nodes[beam.endNodeId].x) - 1.0) && 
+                  (model.nodes[l.nodeId].x <= Math.max(model.nodes[beam.startNodeId].x, model.nodes[beam.endNodeId].x) + 1.0) &&
+                  (model.nodes[l.nodeId].z >= Math.min(model.nodes[beam.startNodeId].z, model.nodes[beam.endNodeId].z) - 1.0) &&
+                  (model.nodes[l.nodeId].z <= Math.max(model.nodes[beam.startNodeId].z, model.nodes[beam.endNodeId].z) + 1.0)
+              );
+              
+              try {
+                  const bRes = bSolver.solveSimplySupportedBeam(beam, model.nodes, bLoads);
+                  memberForceResults[beam.id] = bRes.result;
+                  reactions.push(...bRes.reactions);
+              } catch(e: any) {
+                  warnings.push(`Beam Solver Error: ${e.message}`);
+              }
+          });
+
+          // INYECTAR REACCIONES DE VIGA
+          reactions.forEach(r => {
+               if (r.rY_N !== 0 && !model.loads.find(l => l.nodeId === r.nodeId && l.source === 'beam_reaction')) {
+                   model.loads.push({
+                        id: `L_BREAC_${r.nodeId}`, type: 'POINT', loadCase: 'L', source: 'beam_reaction',
+                        nodeId: r.nodeId, fX: 0, fY: -r.rY_N, fZ: 0 // Invertir reacción
+                   });
+               }
+          });
+
+          // Columnas 2D (Studs, Kings, Jacks) - Simulación 1D de Descenso de Cargas y Viento Simple
+          const colMembers = Object.values(model.members).filter(m => m.analysisModel === 'FRAME_2D' || ['stud', 'king', 'jack'].includes(m.memberType));
+          colMembers.forEach(col => {
+              const n1 = model.nodes[col.startNodeId];
+              const n2 = model.nodes[col.endNodeId];
+              const L_m = Math.sqrt(Math.pow(n2.x - n1.x, 2) + Math.pow(n2.y - n1.y, 2)) / 1000;
+              
+              let axialN = 0;
+              model.loads.forEach(l => {
+                  if (!l.nodeId || l.fY === undefined) return;
+                  const ln = model.nodes[l.nodeId];
+                  // Si la carga cae físicamente "encima" del stud (mismo X y Z cruzando)
+                  if (ln && Math.abs(ln.x - n1.x) < 50 && Math.abs(ln.z - n1.z) < 50) {
+                      axialN += l.fY; // Negativo es compresión
+                  }
+              });
+
+              let momentZ_Nm = 0;
+              if (config.loads.windKpa > 0) {
+                  // Momento simplificado wL^2 / 8 (viga simplemente apoyada ante viento)
+                  const spacingM = 0.4; // 400mm espaciamiento default
+                  const w_N_m = (config.loads.windKpa * 1000) * spacingM;
+                  momentZ_Nm = (w_N_m * Math.pow(L_m, 2)) / 8;
+              }
+
+              memberForceResults[col.id] = {
+                  memberId: col.id,
+                  forces: { axialN, shearY_N: 0, momentZ_Nm },
+                  utilization: 0, status: 'SAFE'
+              };
+          });
+
+          // 3. Auditoría por Miembro (MemberChecker PRO)
+          const dtoMembers: Record<string, any> = {};
+          
+          Object.values(model.members).forEach(mem => {
+              const fResult = memberForceResults[mem.id] || { 
+                  memberId: mem.id, forces: { axialN: 0, shearY_N: 0, momentZ_Nm: 0 }, utilization: 0, status: 'SAFE' 
+              };
+
+              const checkSummary = MemberCheckerPRO.checkMember(mem, fResult, model.nodes);
+              checks.push(checkSummary as never);
+
+              dtoMembers[mem.id] = {
+                  id: mem.id,
+                  memberType: mem.memberType,
+                  profileId: mem.profileId,
+                  startNodeId: mem.startNodeId,
+                  endNodeId: mem.endNodeId,
+                  status: checkSummary.controllingResult.status,
+                  utilization: checkSummary.controllingResult.utilization,
+                  forces: checkSummary.controllingResult.demand,
+                  governingEquation: checkSummary.controllingResult.governingEquation,
+                  message: checkSummary.controllingResult.message
+              };
+          });
+
+          return {
+              nodes: model.nodes,
+              members: dtoMembers,
+              reactions,
+              checks,
+              warnings,
+              solverInfo: {
+                  coreVersion: this.STEEL_CORE_VERSION,
+                  stable: true
+              }
+          };
+
+      } catch (e: any) {
+          warnings.push(`Falló el ensamblado Global FEM: ${e.message}`);
+          return { nodes: {}, members: {}, reactions: [], checks: [] as MemberCheckSummary[], warnings, solverInfo: { coreVersion: this.STEEL_CORE_VERSION, stable: false } };
+      }
+  }
 
   /**
    * 1. CÁLCULO DE DEFLEXIÓN (FLECHA)

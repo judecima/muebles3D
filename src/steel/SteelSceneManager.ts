@@ -260,6 +260,13 @@ export class SteelSceneManager {
     // Escala Humana (Referencia)
     this.renderHumanScale();
 
+    // =============== DUMB RENDERER DTO (PHASE 3 FEM CORE) ===============
+    if (structuralResult?.structuralViewModel) {
+        this.renderFEMDTO(structuralResult.structuralViewModel);
+        return; // Omitir todo motor visual legacy!
+    }
+    // ====================================================================
+
     config.walls.forEach(wall => {
       const processed = structuralResult?.processedWalls?.find((pw: any) => pw.id === wall.id);
       const wallGroup = new THREE.Group();
@@ -632,6 +639,107 @@ export class SteelSceneManager {
         }
       });
     });
+  }
+
+  private generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // =========================================================
+  // DUMB RENDERER RECEPTOR: DTO a Instanced / Mesh Visual
+  // =========================================================
+  private addFEMAlert(status: string, message: string, pos: THREE.Vector3, data: any) {
+    const el = document.createElement('div');
+    el.className = `absolute px-2 py-1 rounded text-[10px] font-bold text-white shadow-xl border border-white/30 backdrop-blur-sm pointer-events-auto transition-transform hover:scale-110 ${status === 'FAIL' ? 'bg-red-600' : 'bg-amber-500'}`;
+    
+    // El render no decide; MUESTRA lo que el DTO estructuró
+    const justifyHtml = data?.justification ? `<div class="mt-1 text-[7px] text-cyan-200 opacity-80">⚖️ Gobierna: ${data.justification}</div>` : '';
+    const utilHtml = data?.utilization ? `<div class="mt-1 text-[7px] text-yellow-200 opacity-80">🔥 Utilización: ${(data.utilization * 100).toFixed(1)}%</div>` : '';
+
+    el.innerHTML = `
+      <div class="flex items-center gap-1 border-b border-white/20 mb-1 pb-1">
+        <span>${status === 'FAIL' ? '🚫' : '⚠️'}</span>
+        <span class="uppercase">${status}</span>
+      </div>
+      <div>${message}</div>
+      ${utilHtml}
+      ${justifyHtml}
+    `;
+
+    // Hack para tooltips funcionales on click/hover básicos
+    el.title = "Dumb Renderer Info";
+    
+    this.alertsContainer.appendChild(el);
+    this.alertElements.push({ el, pos });
+  }
+
+  private renderFEMDTO(dto: any) {
+    if (!dto.members || !dto.nodes) return;
+    
+    const materialDB: Record<string, THREE.MeshPhysicalMaterial> = {
+      'SAFE': new THREE.MeshPhysicalMaterial({ color: this.colors.status_ok, metalness: 0.6, roughness: 0.4 }),
+      'WARNING': new THREE.MeshPhysicalMaterial({ color: this.colors.status_warning, metalness: 0.6, roughness: 0.4 }),
+      'FAIL': new THREE.MeshPhysicalMaterial({ color: this.colors.status_error, metalness: 0.6, roughness: 0.4 }),
+      'DEFAULT': new THREE.MeshPhysicalMaterial({ color: this.colors.steel, metalness: 0.8, roughness: 0.2 }),
+    };
+
+    const geometry = new THREE.CylinderGeometry(20, 20, 1, 8); // 40mm grosor base
+    // Pivot en el inicio en lugar del centro, para matchear StartNode a EndNode
+    geometry.translate(0, 0.5, 0); 
+    geometry.rotateX(Math.PI / 2); // Orientar sobre Z local
+
+    Object.values(dto.members).forEach((member: any) => {
+        const n1 = dto.nodes[member.startNodeId];
+        const n2 = dto.nodes[member.endNodeId];
+        if (!n1 || !n2) return;
+
+        const start = new THREE.Vector3(n1.x, n1.y, n1.z);
+        const end = new THREE.Vector3(n2.x, n2.y, n2.z);
+        const distance = start.distanceTo(end);
+
+        if (distance === 0) return;
+
+        // Selección de color según Status del DTO (Sin pensar!)
+        const statusKey = member.status || 'DEFAULT';
+        const material = materialDB[statusKey] || materialDB['DEFAULT'];
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(start);
+        mesh.lookAt(end);
+        mesh.scale.set(1, 1, distance);
+
+        mesh.userData = {
+          isWall: true,
+          isMember: true,
+          memberId: member.id,
+          memberType: member.memberType,
+          profileId: member.profileId,
+          utilization: member.utilization,
+          status: member.status,
+          forces: member.forces,
+          message: member.message,
+          governingEquation: member.governingEquation
+        };
+
+        this.houseGroup.add(mesh);
+
+        // Disparar alertas estructurales calculadas backend
+        if (statusKey === 'WARNING' || statusKey === 'FAIL') {
+            const midPoint = new THREE.Vector3().lerpVectors(start, end, 0.5);
+            this.addFEMAlert(statusKey, member.message || 'Alerta Estructural', midPoint, {
+                justification: member.governingEquation,
+                utilization: member.utilization
+            });
+        }
+    });
+    
+    const box = new THREE.Box3().setFromObject(this.houseGroup);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    this.controls.target.copy(center);
   }
 
   private renderProcessedInternalWall(iw: InternalWall, processed: any, group: THREE.Group, config: SteelHouseConfig) {

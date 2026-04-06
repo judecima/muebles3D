@@ -112,7 +112,13 @@ export interface SteelHouseConfig {
     coveringWeightKpa?: number;
   };
   foundation?: FoundationConfig;
-  prices: PriceConfig;
+  prices?: PriceConfig;
+  profilePreferences?: {
+    studs?: string;
+    tracks?: string;
+    headers?: string;
+    trusses?: string;
+  };
   loads: {
     roofDeadKpa: number;
     roofLiveKpa: number;

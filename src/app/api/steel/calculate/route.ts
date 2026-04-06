@@ -45,6 +45,12 @@ export async function POST(req: Request) {
     // 4. Cimentación (Nueva Integración)
     const foundation = FoundationEngine.calculateFoundation(config, { processedWalls });
 
+    // 5. Orquestador Facade (Phase 3 FEM_V1)
+    let structuralViewModel = null;
+    if (StructuralEngine.STEEL_CORE_VERSION === 'fem_v1') {
+       structuralViewModel = StructuralEngine.getStructuralViewModel(config);
+    }
+
     return NextResponse.json({
       alerts,
       estimate,
@@ -52,7 +58,8 @@ export async function POST(req: Request) {
       processedInternalWalls,
       lateralStability,
       processedRoof,
-      foundation
+      foundation,
+      structuralViewModel
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
