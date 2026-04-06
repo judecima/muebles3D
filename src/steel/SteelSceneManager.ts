@@ -316,6 +316,10 @@ export class SteelSceneManager {
       this.createOpeningTriggers(iw.id, iw.length, iw.height, iw.rotation, iwGroup.position.x, iwGroup.position.z, iw.openings || [], true, processed?.headers || [], 70);
     });
 
+    if (config.roof?.enabled && structuralResult?.processedRoof) {
+      this.renderRoof(structuralResult.processedRoof, config);
+    }
+
     const floorGeom = new THREE.PlaneGeometry(40000, 40000);
     const floorMat = new THREE.MeshStandardMaterial({ color: this.colors.floor });
     this.floorMesh = new THREE.Mesh(floorGeom, floorMat);
@@ -323,6 +327,95 @@ export class SteelSceneManager {
     this.floorMesh.position.y = -5;
     this.floorMesh.receiveShadow = true;
     this.houseGroup.add(this.floorMesh);
+  }
+
+  private renderRoof(trusses: any[], config: SteelHouseConfig) {
+    const roofGroup = new THREE.Group();
+    // Centramos el techo compensando que la casa se grafica en torno a X=0, Z=0
+    const eaveLength = config.roof?.eaveLength || 0;
+    roofGroup.position.set(-config.width / 2 - eaveLength, config.globalWallHeight, -config.length / 2);
+    
+    // Altura global de todos los muros base
+    const baseElevation = 0; 
+    
+    const panelGapZ = (config.explosionFactor || 0) * 800; // Si hay explosión, separamos las cerchas en Z
+    const panelGapY = (config.explosionFactor || 0) * 400; // Y las levantamos un poco
+
+    trusses.forEach((truss, index) => {
+        const trussGroup = new THREE.Group();
+        trussGroup.position.set(0, panelGapY, truss.z + (index * panelGapZ));
+        roofGroup.add(trussGroup);
+
+        if (config.layers.steelProfiles) {
+            truss.elements.forEach((el: any) => {
+                const len = Math.hypot(el.xEnd - el.xStart, el.yEnd - el.yStart);
+                const angle = Math.atan2(el.yEnd - el.yStart, el.xEnd - el.xStart);
+                
+                let color = this.colors.steel;
+                if (el.type === 'top_chord') color = 0x3b82f6; // Blue
+                if (el.type === 'bottom_chord') color = 0x8b5cf6; // Purple
+                if (el.type === 'web') color = 0x10b981; // Emerald
+
+                // rotation Z para inclinación
+                const mesh = this.createProfile(len, el.xStart, el.yStart, 0, el.profile, color);
+                
+                // createProfile dibuja un perfil acostado a lo largo del X. 
+                // Por lo tanto, necesito compensar el ángulo internamente en la malla o envoltorio.
+                // Como createProfile no retorna un Group que gira limpio, vamos a envolverlo:
+                const elementWrapper = new THREE.Group();
+                elementWrapper.position.set(el.xStart, el.yStart, 0);
+                elementWrapper.rotation.z = angle;
+                
+                // Dibujamos desde 0 localmente
+                const profileGeometry = this.createProfile(len, 0, 0, 0, el.profile, color);
+                elementWrapper.add(profileGeometry);
+                
+                trussGroup.add(elementWrapper);
+            });
+        }
+
+        // --- CUBIERTA OSB (Exterior Panels) ---
+        if (config.layers.exteriorPanels && index < trusses.length - 1) {
+            const spanX = truss.span;
+            const nextTrussBaseZ = trusses[index+1].z;
+            const distZ = nextTrussBaseZ - truss.z;
+            
+            const createRoofPlane = (x1: number, y1: number, x2: number, y2: number) => {
+                const len = Math.hypot(x2 - x1, y2 - y1);
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                
+                const geom = new THREE.PlaneGeometry(len, distZ);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: this.colors.panel_ext, 
+                    roughness: 0.9, 
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(geom, mat);
+                
+                // Rotar para inclinar y orientar
+                mesh.rotation.x = -Math.PI / 2;
+                
+                const wrap = new THREE.Group();
+                wrap.position.set(x1 + (x2-x1)/2, y1 + (y2-y1)/2, distZ/2);
+                wrap.rotation.z = angle;
+                wrap.add(mesh);
+                return wrap;
+            };
+
+            if (config.roof?.type === 'two_slope') {
+                const ridgeX = spanX / 2;
+                const ridgeY = truss.height;
+                trussGroup.add(createRoofPlane(0, 0, ridgeX, ridgeY));
+                trussGroup.add(createRoofPlane(ridgeX, ridgeY, spanX, 0));
+            } else if (config.roof?.type === 'one_slope') {
+                trussGroup.add(createRoofPlane(0, 0, spanX, truss.height));
+            } else if (config.roof?.type === 'flat') {
+                trussGroup.add(createRoofPlane(0, truss.height, spanX, truss.height));
+            }
+        }
+    });
+
+    this.houseGroup.add(roofGroup);
   }
 
   private renderProcessedStructure(wall: SteelWall, processed: any, group: THREE.Group, config: SteelHouseConfig) {
@@ -931,11 +1024,30 @@ export class SteelSceneManager {
       const calculatedVal = (headerData.analysis.f_max ?? headerData.analysis.deflectionMm) / 10;
       const limitVal = (headerData.analysis.limit ?? headerData.analysis.maxAllowableDeflection) / 10;
       
-      if (headerData?.analysis && (!headerData.analysis.isSafe || calculatedVal > (limitVal + 0.01))) {
-        this.addStructuralAlert('FAIL', `Dintel: Flecha o Aplastamiento fuera de límite`, pos, {
-            calculated: calculatedVal,
-            limit: limitVal,
-            unit: 'cm',
+      const isSafe = headerData?.analysis?.isSafe;
+      
+      if (headerData?.analysis && (!isSafe || calculatedVal > (limitVal + 0.01))) {
+        const cripplingFail = headerData.analysis.webCrippling && !headerData.analysis.webCrippling.isSafe;
+        const defFail = calculatedVal > (limitVal + 0.01);
+        
+        let title = "Dintel: Falla Estructural Crítica";
+        let calcVal = calculatedVal;
+        let limVal = limitVal;
+        let pUnit = 'cm';
+
+        if (defFail) {
+            title = "Dintel: Deformación (Flecha) Excesiva";
+        } else if (cripplingFail) {
+            title = "Dintel: Aplastamiento de Apoyos (Crippling)";
+            calcVal = Math.round(headerData.analysis.webCrippling.ratio * 100) / 100;
+            limVal = 1.0;
+            pUnit = 'Ratio';
+        }
+
+        this.addStructuralAlert('FAIL', title, pos, {
+            calculated: calcVal,
+            limit: limVal,
+            unit: pUnit,
             recommendation: headerData.analysis.recommendation,
             justification: headerData.analysis.justification
         });

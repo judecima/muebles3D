@@ -39,7 +39,10 @@ export async function POST(req: Request) {
 
     const lateralStability = StructuralEngine.calculateLateralStability(config);
     
-    // 3. Cimentación (Nueva Integración)
+    // 3. Techos y Cerchas
+    const processedRoof = StructuralEngine.calculateRoofTrusses(config);
+
+    // 4. Cimentación (Nueva Integración)
     const foundation = FoundationEngine.calculateFoundation(config, { processedWalls });
 
     return NextResponse.json({
@@ -48,6 +51,7 @@ export async function POST(req: Request) {
       processedWalls,
       processedInternalWalls,
       lateralStability,
+      processedRoof,
       foundation
     });
   } catch (error: any) {

@@ -16,7 +16,8 @@ import {
   Camera,
   AlertTriangle,
   CheckCircle2,
-  Cpu
+  Cpu,
+  Box
 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
@@ -312,6 +313,78 @@ export const SteelControlPanel = ({
                   </div>
                 ))}
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="roof" className="border-b px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2">
+                <Box className="w-4 h-4 text-purple-600" />
+                <span className="text-xs font-black uppercase tracking-tighter">Techos y Cerchas</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="flex items-center justify-between p-2 bg-slate-100 rounded-lg">
+                <Label className="text-[10px] font-black uppercase">Activar Techo (Cerchas)</Label>
+                <Switch 
+                  checked={config.roof?.enabled || false}
+                  onCheckedChange={(val) => onConfigChange({ ...config, roof: { ...config.roof!, enabled: val } })}
+                />
+              </div>
+              
+              {config.roof?.enabled && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[9px] font-black uppercase text-slate-500">Tipo de Cubierta</Label>
+                    <Select 
+                      value={config.roof.type} 
+                      onValueChange={(val) => onConfigChange({ ...config, roof: { ...config.roof!, type: val as any } })}>
+                      <SelectTrigger className="h-8 text-[10px] font-bold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="one_slope">A Un Agua</SelectItem>
+                        <SelectItem value="two_slope">A Dos Aguas (Gable)</SelectItem>
+                        <SelectItem value="flat">Plano / Azotea</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[8px] font-bold uppercase text-slate-400">Pendiente (°)</Label>
+                      <Input 
+                        type="number" 
+                        value={config.roof.slope} 
+                        onChange={(e) => onConfigChange({...config, roof: {...config.roof!, slope: parseFloat(e.target.value) || 0}})} 
+                        className="h-7 text-[10px] font-bold" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[8px] font-bold uppercase text-slate-400">Separación Cerchas</Label>
+                      <Select 
+                        value={config.roof.trussSpacing?.toString()} 
+                        onValueChange={(val) => onConfigChange({ ...config, roof: { ...config.roof!, trussSpacing: parseInt(val) } })}>
+                        <SelectTrigger className="h-7 text-[10px] font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="400">400 mm</SelectItem>
+                          <SelectItem value="600">600 mm</SelectItem>
+                          <SelectItem value="1200">1200 mm</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1 col-span-2">
+                      <Label className="text-[8px] font-bold uppercase text-slate-400">Alero Voladizo (mm)</Label>
+                      <Input 
+                        type="number" 
+                        value={config.roof.eaveLength || 0} 
+                        onChange={(e) => onConfigChange({...config, roof: {...config.roof!, eaveLength: parseInt(e.target.value) || 0}})} 
+                        className="h-7 text-[10px] font-bold" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
 

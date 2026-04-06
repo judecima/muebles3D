@@ -812,4 +812,99 @@ export class StructuralEngine {
 
     return alerts;
   }
+
+  public static calculateRoofTrusses(config: SteelHouseConfig): any[] {
+    if (!config.roof?.enabled) return [];
+    
+    const trusses: any[] = [];
+    const trussSpacing = config.roof.trussSpacing || 600;
+    const eaveLength = config.roof.eaveLength || 0;
+    const slopeRad = (config.roof.slope || 15) * (Math.PI / 180);
+    
+    // Asumimos que las cerchas cruzan el "ancho" (eje X) y se distribuyen en el "largo" (eje Z)
+    const span = config.width + (eaveLength * 2); 
+    const numTrusses = Math.ceil(config.length / trussSpacing) + 1;
+    const actualSpacing = config.length / (numTrusses - 1);
+
+    for (let i = 0; i < numTrusses; i++) {
+        const zPos = i * actualSpacing;
+        const elements: any[] = [];
+        let height = 0;
+
+        if (config.roof.type === 'two_slope') {
+            height = (span / 2) * Math.tan(slopeRad);
+            // Cordón Inferior (Bottom Chord)
+            elements.push({ id: `tc_${i}_b1`, type: 'bottom_chord', xStart: 0, yStart: 0, xEnd: span, yEnd: 0, profile: 'PGU' });
+            // Cordon Superior Izquierdo (Top Chord Left)
+            elements.push({ id: `tc_${i}_t1`, type: 'top_chord', xStart: 0, yStart: 0, xEnd: span/2, yEnd: height, profile: 'PGU' });
+            // Cordon Superior Derecho (Top Chord Right)
+            elements.push({ id: `tc_${i}_t2`, type: 'top_chord', xStart: span/2, yStart: height, xEnd: span, yEnd: 0, profile: 'PGU' });
+            
+            // Montantes y Diagonales (Howe Truss Simplificado)
+            const webNodes = 3; // Nodos por lado
+            for(let j=1; j<webNodes; j++) {
+                const stepX = (span/2) * (j/webNodes);
+                const stepY = stepX * Math.tan(slopeRad);
+                // Verticales
+                elements.push({ id: `tc_${i}_vL_${j}`, type: 'web', xStart: stepX, yStart: 0, xEnd: stepX, yEnd: stepY, profile: 'PGC' });
+                elements.push({ id: `tc_${i}_vR_${j}`, type: 'web', xStart: span - stepX, yStart: 0, xEnd: span - stepX, yEnd: stepY, profile: 'PGC' });
+                // Diagonales (del centro hacia abajo)
+                if (j === 1) {
+                   elements.push({ id: `tc_${i}_dL_${j}`, type: 'web', xStart: span/2, yStart: height, xEnd: stepX, yEnd: 0, profile: 'PGC' });
+                   elements.push({ id: `tc_${i}_dR_${j}`, type: 'web', xStart: span/2, yStart: height, xEnd: span - stepX, yEnd: 0, profile: 'PGC' });
+                }
+            }
+            // Montante Rey (King Post)
+            elements.push({ id: `tc_${i}_king`, type: 'web', xStart: span/2, yStart: 0, xEnd: span/2, yEnd: height, profile: 'PGC' });
+        } 
+        else if (config.roof.type === 'one_slope') {
+            height = span * Math.tan(slopeRad);
+            elements.push({ id: `tc_${i}_b1`, type: 'bottom_chord', xStart: 0, yStart: 0, xEnd: span, yEnd: 0, profile: 'PGU' });
+            elements.push({ id: `tc_${i}_t1`, type: 'top_chord', xStart: 0, yStart: 0, xEnd: span, yEnd: height, profile: 'PGU' });
+            
+            const webNodes = 5;
+            for(let j=1; j<webNodes; j++) {
+                const stepX = span * (j/webNodes);
+                const stepY = stepX * Math.tan(slopeRad);
+                elements.push({ id: `tc_${i}_v_${j}`, type: 'web', xStart: stepX, yStart: 0, xEnd: stepX, yEnd: stepY, profile: 'PGC' });
+                if (j < webNodes - 1) {
+                    const nextX = span * ((j+1)/webNodes);
+                    elements.push({ id: `tc_${i}_d_${j}`, type: 'web', xStart: stepX, yStart: 0, xEnd: nextX, yEnd: nextX * Math.tan(slopeRad), profile: 'PGC' });
+                }
+            }
+            elements.push({ id: `tc_${i}_v_end`, type: 'web', xStart: span, yStart: 0, xEnd: span, yEnd: height, profile: 'PGC' });
+        }
+        else if (config.roof.type === 'flat') {
+            height = 300; // 30cm espesor estandar
+            elements.push({ id: `tc_${i}_b1`, type: 'bottom_chord', xStart: 0, yStart: 0, xEnd: span, yEnd: 0, profile: 'PGU' });
+            elements.push({ id: `tc_${i}_t1`, type: 'top_chord', xStart: 0, yStart: height, xEnd: span, yEnd: height, profile: 'PGU' });
+            
+            const webNodes = Math.ceil(span / 600);
+            for(let j=1; j<webNodes; j++) {
+                const stepX = span * (j/webNodes);
+                // Montanes verticales
+                elements.push({ id: `tc_${i}_v_${j}`, type: 'web', xStart: stepX, yStart: 0, xEnd: stepX, yEnd: height, profile: 'PGC' });
+                // Cruz de San Andrés / Warren
+                if (j < webNodes - 1) {
+                   const nextX = span * ((j+1)/webNodes);
+                   elements.push({ id: `tc_${i}_d_${j}`, type: 'web', xStart: stepX, yStart: 0, xEnd: nextX, yEnd: height, profile: 'PGC' });
+                   if (j % 2 !== 0) {
+                      elements.push({ id: `tc_${i}_d2_${j}`, type: 'web', xStart: stepX, yStart: height, xEnd: nextX, yEnd: 0, profile: 'PGC' });
+                   }
+                }
+            }
+        }
+
+        trusses.push({
+            id: `truss_${i}`,
+            z: zPos,
+            span,
+            height,
+            elements
+        });
+    }
+
+    return trusses;
+  }
+
 }

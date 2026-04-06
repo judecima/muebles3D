@@ -104,8 +104,11 @@ export interface SteelHouseConfig {
   layers: LayerVisibility;
   structuralMode: boolean;
   roof?: {
+    enabled: boolean;
     type: 'flat' | 'one_slope' | 'two_slope';
     slope: number; // grados
+    trussSpacing: number; // mm
+    eaveLength: number; // mm
     coveringWeightKpa?: number;
   };
   foundation?: FoundationConfig;
@@ -123,7 +126,26 @@ export interface SteelHouseConfig {
   blueprintMode?: boolean;
 }
 
+export interface TrussElement {
+  id: string;
+  type: 'top_chord' | 'bottom_chord' | 'web';
+  xStart: number;
+  yStart: number;
+  xEnd: number;
+  yEnd: number;
+  profile: 'PGU' | 'PGC';
+}
+
+export interface SteelTruss {
+  id: string;
+  z: number;
+  span: number;
+  height: number;
+  elements: TrussElement[];
+}
+
 export interface StructuralAnalysisResult {
+  roofTrusses?: SteelTruss[];
   isSafe: boolean;
   stressRatio: number; // 0 a 1+
   f_max: number; // deflexión real cm

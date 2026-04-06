@@ -160,6 +160,28 @@ export function calculateSteelMaterials(config: SteelHouseConfig): MaterialEstim
     areaInteriorTotal += wallArea * 2;
   });
 
+  if (config.roof?.enabled) {
+    const trusses = StructuralEngine.calculateRoofTrusses(config);
+    trusses.forEach(truss => {
+      truss.elements.forEach((el: any) => {
+        const len = Math.hypot(el.xEnd - el.xStart, el.yEnd - el.yStart);
+        if (el.profile === 'PGU') pgu100Len += len;
+        else pgc100_090 += len;
+        totalConnections += 4;
+      });
+    });
+
+    let roofArea = 0;
+    const span = config.width + (config.roof.eaveLength || 0) * 2;
+    const slopeRad = (config.roof.slope || 15) * Math.PI / 180;
+    
+    if (config.roof.type === 'one_slope') roofArea = Math.hypot(span, span * Math.tan(slopeRad)) * config.length;
+    else if (config.roof.type === 'two_slope') roofArea = (Math.hypot(span / 2, (span / 2) * Math.tan(slopeRad)) * 2) * config.length;
+    else roofArea = span * config.length;
+
+    areaExteriorGross += roofArea / 1000000;
+  }
+
   pushIfPositive({ name: 'Perfiles PGC 100x0.90mm (6m)', category: 'perfileria', unit: 'un', quantity: Math.ceil((pgc100_090 / BAR_LEN) * WASTE_STEEL), description: 'Montantes estructurales' });
   pushIfPositive({ name: 'Perfiles PGC 100x1.25mm (6m)', category: 'perfileria', unit: 'un', quantity: Math.ceil((pgc100_125 / BAR_LEN) * WASTE_STEEL), description: 'Cordones de vigas reticuladas' });
   pushIfPositive({ name: 'Perfiles PGC 100x1.60mm (6m)', category: 'perfileria', unit: 'un', quantity: Math.ceil((pgc100_160 / BAR_LEN) * WASTE_STEEL), description: 'Cordones reforzados de truss' });
