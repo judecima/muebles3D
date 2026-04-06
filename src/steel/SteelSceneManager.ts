@@ -9,6 +9,7 @@ import { PlayerController } from '@/engine/player/PlayerController';
 import { ThirdPersonCamera } from '@/engine/player/ThirdPersonCamera';
 import { StructuralEngine } from '@/server/steel/structuralEngine';
 import { FoundationEngine } from '@/server/steel/foundationEngine';
+import { StructuralSceneAdapter, RenderMode } from './adapters/StructuralSceneAdapter';
 
 export class SteelSceneManager {
   private scene: THREE.Scene;
@@ -35,6 +36,9 @@ export class SteelSceneManager {
   private tpCamera: ThirdPersonCamera;
   private isWalkModeActive = false;
   private prevTime = performance.now();
+  private renderMode: RenderMode = 'presentation';
+  private lastConfig: SteelHouseConfig | null = null;
+  private lastStructuralResult: any = null;
 
   public onOpeningDoubleClick: ((wallId: string, opening: SteelOpening, isInternal?: boolean) => void) | null = null;
   public onWallDoubleClick: ((wallId: string, x: number, side: 'exterior' | 'interior') => void) | null = null;
@@ -244,6 +248,9 @@ export class SteelSceneManager {
   }
   
   public buildHouse(config: SteelHouseConfig, structuralResult: any) {
+    this.lastConfig = config;
+    this.lastStructuralResult = structuralResult;
+
     [this.houseGroup, this.openingsGroup, this.internalWallsGroup].forEach(group => {
       while (group.children.length > 0) {
         const child = group.children[0];
@@ -260,12 +267,10 @@ export class SteelSceneManager {
     // Escala Humana (Referencia)
     this.renderHumanScale();
 
-    // =============== DUMB RENDERER DTO (PHASE 3 FEM CORE) ===============
-    if (structuralResult?.structuralViewModel) {
-        this.renderFEMDTO(structuralResult.structuralViewModel);
-        return; // Omitir todo motor visual legacy!
-    }
-    // ====================================================================
+    // =============== HYBRID RENDERER INIT ===============
+    const hasFem = !!structuralResult?.structuralViewModel;
+    const dto = structuralResult?.structuralViewModel;
+    // ====================================================
 
     config.walls.forEach(wall => {
       const processed = structuralResult?.processedWalls?.find((pw: any) => pw.id === wall.id);
@@ -277,24 +282,35 @@ export class SteelSceneManager {
       const panelGap = (config.explosionFactor || 0) * 800; 
       const panelsToRender = processed?.panels || [{ xStart: 0, xEnd: wall.length, width: wall.length }];
 
-      if (!config.structuralMode) {
-        panelsToRender.forEach((p: any, index: number) => {
-          const visualPanelGroup = new THREE.Group();
-          visualPanelGroup.position.x = p.xStart + (index * panelGap);
-          wallGroup.add(visualPanelGroup);
-          
-          if (config.layers.exteriorPanels) visualPanelGroup.add(this.createPanelMesh(wall, p, 'exterior', config));
-          if (config.layers.interiorPanels) visualPanelGroup.add(this.createPanelMesh(wall, p, 'interior', config));
-        });
+      // 1. RENDER ARQUITECTÓNICO (Pieles y Openings) - Siempre visible si está habilitado
+      panelsToRender.forEach((p: any, index: number) => {
+        const visualPanelGroup = new THREE.Group();
+        visualPanelGroup.position.x = p.xStart + (index * panelGap);
+        wallGroup.add(visualPanelGroup);
+        
+        if (config.layers.exteriorPanels) visualPanelGroup.add(this.createPanelMesh(wall, p, 'exterior', config));
+        if (config.layers.interiorPanels) visualPanelGroup.add(this.createPanelMesh(wall, p, 'interior', config));
+      });
+      
+      // 2. RENDER ESTRUCTURAL (Overlay FEM o Proceso Legacy)
+      if (hasFem && dto) {
+          const sceneElements = StructuralSceneAdapter.transformWallToScene(
+              dto,
+              wall,
+              this.renderMode
+          );
+          wallGroup.add(sceneElements.members);
+          if (this.renderMode === 'structural_debug') {
+              wallGroup.add(sceneElements.nodes);
+          }
+      } else if (config.layers.steelProfiles && processed) {
+          this.renderProcessedStructure(wall, processed, wallGroup, config);
       }
       
       this.clearAlerts();
-      if (config.layers.steelProfiles && processed) {
-        this.renderProcessedStructure(wall, processed, wallGroup, config);
-        if (config.layers.structuralDiagrams && structuralResult.lateralStability) {
-          this.renderLoadPath(wall, processed, wallGroup, config, structuralResult);
-          this.renderWindVectors(wall, structuralResult.lateralStability, wallGroup, config);
-        }
+      if (config.layers.structuralDiagrams && structuralResult.lateralStability && processed) {
+        this.renderLoadPath(wall, processed, wallGroup, config, structuralResult);
+        this.renderWindVectors(wall, structuralResult.lateralStability, wallGroup, config);
       }
       if (!this.initialPositions.has(wall.id)) {
         this.initialPositions.set(wall.id, wallGroup.position.clone());
@@ -641,11 +657,18 @@ export class SteelSceneManager {
     });
   }
 
-  private generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+  private reCenterCamera() {
+    const box = new THREE.Box3().setFromObject(this.houseGroup);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    this.controls.target.copy(center);
+  }
+
+  public setRenderMode(mode: RenderMode) {
+    this.renderMode = mode;
+    if (this.lastConfig && this.lastStructuralResult) {
+        this.buildHouse(this.lastConfig, this.lastStructuralResult);
+    }
   }
 
   // =========================================================
@@ -848,15 +871,59 @@ export class SteelSceneManager {
     if (!config.structuralMode) {
       if (config.layers.interiorPanels) {
         const shape = new THREE.Shape();
-        shape.moveTo(0, 0); 
-        shape.lineTo(iw.length, 0); 
+        
+        // 1. Determinar puertas
+        const doors = (iw.openings || []).filter(op => op.type === 'door').sort((a, b) => a.position - b.position);
+
+        // 2. Contorno con mordiscos para puertas (evitando solapamientos en bordes)
+        const hStart = iw.height || 2600;
+        const hEnd = iw.height || 2600;
+        
+        const firstDoorAtStart = doors.length > 0 && doors[0].position <= 0.1;
+        const lastDoorAtEnd = doors.length > 0 && (doors[doors.length - 1].position + doors[doors.length - 1].width) >= (iw.length - 0.1);
+
+        if (firstDoorAtStart) {
+          shape.moveTo(0, doors[0].height);
+        } else {
+          shape.moveTo(0, 0);
+        }
+
+        let currX = 0;
+        doors.forEach((op, idx) => {
+          if (op.position > currX + 0.1) {
+            shape.lineTo(op.position, 0);
+          }
+          if (!(idx === 0 && firstDoorAtStart)) {
+            shape.lineTo(op.position, op.height);
+          }
+          shape.lineTo(op.position + op.width, op.height);
+          
+          const isLast = idx === doors.length - 1;
+          if (!(isLast && lastDoorAtEnd)) {
+            shape.lineTo(op.position + op.width, 0);
+          }
+          currX = op.position + op.width;
+        });
+
+        if (currX < iw.length - 0.1) {
+          shape.lineTo(iw.length, 0);
+        }
+
+        // 3. Contorno superior y cierre
         shape.lineTo(iw.length, hEnd); 
         shape.lineTo(0, hStart); 
-        shape.lineTo(0, 0);
         
-        (iw.openings || []).forEach(op => {
+        // El cierre final debe conectar con el punto inicial del shape
+        if (firstDoorAtStart) {
+          shape.lineTo(0, doors[0].height);
+        } else {
+          shape.lineTo(0, 0);
+        }
+
+        // 4. Ventanas como holes
+        (iw.openings || []).filter(op => op.type !== 'door').forEach(op => {
           const hole = new THREE.Path(); 
-          const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+          const sill = (op.sillHeight || 900);
           hole.moveTo(op.position, sill); 
           hole.lineTo(op.position + op.width, sill); 
           hole.lineTo(op.position + op.width, sill + op.height); 
@@ -1076,24 +1143,71 @@ export class SteelSceneManager {
     const hEnd = hStartOrig + (p.xEnd / wall.length) * (hEndOrig - hStartOrig);
     
     const shape = new THREE.Shape(); 
-    shape.moveTo(0, 0); 
-    shape.lineTo(p.width, 0); 
+    
+    // 1. Filtrar solo puertas que toquen la base (sill < 10)
+    const doors = (wall.openings || []).filter(op => {
+      const opGlobalLeft = op.position;
+      const opGlobalRight = op.position + op.width;
+      const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+      return opGlobalRight > p.xStart && opGlobalLeft < p.xEnd && sill < 10;
+    }).sort((a, b) => a.position - b.position);
+
+    // 2. Construir contorno 'mordido' (evitando solapamientos en bordes)
+    const firstDoorAtStart = doors.length > 0 && Math.max(0, doors[0].position - p.xStart) <= 0.1;
+    const lastDoorAtEnd = doors.length > 0 && Math.min(p.width, (doors[doors.length-1].position + doors[doors.length-1].width) - p.xStart) >= (p.width - 0.1);
+
+    if (firstDoorAtStart) {
+      shape.moveTo(0, doors[0].height);
+    } else {
+      shape.moveTo(0, 0);
+    }
+
+    let currX = 0;
+    doors.forEach((op, idx) => {
+      const localOpX = Math.max(0, op.position - p.xStart);
+      const localOpRight = Math.min(p.width, op.position + op.width - p.xStart);
+      
+      if (localOpX > currX + 0.1) {
+        shape.lineTo(localOpX, 0);
+      }
+      if (!(idx === 0 && firstDoorAtStart)) {
+        shape.lineTo(localOpX, op.height);
+      }
+      shape.lineTo(localOpRight, op.height);
+      
+      const isLast = idx === doors.length - 1;
+      if (!(isLast && lastDoorAtEnd)) {
+        shape.lineTo(localOpRight, 0);
+      }
+      currX = localOpRight;
+    });
+
+    if (currX < p.width - 0.1) {
+      shape.lineTo(p.width, 0);
+    }
+
+    // 3. Contorno superior y cierre lateral
     shape.lineTo(p.width, hEnd); 
     shape.lineTo(0, hStart); 
-    shape.lineTo(0, 0);
+    
+    if (firstDoorAtStart) {
+      shape.lineTo(0, doors[0].height);
+    } else {
+      shape.lineTo(0, 0);
+    }
 
+    // 4. Agregar ventanas como holes (solo si no son puertas base)
     (wall.openings || []).forEach(op => {
       const opGlobalLeft = op.position;
       const opGlobalRight = op.position + op.width;
-      
-      if (opGlobalRight > p.xStart && opGlobalLeft < p.xEnd) {
-        const localOpX = Math.max(0, opGlobalLeft - p.xStart);
-        const rightX = Math.min(p.width, opGlobalRight - p.xStart);
-        const opW = rightX - localOpX;
+      const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
+
+      if (opGlobalRight > p.xStart && opGlobalLeft < p.xEnd && sill >= 10) {
+        const localOpX = Math.max(0, op.position - p.xStart);
+        const opW = Math.min(p.width, op.position + op.width - p.xStart) - localOpX;
         
         if (opW > 0) {
             const hole = new THREE.Path(); 
-            const sill = op.type === 'door' ? 0 : (op.sillHeight || 900);
             hole.moveTo(localOpX, sill); 
             hole.lineTo(localOpX + opW, sill); 
             hole.lineTo(localOpX + opW, sill + op.height); 

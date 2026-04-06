@@ -2,6 +2,7 @@
 import { Node3D } from '../../server/steel/domain/model';
 import { Reaction } from '../../server/steel/analysis/AnalysisResult';
 import { MemberCheckSummary } from '../../server/steel/checks/types';
+import { PanelDrawing } from '../../server/steel/drawings/panelTypes';
 
 export interface DTOMember {
     id: string;
@@ -9,6 +10,7 @@ export interface DTOMember {
     profileId: string;
     startNodeId: string;
     endNodeId: string;
+    wallId?: string;
     status: 'SAFE' | 'WARNING' | 'FAIL';
     utilization?: number;
     forces?: {
@@ -30,4 +32,5 @@ export interface HouseStructuralViewModel {
         coreVersion: string;
         stable: boolean;
     };
+    panelDrawings?: PanelDrawing[];
 }

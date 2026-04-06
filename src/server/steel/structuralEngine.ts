@@ -10,6 +10,7 @@ import { MemberCheckerPRO } from './checks/MemberChecker';
 import { HouseStructuralViewModel } from '@/lib/steel/structuralDTO';
 import { Reaction, MemberResult } from './analysis/AnalysisResult';
 import { MemberCheckSummary } from './checks/types';
+import { PanelGenerator } from './drawings/PanelGenerator';
 
 export interface StructuralMemberProps {
   name: string;
@@ -197,6 +198,7 @@ export class StructuralEngine {
                   profileId: mem.profileId,
                   startNodeId: mem.startNodeId,
                   endNodeId: mem.endNodeId,
+                  wallId: mem.wallId, // Crucial para el generador de planos
                   status: checkSummary.controllingResult.status,
                   utilization: checkSummary.controllingResult.utilization,
                   forces: checkSummary.controllingResult.demand,
@@ -204,6 +206,12 @@ export class StructuralEngine {
                   message: checkSummary.controllingResult.message
               };
           });
+
+          // 4. GENERAR PLANOS DE PANELES (Novedad Fase 5)
+          const panelDrawings = PanelGenerator.generateAllPanels(
+              { nodes: model.nodes, members: dtoMembers as any },
+              config
+          );
 
           return {
               nodes: model.nodes,
@@ -214,7 +222,8 @@ export class StructuralEngine {
               solverInfo: {
                   coreVersion: this.STEEL_CORE_VERSION,
                   stable: true
-              }
+              },
+              panelDrawings
           };
 
       } catch (e: any) {
